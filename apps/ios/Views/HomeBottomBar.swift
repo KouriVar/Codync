@@ -7,19 +7,18 @@ struct HomeBottomBar: View {
     @Binding var searchText: String
     let openCamera: () -> Void
     let openPlugins: () -> Void
-    private let iconSize: CGFloat = 18
+    /// HIG touch target: 44pt circle, 24pt glyph (10pt of padding all round).
+    private let iconSize: CGFloat = 24
     private let iconLineWidth: CGFloat = 1.8
 
     var body: some View {
         GlassEffectContainer(spacing: 12) {
             HStack(spacing: 12) {
                 Button(action: openPlugins) {
-                    PluginGlyph(lineWidth: iconLineWidth)
-                    .stroke(style: StrokeStyle(lineWidth: iconLineWidth, lineCap: .round, lineJoin: .round))
-                    .foregroundStyle(Palette.text)
-                    .frame(width: iconSize, height: iconSize)
-                    .frame(width: 48, height: 48)
-                    .glassEffect(.regular.interactive(), in: Circle())
+                    RemixIcon("apps-2-line", size: iconSize)
+                        .foregroundStyle(Palette.text)
+                        .frame(width: 44, height: 44)
+                        .glassEffect(.regular.interactive(), in: Circle())
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("插件")
@@ -32,10 +31,9 @@ struct HomeBottomBar: View {
                     .accessibilityLabel("搜索聊天")
 
                 Button(action: openCamera) {
-                    RemixIcon("camera-fill")
-                        .font(.system(size: iconSize, weight: .semibold))
+                    RemixIcon("camera-fill", size: iconSize)
                         .foregroundStyle(Palette.text)
-                        .frame(width: 48, height: 48)
+                        .frame(width: 44, height: 44)
                         .glassEffect(.regular.interactive(), in: Circle())
                 }
                 .buttonStyle(.plain)
