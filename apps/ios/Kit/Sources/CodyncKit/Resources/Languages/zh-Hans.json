@@ -1511,5 +1511,20 @@
   "This computer isn't in an account: it uses a private relay": "这台电脑不在任何账户里：它用私人中继",
   "This computer isn't in your account": "这台电脑不在你的账户里",
   "This iPhone stops getting the account's notifications and keeps its computers, so signing back in needs no scan. To take it off them, use Start over in Settings instead.": "这台 iPhone 不再收到这个账户的通知，但会保留它的电脑，重新登录后不用再扫码。要把它从那些电脑上移除，请改用设置里的“重新开始”。",
-  "This phone stops getting the account's notifications and keeps its computers, so signing back in needs no scan. To take it off them, use Start over in Settings instead.": "这台手机不再收到这个账户的通知，但会保留它的电脑，重新登录后不用再扫码。要把它从那些电脑上移除，请改用设置里的“重新开始”。"
+  "This phone stops getting the account's notifications and keeps its computers, so signing back in needs no scan. To take it off them, use Start over in Settings instead.": "这台手机不再收到这个账户的通知，但会保留它的电脑，重新登录后不用再扫码。要把它从那些电脑上移除，请改用设置里的“重新开始”。",
+  "Reasoning effort": "推理强度",
+  "Low": "低",
+  "High": "高",
+  "Extra high": "超高",
+  "Max": "最高",
+  "None": "无",
+  "Local account": "本地账户",
+  "Delete {name}?": "删除「{name}」？",
+  "Share as template": "分享为模板",
+  "Copy ID": "复制 ID",
+  "Hide": "隐藏",
+  "Mark as unread": "标为未读",
+  "More": "更多",
+  "Unread": "未读",
+  "No messages yet": "还没有消息"
 }

@@ -1511,5 +1511,20 @@
   "This computer isn't in an account: it uses a private relay": "這臺電腦不在任何賬戶裡：它用私人中繼",
   "This computer isn't in your account": "這臺電腦不在你的賬戶裡",
   "This iPhone stops getting the account's notifications and keeps its computers, so signing back in needs no scan. To take it off them, use Start over in Settings instead.": "這臺 iPhone 不再收到這個賬戶的通知，但會保留它的電腦，重新登入後不用再掃碼。要把它從那些電腦上移除，請改用設定裡的「重新開始」。",
-  "This phone stops getting the account's notifications and keeps its computers, so signing back in needs no scan. To take it off them, use Start over in Settings instead.": "這支手機不再收到這個賬戶的通知，但會保留它的電腦，重新登入後不用再掃碼。要把它從那些電腦上移除，請改用設定裡的「重新開始」。"
+  "This phone stops getting the account's notifications and keeps its computers, so signing back in needs no scan. To take it off them, use Start over in Settings instead.": "這支手機不再收到這個賬戶的通知，但會保留它的電腦，重新登入後不用再掃碼。要把它從那些電腦上移除，請改用設定裡的「重新開始」。",
+  "Reasoning effort": "推理強度",
+  "Low": "低",
+  "High": "高",
+  "Extra high": "超高",
+  "Max": "最高",
+  "None": "無",
+  "Local account": "本機帳號",
+  "Delete {name}?": "刪除「{name}」？",
+  "Share as template": "分享為範本",
+  "Copy ID": "複製 ID",
+  "Hide": "隱藏",
+  "Mark as unread": "標為未讀",
+  "More": "更多",
+  "Unread": "未讀",
+  "No messages yet": "還沒有訊息"
 }

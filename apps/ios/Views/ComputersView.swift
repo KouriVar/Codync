@@ -12,14 +12,17 @@ struct ComputersView: View {
     @State private var confirmForget: Computer?
     @State private var confirmRevoke: CloudComputer?
     @State private var access: AccessTarget?
+    @State private var routeTarget: ConnectionTarget?
 
     var body: some View {
+        NavigationStack {
         // One card per computer, so each one's rows read as its own.
-        CardForm {
+        Form {
             ForEach(accounts.computers) { computer in
                 if let store = accounts.store(for: computer.id) {
-                    CardSection {
+                    Section {
                         ComputerRows(store: store, inAccount: cloudComputer(computer.id),
+                                     openConnection: { routeTarget = ConnectionTarget(store: store) },
                                      openScreen: { closeSheet { store.screenRequest = ScreenRequest() } },
                                      openMarketplace: { closeSheet { app.marketplace = store.computer.id } },
                                      ask: cloudComputer(computer.id).map { c in { access = AccessTarget(computer: c) } },
@@ -29,7 +32,7 @@ struct ComputersView: View {
                 }
             }
             ForEach(accountOnly) { computer in
-                CardSection {
+                Section {
                     if accounts.isOlderCopy(computer) {
                         OlderCopyRow(computer: computer)
                     } else {
@@ -40,7 +43,7 @@ struct ComputersView: View {
                 }
             }
             if !hiddenBots.isEmpty {
-                CardSection("Hidden bots") {
+                Section("已隐藏的 Bot") {
                     ForEach(hiddenBots) { item in
                         let store = item.store, bot = item.bot
                         HStack {
@@ -50,29 +53,46 @@ struct ComputersView: View {
                                 Text(store.hostName).font(.caption).foregroundStyle(Palette.tertiary)
                             }
                             Spacer()
-                            IconButton("Unhide", systemImage: "eye") {
+                            Button {
                                 withAnimation(Motion.layout) { store.setHidden(bot, false) }
-                            }
+                            } label: { Image(systemName: "eye") }
+                            .buttonStyle(.borderless)
                         }
                     }
                 }
             }
-            CardSection(footer: app.account.isSignedIn
-                        ? "Computers in your account need your OK on the computer before this iPhone can use them."
-                        : "Each bot runs on its own computer. Sign in to see the computers in your account.") {
+            Section {
                 Button {
                     addingComputer = true
                 } label: {
-                    Label(L10n.tr("Pair a computer"), systemImage: "qrcode.viewfinder")
-                        .foregroundStyle(Palette.text)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .contentShape(Rectangle())
+                    HStack {
+                        Text(L10n.tr("Pair a computer"))
+                        Spacer(minLength: 8)
+                        Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
+                    }
                 }
                 .buttonStyle(.plain)
+            } footer: {
+                Text(L10n.tr(app.account.isSignedIn
+                             ? "Computers in your account need your OK on the computer before this iPhone can use them."
+                             : "Each bot runs on its own computer. Sign in to see the computers in your account."))
             }
         }
-        .refreshable { await accounts.refreshCloud() }
-        .page("Computer management", icon: "gearshape")
+            .refreshable { await accounts.refreshCloud() }
+            .navigationTitle(L10n.tr("Computer management"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(L10n.tr("Close")) { dismissModal() }
+                }
+            }
+            .sheet(item: $routeTarget) { target in
+                ConnectionRouteSheet(store: target.store)
+                    .presentationDetents([.medium])
+                    .presentationDragIndicator(.visible)
+            }
+        }
+        .tint(.primary)
         .tracked(.screenViewed(.computers))
         .task { await accounts.refreshCloud() }
         .codyncSheet(isPresented: $addingComputer) {
@@ -145,6 +165,7 @@ struct ComputersView: View {
 private struct ComputerRows: View {
     let store: BotStore
     let inAccount: CloudComputer?
+    let openConnection: () -> Void
     let openScreen: () -> Void
     /// Agents, connectors and skills installed on this computer.
     let openMarketplace: () -> Void
@@ -157,20 +178,28 @@ private struct ComputerRows: View {
     @State private var voiceSettings = false
     @State private var networkSheet = false
 
+    /// A native list row: title on the left, chevron on the right (no leading icon).
+    private func linkRow(_ title: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack {
+                Text(title)
+                Spacer(minLength: 8)
+                Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
     var body: some View {
         summary
         if store.connection == .online {
-            Button(action: openMarketplace) { RowLabel("Extensions", systemImage: "square.grid.2x2", chevron: true) }
-                .buttonStyle(.plain)
-            Button { voiceSettings = true } label: { RowLabel("Voice chat", systemImage: "waveform", chevron: true) }
-                .buttonStyle(.plain)
+            linkRow(L10n.tr("Extensions"), action: openMarketplace)
+            linkRow(L10n.tr("Voice chat")) { voiceSettings = true }
             if store.screen != nil {
-                Button(action: openScreen) { RowLabel("Screen", systemImage: "display", chevron: true) }
-                    .buttonStyle(.plain)
+                linkRow(L10n.tr("Screen"), action: openScreen)
             }
             if showsNetwork {
-                Button { networkSheet = true } label: { RowLabel("Network", image: .codyncNetwork, chevron: true) }
-                    .buttonStyle(.plain)
+                linkRow(L10n.tr("Network")) { networkSheet = true }
             }
         }
         ComputerNotificationsRow(store: store)
@@ -180,7 +209,7 @@ private struct ComputerRows: View {
             CodyncVersionRow(store: store)
         }
         if accounts.isStale(store.computer.id), inAccount == nil {
-            Button(action: remove) { RowLabel("Remove", systemImage: "trash", tint: Palette.danger) }
+            Button(role: .destructive, action: remove) { Text(L10n.tr("Remove")) }
                 .buttonStyle(.plain)
         }
     }
@@ -243,27 +272,18 @@ private struct ComputerRows: View {
         }
     }
 
-    /// How this iPhone reaches the computer: the short name on the row, the whole route in the menu.
+    /// How this iPhone reaches the computer. Tapping opens a half-sheet of routes.
     private var connection: some View {
-        DropdownMenu {
-            ConnectionRoute.allCases.map { route in
-                MenuItem(RelayCopy.routeTitle(route, cloud: store.computer.cloud), icon: route.icon, selected: route == preference) {
-                    accounts.setRoute(store.computer.id, route)
-                }
-            }
-        } label: {
-            HStack(spacing: 12) {
-                Image(systemName: preference.icon).font(.system(size: 17)).frame(width: 26)
+        Button(action: openConnection) {
+            HStack {
                 Text(L10n.tr("Connection"))
                 Spacer(minLength: 8)
                 Text(L10n.tr(RelayCopy.routeShortTitle(preference, cloud: store.computer.cloud)))
-                    .foregroundStyle(Palette.secondary)
-                    .lineLimit(1)
-                Image(systemName: "chevron.up.chevron.down").font(.caption.weight(.semibold)).foregroundStyle(Palette.tertiary)
+                    .foregroundStyle(Palette.secondary).lineLimit(1)
+                Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
             }
-            .foregroundStyle(Palette.text)
-            .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
     }
 
     private var connectionDetail: some View {
@@ -294,7 +314,6 @@ private struct CodyncVersionRow: View {
     var body: some View {
         if let line = store.hostVersionLine(now: max(now, .now)) {
             HStack(spacing: 12) {
-                Image(systemName: "arrow.down.circle").font(.system(size: 17)).frame(width: 26)
                 VStack(alignment: .leading, spacing: 3) {
                     HStack(spacing: 8) {
                         Text(verbatim: "Codync")
@@ -434,9 +453,9 @@ private struct ComputerNotificationsRow: View {
         Group {
             if allowed == true {
                 Toggle(isOn: Binding(get: { store.computer.notifications ?? true }, set: { app.setNotifications(store.computer.id, $0) })) {
-                    RowLabel("Push notifications", systemImage: "bell")
+                    Text(L10n.tr("Push notifications"))
                 }
-                .toggleStyle(.codync)
+                .toggleStyle(.switch)
             } else {
                 Button {
                     if allowed == false {
@@ -448,7 +467,7 @@ private struct ComputerNotificationsRow: View {
                     }
                 } label: {
                     VStack(alignment: .leading, spacing: 4) {
-                        RowLabel("Push notifications", systemImage: "bell", chevron: true)
+                        Text(L10n.tr("Push notifications"))
                         Text(L10n.tr("Turn on notifications in Settings"))
                             .font(.footnote).foregroundStyle(Palette.secondary)
                     }
@@ -467,5 +486,52 @@ private struct ComputerNotificationsRow: View {
     private func refresh() async {
         allowed = await PushRegistrar.shared.isAllowed()
         checked = true
+    }
+}
+
+/// Identifies the computer whose connection route is being chosen.
+private struct ConnectionTarget: Identifiable {
+    let store: BotStore
+    var id: ObjectIdentifier { ObjectIdentifier(store) }
+}
+
+/// Half-sheet of the ways this iPhone can reach a computer; picking one saves it.
+private struct ConnectionRouteSheet: View {
+    let store: BotStore
+    @Environment(AccountStore.self) private var accounts
+    @Environment(\.dismiss) private var dismiss
+
+    private var preference: ConnectionRoute { store.computer.route ?? .automatic }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    ForEach(ConnectionRoute.allCases, id: \.self) { route in
+                        Button {
+                            accounts.setRoute(store.computer.id, route)
+                            dismiss()
+                        } label: {
+                            HStack {
+                                Text(L10n.tr(RelayCopy.routeTitle(route, cloud: store.computer.cloud)))
+                                Spacer()
+                                if route == preference {
+                                    Image(systemName: "checkmark").foregroundStyle(Palette.accent)
+                                }
+                            }
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+            .navigationTitle(L10n.tr("Connection"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(L10n.tr("Done")) { dismiss() }
+                }
+            }
+        }
+        .tint(.primary)
     }
 }

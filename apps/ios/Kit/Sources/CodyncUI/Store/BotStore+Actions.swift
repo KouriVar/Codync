@@ -195,6 +195,14 @@ extension BotStore {
         perform(replay: true) { _ = try await $0.updateBot(d) }
     }
 
+    /// The native profile switch shares the existing optimistic update and error handling.
+    func setNotifications(_ bot: Bot, _ on: Bool) {
+        var draft = BotDraft(bot)
+        draft.notify = on
+        bots[bot.id]?.notify = on
+        perform(replay: true) { _ = try await $0.updateBot(draft) }
+    }
+
     /// Whether the bot may see and use the computer's screen.
     public func setComputer(_ bot: Bot, _ computer: Bool) {
         var d = BotDraft(bot)

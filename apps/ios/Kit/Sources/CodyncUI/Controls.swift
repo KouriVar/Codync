@@ -449,10 +449,12 @@ public struct ValueRow<Value: View>: View {
 public struct SearchField: View {
     let prompt: String
     @Binding var text: String
+    private let opaqueBackground: Bool
 
-    public init(_ prompt: String = "Search", text: Binding<String>) {
+    public init(_ prompt: String = "Search", text: Binding<String>, opaqueBackground: Bool = true) {
         self.prompt = prompt
         _text = text
+        self.opaqueBackground = opaqueBackground
     }
 
     public var body: some View {
@@ -470,7 +472,7 @@ public struct SearchField: View {
         .font(.body)
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
-        .background(Palette.bubbleAgent, in: Capsule())
+        .background(opaqueBackground ? Palette.bubbleAgent : Color.clear, in: Capsule())
     }
 }
 

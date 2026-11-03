@@ -37,6 +37,7 @@ struct FallbackList: View {
     @Binding var draft: BotDraft
     /// The saved bot: the fallback it's on and the agents resting.
     let bot: Bot?
+    var nativeStyle = false
     @Environment(BotStore.self) private var model
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var adding = false
@@ -66,8 +67,13 @@ struct FallbackList: View {
         }
         .codyncSheet(isPresented: $adding) { AddFallbackSheet(choices: choices) { new in change { $0.append(new) } } }
         .codyncSheet(isPresented: $explaining) { FallbackInfoSheet() }
+        if nativeStyle {
+            Toggle("允许 Bot 修改备用列表", isOn: Binding(get: { draft.selfFallbacks ?? true }, set: { draft.selfFallbacks = $0 }))
+                .tint(.gray)
+        } else {
         SwitchRow("Let the bot change its fallbacks", detail: "It can set this list itself, for example when you ask it to.",
                   isOn: Binding(get: { draft.selfFallbacks ?? true }, set: { draft.selfFallbacks = $0 }))
+        }
     }
 
     private var header: some View {
@@ -142,37 +148,46 @@ struct AddFallbackSheet: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            ModalHeader("Add fallback") {
-                IconButton("Add", systemImage: "checkmark") {
-                    add(fallback)
-                    dismiss()
-                }
-                .disabled(fallback.backend.isEmpty)
-            }
-            CardForm {
-                CardSection {
+        NavigationStack {
+            Form {
+                Section {
                     AgentModelPicker(backend: fallback.backend, selection: $fallback.model, options: $fallback.modelOptions,
                                      agents: choices.map { ($0.id, model.agentLabel($0)) },
                                      onAgentChange: { fallback.backend = $0; fallback.model = nil; fallback.modelOptions = [:] })
                 }
             }
+            .navigationTitle(L10n.tr("Add fallback"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button(L10n.tr("Close")) { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(L10n.tr("Add")) { add(fallback); dismiss() }
+                        .disabled(fallback.backend.isEmpty)
+                }
+            }
         }
-        .background(Palette.background)
+        .tint(.primary)
     }
 }
 
 /// ⓘ beside Fallbacks: what they do, and what they cost.
 private struct FallbackInfoSheet: View {
+    @Environment(\.dismissModal) private var dismiss
     var body: some View {
-        VStack(spacing: 0) {
-            ModalHeader("Fallbacks")
-            CardForm {
+        NavigationStack {
+            ScrollView {
                 Text(L10n.tr("When this bot's agent runs out of usage, is rate limited, signed out or won't start, the next agent here carries on in the same chat, with the same memory and workspace. The bot goes back to its own agent when it recovers. A fallback that uses an API key costs money. To fall back between one agent's models, set that in the agent itself (Claude Code's fallbackModel)."))
-                    .foregroundStyle(Palette.secondary)
+                    .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(20)
+            }
+            .navigationTitle(L10n.tr("Fallbacks"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) { Button(L10n.tr("Close")) { dismiss() } }
             }
         }
-        .background(Palette.background)
+        .tint(.primary)
     }
 }

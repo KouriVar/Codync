@@ -3,16 +3,24 @@ import SwiftUI
 
 public struct BotRow: View {
     let bot: Bot
+    let manuallyUnread: Bool
     @Environment(BotStore.self) private var model
 
-    public init(bot: Bot) { self.bot = bot }
+    public init(bot: Bot, manuallyUnread: Bool = false) {
+        self.bot = bot
+        self.manuallyUnread = manuallyUnread
+    }
 
-    private let avatar: CGFloat = 46
-    private let rowPadding: CGFloat = 10
-    private let lineSpacing: CGFloat = 4
+    // Reference proportions at the default text size: a 48 pt avatar in an 80 pt row.
+    @ScaledMetric(relativeTo: .body) private var avatar: CGFloat = 48
+    @ScaledMetric(relativeTo: .body) private var rowPadding: CGFloat = 16
+    @ScaledMetric(relativeTo: .body) private var titleSize: CGFloat = 17.5
+    @ScaledMetric(relativeTo: .subheadline) private var previewSize: CGFloat = 15.5
+    @ScaledMetric(relativeTo: .footnote) private var timeSize: CGFloat = 13
+    private let lineSpacing: CGFloat = 3
 
     public var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 14) {
             AvatarWithStatus(bot: bot, members: model.members(of: bot), size: avatar)
             VStack(alignment: .leading, spacing: lineSpacing) {
                 HStack(alignment: .firstTextBaseline) {
@@ -20,8 +28,8 @@ public struct BotRow: View {
                         Image(systemName: "pin.fill").font(.caption2).foregroundStyle(Palette.tertiary)
                     }
                     Text(bot.name)
-                        .font(.body.weight(.semibold))
-                        .foregroundStyle(Palette.text)
+                        .font(.system(size: titleSize, weight: .semibold))
+                        .foregroundStyle(Color(uiColor: .label))
                         .lineLimit(1)
                     if model.screen?.agentBot == bot.id {
                         Image(systemName: "cursorarrow.motionlines")
@@ -31,13 +39,18 @@ public struct BotRow: View {
                     }
                     Spacer(minLength: 8)
                     Text(RelativeTime.day(Date(milliseconds: bot.lastAt)))
-                        .font(.subheadline)
-                        .foregroundStyle(bot.unread > 0 ? Palette.text : Palette.tertiary)
+                        .font(.system(size: timeSize))
+                        .foregroundStyle(bot.unread > 0 ? Color(uiColor: .label) : Color(uiColor: .tertiaryLabel))
+                        .fixedSize(horizontal: true, vertical: false)
                 }
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
                     preview
                     Spacer(minLength: 4)
                     if bot.unread > 0 { UnreadBadge(count: bot.unread) }
+                    else if manuallyUnread {
+                        Circle().fill(Palette.accent).frame(width: 9, height: 9)
+                            .accessibilityLabel(L10n.tr("Unread"))
+                    }
                 }
             }
         }
@@ -55,7 +68,7 @@ public struct BotRow: View {
             } icon: {
                 ThinkingOrb(state: .listening, size: 16, color: Palette.warning)
             }
-                .font(.subheadline)
+                .font(.system(size: previewSize))
                 .foregroundStyle(Palette.warning)
                 .lineLimit(1)
         } else if bot.isWorking {
@@ -64,17 +77,17 @@ public struct BotRow: View {
                 Text(L10n.tr(bot.activity.isEmpty ? "Working…" : bot.activity))
                     .lineLimit(1)
             }
-            .font(.subheadline)
-            .foregroundStyle(Palette.secondary)
+            .font(.system(size: previewSize))
+            .foregroundStyle(Color(uiColor: .secondaryLabel))
         } else if bot.status == "error" {
             Text(MessagePreview.text(bot.lastMessage ?? "Something went wrong"))
-                .font(.subheadline)
+                .font(.system(size: previewSize))
                 .foregroundStyle(Palette.danger)
                 .lineLimit(1)
         } else {
             Text(MessagePreview.text(bot.lastMessage ?? (bot.isGroup ? "\(bot.members.count) bots" : "\(model.backendName(bot.backend)) · \(bot.managedWorkspace ? L10n.tr("Personal workspace") : bot.folderName)")))
-                .font(.subheadline)
-                .foregroundStyle(Palette.secondary)
+                .font(.system(size: previewSize))
+                .foregroundStyle(Color(uiColor: .secondaryLabel))
                 .lineLimit(1)
         }
     }

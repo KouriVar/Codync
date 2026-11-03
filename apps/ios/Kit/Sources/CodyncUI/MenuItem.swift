@@ -14,7 +14,7 @@ public struct MenuItem: Identifiable {
     /// Shows `title` as it is, never translated: a name the user gave (a section's).
     public var verbatim: Bool
     /// The rows of the submenu this row opens ("Move to section ▸") instead of running `action`;
-    /// one level deep: a row inside it can't open another.
+    /// rendered recursively as native system menus.
     public var submenu: [MenuItem] = []
     public var action: () -> Void
 
@@ -54,6 +54,17 @@ public struct ReactionPick {
 }
 
 public extension View {
+    /// System positioning and interaction, with a separate, read-only conversation preview.
+    func contextActions<Preview: View>(@ViewBuilder preview: () -> Preview,
+                                      _ items: @escaping () -> [MenuItem]) -> some View {
+        contextMenu {
+            ForEach(items()) { item in
+                if item.divider { Divider() }
+                systemMenuRow(item)
+            }
+        } preview: { preview() }
+    }
+
     /// Long-press opens the system context menu; `reactions` puts a quick-reaction row on top.
     func contextActions(reactions: ReactionPick? = nil, _ items: @escaping () -> [MenuItem]) -> some View {
         modifier(ContextActions(items: items, reactions: reactions))
@@ -84,18 +95,22 @@ private struct ContextActions: ViewModifier {
 }
 
 /// A `MenuItem` inside a system `Menu` or `contextMenu`; a submenu opens its rows in a system
-/// `Menu`, one level deep (an opaque row type can't contain itself).
-@ViewBuilder private func systemMenuRow(_ item: MenuItem) -> some View {
-    if item.submenu.isEmpty {
-        systemMenuAction(item)
-    } else {
-        Menu {
-            ForEach(item.submenu) { row in
-                let _ = assert(row.submenu.isEmpty, "A submenu is one level deep: this row would be a dead button")
-                if row.divider { Divider() }
-                systemMenuAction(row)
-            }
-        } label: { menuLabel(item) }
+/// `Menu`, including nested menus.
+@MainActor private func systemMenuRow(_ item: MenuItem) -> some View { SystemMenuRow(item: item) }
+
+private struct SystemMenuRow: View {
+    let item: MenuItem
+    var body: some View {
+        if item.submenu.isEmpty {
+            systemMenuAction(item)
+        } else {
+            Menu {
+                ForEach(item.submenu) { row in
+                    if row.divider { Divider() }
+                    SystemMenuRow(item: row)
+                }
+            } label: { menuLabel(item) }
+        }
     }
 }
 
@@ -109,6 +124,7 @@ private struct ContextActions: ViewModifier {
         Toggle(isOn: Binding(get: { selected }, set: { _ in action() })) { menuLabel(item) }
     } else {
         Button(role: role, action: item.action) { menuLabel(item) }
+            .tint(item.destructive ? .red : nil)
     }
 }
 
@@ -117,7 +133,11 @@ private struct ContextActions: ViewModifier {
     if let image = item.image {
         SwiftUI.Label { Text(title) } icon: { image }
     } else if let icon = item.icon {
-        SwiftUI.Label(title, systemImage: icon)
+        if item.destructive {
+            SwiftUI.Label { Text(title) } icon: { SwiftUI.Image(systemName: icon).foregroundStyle(.red) }
+        } else {
+            SwiftUI.Label(title, systemImage: icon)
+        }
     } else {
         Text(title)
     }

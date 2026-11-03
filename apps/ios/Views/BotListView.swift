@@ -1,6 +1,7 @@
 import CodyncKit
 import CodyncUI
 import SwiftUI
+import UIKit
 
 /// The roster: every bot on every computer is a person you can message (Grok Bot sidebar, phone-sized).
 /// A `List` with its styling taken away, for the system's reordering: touch and hold opens a bot's
@@ -14,6 +15,12 @@ struct BotListView: View {
     @State private var editing: EditTarget?
     @State private var editingGroup: GroupTarget?
     @State private var confirmDelete: RosterItem?
+    @State private var sharingTemplate: EditTarget?
+    @AppStorage("manualUnreadConversations") private var manualUnreadData = Data()
+    @State private var searchText = ""
+    @State private var showCameraSheet = false
+    @State private var cardMenu: CardMenuState?
+    @State private var rowAnchors: [String: CGRect] = [:]
     /// What the section name dialog names while it's open.
     @State private var naming: SectionNaming?
     /// The row that's lifted (a `RosterLine` id): a bot to drag or for its menu, or a computer's heading.
@@ -60,7 +67,7 @@ struct BotListView: View {
             // Right before the call, which moves the bots before it waits: one update shows both.
             let orderBefore = sectionOrderData
             var renamedOrder = sectionOrder
-            renamedOrder.set(sectionLines(store).compactMap { $0.sectionName(on: store.computer.id) }, on: store.computer.id)
+            renamedOrder.set(sectionLines(store, matchingSearch: false).compactMap { $0.sectionName(on: store.computer.id) }, on: store.computer.id)
             renamedOrder.rename(name, to: newName, on: store.computer.id)
             sectionOrder = renamedOrder
             let orderAfter = sectionOrderData
@@ -83,6 +90,14 @@ struct BotListView: View {
 
     /// One computer shows a flat list; more get a heading each.
     private var grouped: Bool { shownStores.count > 1 }
+
+    private var searchQuery: String { searchText.trimmingCharacters(in: .whitespacesAndNewlines) }
+    private var isSearching: Bool { !searchQuery.isEmpty }
+
+    private func matchesSearch(_ item: RosterItem) -> Bool {
+        !isSearching || item.bot.name.localizedStandardContains(searchQuery)
+            || (item.bot.lastMessage?.localizedStandardContains(searchQuery) ?? false)
+    }
 
     /// Moves a computer one place up (-1) or down (+1) among the shown ones.
     private func move(_ id: ComputerID, _ offset: Int) {
@@ -107,17 +122,20 @@ struct BotListView: View {
     private var lines: [RosterLine] {
         shownStores.flatMap { store -> [RosterLine] in
             let id = store.computer.id
-            let rows = grouped && collapsedIDs.contains(id) ? [] : sectionLines(store)
+            if isSearching && !accounts.roster.contains(where: { $0.ref.computerId == id && matchesSearch($0) }) {
+                return []
+            }
+            let rows = grouped && collapsedIDs.contains(id) && !isSearching ? [] : sectionLines(store)
             return grouped ? [.computer(id, store)] + rows : rows
         }
     }
 
     /// A computer's bots: pinned ones, then each section's heading with its bots (none while
     /// folded), then the bots in no section (under the "Bots" label when there are sections).
-    private func sectionLines(_ store: BotStore) -> [RosterLine] {
+    private func sectionLines(_ store: BotStore, matchingSearch: Bool = true) -> [RosterLine] {
         let id = store.computer.id
-        let items = accounts.roster.filter { $0.ref.computerId == id }
-        return RosterSection.lines(items, folded: foldedSections, order: sectionOrder.saved(on: id)) { $0.bot }.map { line -> RosterLine in
+        let items = accounts.roster.filter { $0.ref.computerId == id && (!matchingSearch || matchesSearch($0)) }
+        return RosterSection.lines(items, folded: matchingSearch && isSearching ? [] : foldedSections, order: sectionOrder.saved(on: id)) { $0.bot }.map { line -> RosterLine in
             switch line {
             case let .header(section): .section(section, id, store)
             case .label: .label(id)
@@ -127,7 +145,7 @@ struct BotListView: View {
     }
 
     var body: some View {
-        let roster = accounts.roster.filter { shownIDs.contains($0.ref.computerId) }
+        let roster = accounts.roster.filter { shownIDs.contains($0.ref.computerId) && matchesSearch($0) }
         let lines = self.lines
         let movingComputer = lines.contains { $0.id == lifted && $0.computerId != nil }
         let movingSection = lines.first { $0.id == lifted }?.sectionComputer
@@ -141,7 +159,15 @@ struct BotListView: View {
                     ForEach(shownStores, id: \.computer.id) { updateCard($0) }
                 }
                 // A computer waiting for an update has its card instead; its bots aren't known yet.
-                if roster.isEmpty && shownStores.allSatisfy({ $0.mismatch == nil }) {
+                if isSearching && roster.isEmpty {
+                    VStack(spacing: 12) {
+                        Image(systemName: "magnifyingglass").font(.title)
+                        Text("没有找到匹配的聊天").font(.body)
+                    }
+                    .foregroundStyle(Palette.secondary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 40)
+                } else if roster.isEmpty && shownStores.allSatisfy({ $0.mismatch == nil }) {
                     // Computers that turned this iPhone away count as none: the way on is in Computers.
                     EmptyRoster(canCreate: !availableStores.isEmpty, hasComputer: accounts.computers.contains { !accounts.isStale($0.id) },
                                 create: newBot, showComputers: { app.showComputers = true })
@@ -153,10 +179,12 @@ struct BotListView: View {
                         if movingComputer { Color.clear.frame(height: 0) } else { sectionHeading(section, store: store) }
                     case .label:
                         if movingComputer { Color.clear.frame(height: 0) } else {
-                            RosterBotsLabel().itemProvider { lift(line) }
+                            RosterBotsLabel()
                                 .accessibilityActions {
-                                    Button(L10n.tr("Move up")) { moveSection(line, by: -1) }
-                                    Button(L10n.tr("Move down")) { moveSection(line, by: 1) }
+                                    if !isSearching {
+                                        Button(L10n.tr("Move up")) { moveSection(line, by: -1) }
+                                        Button(L10n.tr("Move down")) { moveSection(line, by: 1) }
+                                    }
                                 }
                         }
                     case let .bot(item, store):
@@ -166,28 +194,44 @@ struct BotListView: View {
                         if movingComputer || movingSection == item.ref.computerId { Color.clear.frame(height: 0) } else { row(item, store: store) }
                     }
                 }
-                .onMove(perform: moveLines)
             }
-            .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
+            .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: 0, trailing: 22))
             .listRowSeparator(.hidden)
             .listRowBackground(Color.clear)
         }
         .reviewInvitation(blocked: creating != nil || editing != nil || editingGroup != nil
                           || confirmDelete != nil || lifted != nil)
         .listStyle(.plain)
+        .coordinateSpace(name: "botlist")
+        .contentMargins(.top, 12, for: .scrollContent)
+        // Keep the iOS 26 soft, progressive falloff instead of iOS 27's automatic edge treatment.
+        .scrollEdgeEffectStyle(.soft, for: .top)
         .scrollContentBackground(.hidden)
         .environment(\.defaultMinListRowHeight, 0)
         .background(Palette.background)
-        .navigationTitle(L10n.tr("Bots"))
+        .scrollDismissesKeyboard(.interactively)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            HomeBottomBar(searchText: $searchText, openCamera: { showCameraSheet = true }) {
+                if let store = app.currentStore {
+                    app.marketplace = store.computer.id
+                } else {
+                    app.showComputers = true
+                }
+            }
+        }
+        .sheet(isPresented: $showCameraSheet) {
+            QuickCaptureSheet(onCapture: attachCapturedPhoto)
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+        }
+        .task {
+            if ProcessInfo.processInfo.environment["CODYNC_QUICKCAPTURE"] == "1" { showCameraSheet = true }
+        }
+        .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.visible, for: .navigationBar)
         .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                AccountSwitcherButton()
-            }
-            ToolbarItem(placement: .principal) {
-                ComputerFilterHeader(accounts: accounts, hidden: $hiddenComputers) { app.showComputers = true }
-            }
+            accountToolbar
             ToolbarItem(placement: .topBarTrailing) {
                 // A native menu: the bar hosts toolbar buttons outside SwiftUI's layout,
                 // so an anchored Codync menu can't find where the button is.
@@ -242,15 +286,47 @@ struct BotListView: View {
                 GroupEditorView(group: target.group).environment(store)
             }
         }
-        .codyncDialog("Delete \(confirmDelete?.bot.name ?? "bot")?",
-                      isPresented: Binding(get: { confirmDelete != nil }, set: { if !$0 { confirmDelete = nil } }),
-                      message: confirmDelete?.bot.isGroup == true ? "Its bots and their own chats stay." : "Files it changed on your computer stay as they are.") {
-            let item = confirmDelete
-            return [DialogAction(item?.bot.isGroup == true ? "Delete group chat" : "Delete bot and its conversation", destructive: true) {
-                if let item { accounts.store(for: item.ref.computerId)?.delete(item.bot) }
-            }]
+        .alert(L10n.tr("Delete {name}?").replacingOccurrences(of: "{name}", with: confirmDelete?.bot.name ?? "Bot"),
+               isPresented: Binding(get: { confirmDelete != nil }, set: { if !$0 { confirmDelete = nil } }),
+               presenting: confirmDelete) { item in
+            Button(L10n.tr(item.bot.isGroup ? "Delete group chat" : "Delete bot and its conversation"), role: .destructive) {
+                #if DEBUG
+                // The visual smoke check must never delete a real bot, even if tapped.
+                if ProcessInfo.processInfo.environment["CODYNC_DELETE_PREVIEW"] == "1" { return }
+                #endif
+                accounts.store(for: item.ref.computerId)?.delete(item.bot)
+            }
+            Button(L10n.tr("Cancel"), role: .cancel) {}
+        } message: { item in
+            Text(L10n.tr(item.bot.isGroup ? "Its bots and their own chats stay." : "Files it changed on your computer stay as they are."))
+        }
+        .codyncSheet(item: $sharingTemplate) { target in
+            BotTemplateView(draft: target.draft)
         }
         .sectionNameDialog($naming)
+        #if DEBUG
+        .task {
+            if ProcessInfo.processInfo.environment["CODYNC_CREATE_PREVIEW"] == "bot" { newBot() }
+            else if ProcessInfo.processInfo.environment["CODYNC_DELETE_PREVIEW"] == "1" {
+                confirmDelete = accounts.roster.first { !$0.bot.isGroup && !$0.bot.lead }
+            }
+        }
+        #endif
+    }
+
+    /// iOS 27 can keep the native glass rim without the default icon-sized inset around a photo.
+    @ToolbarContentBuilder
+    private var accountToolbar: some ToolbarContent {
+        if #available(iOS 27.0, *) {
+            ToolbarItem(placement: .topBarLeading) {
+                AccountSwitcherButton()
+            }
+            .contentMarginsRemoved()
+        } else {
+            ToolbarItem(placement: .topBarLeading) {
+                AccountSwitcherButton()
+            }
+        }
     }
 
     /// A row the system's reordering dropped. A heading moves its computer and its bots (an order
@@ -297,7 +373,6 @@ struct BotListView: View {
                 .onTapGesture { toggleCollapsed(id) }
             updateCard(store)
         }
-        .itemProvider { lift(.computer(id, store)) }
     }
 
     /// A section's heading: tap folds its bots away (on this device); touch and hold to rename or
@@ -305,10 +380,11 @@ struct BotListView: View {
     @ViewBuilder private func sectionHeading(_ section: RosterSection, store: BotStore) -> some View {
         let header = RosterSectionHeader(section: section, hasMenu: store.supportsSections, toggle: { toggleSection(section.name) },
                                          moving: lines.first { $0.id == lifted }?.sectionComputer == store.computer.id)
-            .itemProvider { lift(.section(section, store.computer.id, store)) }
             .accessibilityActions {
-                Button(L10n.tr("Move up")) { moveSection(.section(section, store.computer.id, store), by: -1) }
-                Button(L10n.tr("Move down")) { moveSection(.section(section, store.computer.id, store), by: 1) }
+                if !isSearching {
+                    Button(L10n.tr("Move up")) { moveSection(.section(section, store.computer.id, store), by: -1) }
+                    Button(L10n.tr("Move down")) { moveSection(.section(section, store.computer.id, store), by: 1) }
+                }
             }
         if store.supportsSections {
             header.contextActions {
@@ -327,11 +403,23 @@ struct BotListView: View {
     }
 
     private func moveSection(_ line: RosterLine, by offset: Int) {
-        guard let computer = line.sectionComputer, let name = line.sectionName(on: computer) else { return }
-        var names = lines.compactMap { $0.sectionName(on: computer) }
+        guard !isSearching, let computer = line.sectionComputer, let name = line.sectionName(on: computer),
+              let store = accounts.store(for: computer) else { return }
+        var names = sectionLines(store, matchingSearch: false).compactMap { $0.sectionName(on: computer) }
         guard let from = names.firstIndex(of: name), names.indices.contains(from + offset) else { return }
         names.swapAt(from, from + offset)
         withAnimation(Motion.reduced(Motion.layout, reduceMotion)) { sectionOrder.set(names, on: computer) }
+    }
+
+    /// Pull-to-capture hands the shot to the current computer's lead bot (the starred main bot);
+    /// without a lead, the first bot. It lands in that bot's composer as an attachment, unsent.
+    private func attachCapturedPhoto(_ image: UIImage) {
+        showCameraSheet = false
+        guard let store = app.currentStore, let jpeg = image.jpegData(compressionQuality: 0.85) else { return }
+        let candidates = accounts.roster.filter { $0.ref.computerId == store.computer.id && !$0.bot.isGroup }
+        guard let target = candidates.first(where: { $0.bot.lead }) ?? candidates.first else { return }
+        store.attachPendingFile(OutgoingFile(name: "photo-\(Int(Date.now.timeIntervalSince1970)).jpg", data: jpeg), to: target.bot.id)
+        accounts.selection = target.ref
     }
 
     private func row(_ item: RosterItem, store: BotStore) -> some View {
@@ -339,45 +427,73 @@ struct BotListView: View {
         let line = RosterLine.bot(item, store)
         let card = RoundedRectangle(cornerRadius: 16, style: .continuous)
         // A plain button instead of a NavigationLink: same push, no chevron.
-        return Button { accounts.selection = item.ref } label: {
-            BotRow(bot: bot)
-                .environment(store)
-        }
-        .buttonStyle(.plain)
+        return BotRow(bot: bot, manuallyUnread: manuallyUnread(item))
+            .environment(store)
+            .contentShape(Rectangle())
+            .onTapGesture { accounts.selection = item.ref }
         // Lifted, it's a rounded card with room around the avatar.
         .padding(.horizontal, 8)
         .background(lifted == line.id ? Palette.surface : .clear, in: card)
-        .contentShape([.dragPreview, .contextMenuPreview], card)
+        .contentShape(.contextMenuPreview, RoundedRectangle(cornerRadius: 34, style: .continuous))
         .padding(.horizontal, -8)
-        .itemProvider { lift(line) }
         .accessibilityLabel(accounts.computers.count > 1 ? "\(bot.name), on \(store.hostName)" : bot.name)
         .accessibilityActions {
             Button(L10n.tr("Move up")) { withAnimation(Motion.reduced(Motion.layout, reduceMotion)) { store.move(bot.id, by: -1) } }
             Button(L10n.tr("Move down")) { withAnimation(Motion.reduced(Motion.layout, reduceMotion)) { store.move(bot.id, by: 1) } }
         }
-        .contextActions {
-            var items = [MenuItem(bot.pinned ? "Unpin" : "Pin", icon: bot.pinned ? "pin.slash" : "pin") { store.setPinned(bot, !bot.pinned) }]
-            // Below Pin, like the desktop; an older computer has no sections.
-            if store.supportsSections { items.append(sectionMenu(bot, store: store)) }
-            items += [
-                bot.isGroup
-                    ? MenuItem("Edit group", icon: "person.2") { editingGroup = GroupTarget(computerId: item.ref.computerId, group: bot) }
-                    : MenuItem("Edit profile", icon: "pencil") { editing = EditTarget(computerId: item.ref.computerId, draft: BotDraft(bot)) },
-                MenuItem("Mark as read", icon: "checkmark.message") { store.markAllRead(bot.id) },
-            ]
-            if !bot.lead && !bot.isGroup && store.supportsLeadChoice {
-                items.append(MenuItem("Make lead agent", icon: "star") { store.setLead(bot) })
-            }
-            // The lead stays in sight.
-            if !bot.lead {
-                items.append(MenuItem("Hide from list", icon: "eye.slash") { store.setHidden(bot, true) })
-            }
-            // An older computer keeps its lead.
-            if !bot.lead || store.supportsLeadChoice {
-                items.append(MenuItem("Delete", icon: "trash", destructive: true) { confirmDelete = item })
-            }
-            return items
+        .contextActions(preview: { BotMenuPreview(bot: bot).environment(store) }) {
+            botMenuItems(item, store: store)
         }
+    }
+
+    private func botMenuItems(_ item: RosterItem, store: BotStore) -> [MenuItem] {
+        let bot = item.bot
+        let unread = bot.unread > 0 || manuallyUnread(item)
+        var items = [MenuItem(unread ? "Mark as read" : "Mark as unread", icon: unread ? "checkmark.message" : "message.badge") {
+            setManuallyUnread(!unread, item: item)
+            if unread { store.markAllRead(bot.id) }
+        }, MenuItem(bot.pinned ? "Unpin" : "Pin", icon: bot.pinned ? "pin.slash" : "pin") { store.setPinned(bot, !bot.pinned) }]
+        if store.supportsSections {
+            items.append(MenuItem("New section", icon: "folder.badge.plus") {
+                naming = SectionNaming(title: "New section", name: "") { store.setSection(bot, to: $0) }
+            })
+        }
+        items.append(MenuItem("Share as template", icon: "square.and.arrow.up") { sharingTemplate = EditTarget(computerId: item.ref.computerId, draft: BotDraft(bot)) })
+        if !bot.lead {
+            items.append(MenuItem("Hide", icon: "eye.slash", destructive: true) { store.setHidden(bot, true) })
+        }
+        var more = [MenuItem("Copy ID", icon: "square.on.square") { UIPasteboard.general.string = bot.id }]
+        more.append(bot.isGroup
+            ? MenuItem("Edit group", icon: "person.2") { editingGroup = GroupTarget(computerId: item.ref.computerId, group: bot) }
+            : MenuItem("Edit profile", icon: "pencil") { editing = EditTarget(computerId: item.ref.computerId, draft: BotDraft(bot)) })
+        if store.supportsSections { more.append(sectionMenu(bot, store: store)) }
+        if !bot.lead && !bot.isGroup && store.supportsLeadChoice {
+            more.append(MenuItem("Make lead agent", icon: "star") { store.setLead(bot) })
+        }
+        if !bot.lead || store.supportsLeadChoice {
+            more.append(MenuItem("Delete", icon: "trash", destructive: true, divider: true) { confirmDelete = item })
+        }
+        items.append(MenuItem("More", icon: "ellipsis", submenu: more))
+        return items
+    }
+
+    private func openCardMenu(_ item: RosterItem, store: BotStore, bot: Bot, lineId: String) {
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        withAnimation(Motion.reduced(Motion.fade, reduceMotion)) {
+            cardMenu = CardMenuState(preview: AnyView(BotMenuPreview(bot: bot).environment(store)),
+                                     items: botMenuItems(item, store: store),
+                                     anchor: rowAnchors[lineId] ?? .zero)
+        }
+    }
+
+    private func manuallyUnread(_ item: RosterItem) -> Bool {
+        ManualUnreadMarks(data: manualUnreadData).contains(account: accounts.accountId, computer: item.ref.computerId, bot: item.bot.id)
+    }
+
+    private func setManuallyUnread(_ unread: Bool, item: RosterItem) {
+        var marks = ManualUnreadMarks(data: manualUnreadData)
+        marks.set(unread, account: accounts.accountId, computer: item.ref.computerId, bot: item.bot.id)
+        manualUnreadData = marks.data
     }
 
     /// "Move to section ▸": the computer's other sections (by the names the user gave them, never

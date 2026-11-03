@@ -138,6 +138,7 @@ struct LockWidgetGalleryView: View {
             .padding(18).frame(maxWidth: 560).frame(maxWidth: .infinity)
         }
         .background(Palette.background)
-        .page("Lock Screen widgets", pushed: true)
+        .navigationTitle(L10n.tr("Lock Screen widgets"))
+        .navigationBarTitleDisplayMode(.inline)
     }
 }

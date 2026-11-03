@@ -8,7 +8,7 @@ struct ReasoningSlider: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var index: Int? { option.values.firstIndex { $0.id == (selection ?? option.default) } }
-    private var name: String { index.map { option.values[$0].name } ?? "" }
+    private var name: String { index.map { option.localizedName(for: option.values[$0]) } ?? "" }
 
     private func choose(_ index: Int) {
         guard option.values.indices.contains(index) else { return }
@@ -18,7 +18,7 @@ struct ReasoningSlider: View {
     var body: some View {
         VStack(spacing: 6) {
             HStack(spacing: 8) {
-                Text(option.name).font(.caption).foregroundStyle(Palette.secondary)
+                Text(option.localizedTitle).font(.caption).foregroundStyle(Palette.secondary)
                 Spacer(minLength: 0)
                 Text(name).font(.subheadline.weight(.medium)).foregroundStyle(Palette.text)
                     .contentTransition(.opacity)
@@ -53,7 +53,7 @@ struct ReasoningSlider: View {
                     choose(Int((position * CGFloat(last)).rounded()))
                 })
                 .accessibilityElement(children: .ignore)
-                .accessibilityLabel(option.name)
+                .accessibilityLabel(option.localizedTitle)
                 .accessibilityValue(name.isEmpty ? L10n.tr("Default") : name)
                 .accessibilityAdjustableAction { direction in
                     switch direction {

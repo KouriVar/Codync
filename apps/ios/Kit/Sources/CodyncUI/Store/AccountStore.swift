@@ -102,16 +102,21 @@ public final class AccountStore {
 
     // MARK: computers
 
-    /// QR pairing (§4.1) with this account's certificate: a computer in another account turns the phone away,
-    /// one in none asks its user, then joins this account. The computer is saved in this context and connected.
+    /// QR pairing (§4.1), with an account certificate when cloud accounts are configured.
+    /// Local-only builds use the host's QR-only pairing support and save its device key locally.
     public func pair(_ pairing: Pairing, deviceName: String, platform: String) async throws -> Computer {
         let identity = try DeviceIdentity.load(context: storage)
-        guard let cloud else { throw Self.noCertificate }
-        let certificate = try await pairingCertificate(cloud, deviceName: deviceName, platform: platform)
-        // Without a claim the computer still pairs; it just doesn't join the account.
+        let certificate: DeviceCertificate?
         let claim: CloudClaim?
-        do { claim = try await cloud.createClaim() } catch {
-            log.info("pairing without a claim: \(error.localizedDescription, privacy: .public)")
+        if let cloud {
+            certificate = try await pairingCertificate(cloud, deviceName: deviceName, platform: platform)
+            // Without a claim the computer still pairs; it just doesn't join the account.
+            do { claim = try await cloud.createClaim() } catch {
+                log.info("pairing without a claim: \(error.localizedDescription, privacy: .public)")
+                claim = nil
+            }
+        } else {
+            certificate = nil
             claim = nil
         }
         pairingCheck = pairing.checkCode(for: identity)
@@ -123,7 +128,7 @@ public final class AccountStore {
         if let previous = saved.first(where: { $0.id == computer.id }) { computer.keepDevicePicks(from: previous) }
         save(computer)
         open(computer)
-        if let claim, let signed = paired.claim {
+        if let cloud, let claim, let signed = paired.claim {
             Task { await joinAccount(claimId: claim.claimId, signed: signed, cloud: cloud) }
         }
         return computer

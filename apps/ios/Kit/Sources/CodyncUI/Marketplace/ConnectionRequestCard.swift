@@ -159,7 +159,7 @@ struct ConnectionRequestCard: View {
     }
 }
 
-struct CredentialsView: View {
+public struct CredentialsView: View {
     @Environment(BotStore.self) private var model
     @State private var selected: InstalledConnector?
     @State private var token = ""
@@ -167,16 +167,17 @@ struct CredentialsView: View {
     @State private var busy = false
     @State private var error: String?
 
-    var body: some View {
-        VStack(spacing: 0) {
-            ModalHeader("Credentials") {}
-            CardForm {
-                CardSection("Storage") {
+    public init() {}
+
+    public var body: some View {
+        NativeExtensionSheet("Credentials", busy: busy) {
+            Form {
+                NativeFormSection("Storage") {
                     Text(L10n.tr(status?.provider ?? "System credential store"))
                     Text(L10n.tr("Encrypted on the connected computer."))
                         .foregroundStyle(Palette.secondary)
                 }
-                CardSection("Saved connections") {
+                NativeFormSection("Saved connections") {
                     ForEach(model.installedConnectors.filter { !$0.keys.isEmpty }) { connector in
                         Button { withAnimation(Motion.layout) { selected = connector } } label: {
                             HStack { Text(connector.name); Spacer(); Image(systemName: "chevron.right") }
@@ -191,25 +192,25 @@ struct CredentialsView: View {
                         .font(.caption).foregroundStyle(Palette.secondary)
                 }
                 LoginsSection()
-                CardSection("1Password", footer: "Use a service account with read access only to a dedicated shared vault. The 1Password CLI must be installed on the computer.") {
+                NativeFormSection("1Password", footer: "Use a service account with read access only to a dedicated shared vault. The 1Password CLI must be installed on the computer.") {
                     Text(L10n.tr(status?.onePasswordConnected == true ? "Connected" : "Connect a shared vault"))
                     CredentialFieldRow("Service account token") {
                         SecureField(L10n.tr("Paste your token"), text: $token).plainTextInput()
                     }
-                    Button(L10n.tr("Connect")) { save(token) }.buttonStyle(PrimaryButtonStyle()).disabled(busy || token.isEmpty)
+                    Button(L10n.tr("Connect")) { save(token) }.buttonStyle(.borderedProminent).disabled(busy || token.isEmpty)
                     if status?.onePasswordConnected == true {
-                        Button(L10n.tr("Disconnect")) { save("") }.buttonStyle(SecondaryButtonStyle()).disabled(busy)
+                        Button(L10n.tr("Disconnect")) { save("") }.buttonStyle(.bordered).disabled(busy)
                     }
                     Text(L10n.tr("Use op://vault/item/field in a connector's credential field. Codync retrieves the value when the connector runs."))
                         .font(.footnote).foregroundStyle(Palette.secondary)
                 }
-                if busy { Spinner() }
+                if busy { ProgressView() }
                 if let error { Text(L10n.tr(error)).foregroundStyle(Palette.danger) }
             }
         }
         .background(Palette.background)
         .textFieldStyle(.plain)
-        .codyncSheet(item: $selected) { ConnectorCredentialEditor(connector: $0) }
+        .codyncSheet(item: $selected) { ConnectorCredentialEditor(connector: $0).environment(model) }
         .task {
             await model.refreshPlugins()
             do { status = try await model.client?.credentialStatus() }
@@ -241,7 +242,7 @@ private struct LoginsSection: View {
     @State private var error: String?
 
     var body: some View {
-        CardSection("Sign-ins", footer: "Bots type these into the matching website or app and never see the password. You can use an op:// reference.") {
+        NativeFormSection("Sign-ins", footer: "Bots type these into the matching website or app and never see the password. You can use an op:// reference.") {
             ForEach(logins) { login in
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
@@ -262,7 +263,7 @@ private struct LoginsSection: View {
                 SecureField(L10n.tr("Password or op:// reference"), text: $password).plainTextInput()
             }
             Button(L10n.tr("Save sign-in")) { save() }
-                .buttonStyle(PrimaryButtonStyle())
+                .buttonStyle(.borderedProminent)
                 .disabled(busy || site.isEmpty || password.isEmpty)
             if let error { Text(L10n.tr(error)).font(.footnote).foregroundStyle(Palette.danger) }
         }
@@ -308,13 +309,10 @@ private struct ConnectorCredentialEditor: View {
     @State private var error: String?
 
     var body: some View {
-        VStack(spacing: 0) {
-            ModalHeader(connector.name) {
-                if saving { Spinner() }
-                else { IconButton("Save credentials", systemImage: "checkmark") { save() }.disabled(fields.values.allSatisfy(\.isEmpty)) }
-            }
-            CardForm {
-                CardSection(footer: "Enter only the values you want to replace. You can use an op:// reference.") {
+        NativeExtensionSheet(connector.name, busy: saving, actionTitle: "Save credentials",
+                             actionEnabled: !fields.values.allSatisfy(\.isEmpty), action: save) {
+            Form {
+                NativeFormSection(footer: "Enter only the values you want to replace. You can use an op:// reference.") {
                     ForEach(connector.keys, id: \.self) { key in
                         SecureField(key, text: Binding(get: { fields[key] ?? "" }, set: { fields[key] = $0 })).plainTextInput()
                     }

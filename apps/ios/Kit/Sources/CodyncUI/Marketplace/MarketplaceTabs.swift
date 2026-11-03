@@ -2,34 +2,6 @@ import CodyncKit
 import SwiftUI
 
 extension MarketplaceView {
-    var extensionRail: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            ForEach(ExtensionSection.allCases) { item in
-                let on = section == item
-                Button {
-                    withAnimation(Motion.morph) { section = item }
-                } label: {
-                    HStack(spacing: 10) {
-                        Image(systemName: item.icon)
-                        Text(L10n.tr(item.title))
-                    }
-                    .font(.subheadline.weight(on ? .semibold : .regular))
-                    .foregroundStyle(on ? Palette.text : Palette.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .background(on ? Palette.bubbleAgent : Color.clear, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                    .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                }
-                .buttonStyle(PressScale())
-                .accessibilityAddTraits(on ? .isSelected : [])
-            }
-        }
-        .frame(width: 168)
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel(L10n.tr("Extensions sections"))
-    }
-
     @ViewBuilder var tabBody: some View {
         VStack(alignment: .leading, spacing: 12) {
             switch section {

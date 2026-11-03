@@ -31,6 +31,7 @@ struct AccessRequestView: View {
     private var approved: Bool { requestId != nil && accounts.approvedAccess[computer.computerId] == requestId }
 
     var body: some View {
+        NavigationStack {
         VStack(spacing: 24) {
             ComputerBadge(Computer(id: computer.computerId, name: computer.name, signKey: computer.signKey, device: computer.device), size: 64)
                 .padding(.top, 32)
@@ -111,8 +112,14 @@ struct AccessRequestView: View {
         .padding(24)
         .frame(maxWidth: .infinity)
         .background(Palette.background)
+        .navigationTitle(L10n.tr("Access"))
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) { Button(L10n.tr("Close")) { dismiss() } }
+        }
+        }
+        .tint(.primary)
         // Closing keeps waiting in the background; the computer shows up once approved.
-        .safeAreaInset(edge: .top, spacing: 0) { ModalHeader("Access") }
         .onChange(of: ticket?.requestId) { old, id in
             if let id {
                 requestId = id

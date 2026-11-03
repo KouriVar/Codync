@@ -8,6 +8,7 @@ public struct TraceView: View {
 
     public init(botId: String) { self.botId = botId }
     @Environment(BotStore.self) private var model
+    @Environment(\.dismissModal) private var dismiss
 
     public var body: some View {
         let all = model.chat(botId)
@@ -15,33 +16,27 @@ public struct TraceView: View {
             .sorted { $0.key < $1.key }
         // The running turn's thoughts start unfolded.
         let running = Entry.runningTurn(all, working: model.bots[botId]?.isWorking(in: botId) == true)
-        VStack(spacing: 0) {
-            ModalHeader("Full conversation")
-            ScrollView {
-            LazyVStack(alignment: .leading, spacing: 22) {
+        NavigationStack {
+            Form {
                 if turns.isEmpty {
-                    Text(L10n.tr("Nothing yet.")).foregroundStyle(Palette.tertiary)
+                    Section { Text(L10n.tr("Nothing yet.")).foregroundStyle(.secondary) }
                 }
                 ForEach(turns, id: \.key) { turn, entries in
-                    VStack(alignment: .leading, spacing: 8) {
-                        // A plain one-line turn header (CardSection's own title wraps).
-                        Text(entries.first { $0.kind == "user" }?.data.text ?? "Turn \(turn)")
-                            .lineLimit(1)
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(Palette.text)
-                            .padding(.leading, 4)
-                        CardSection {
-                            ForEach(entries) { TraceRow(entry: $0, unfolded: turn == running) }
-                        }
+                    Section {
+                        ForEach(entries) { TraceRow(entry: $0, unfolded: turn == running) }
+                    } header: {
+                        Text(entries.first { $0.kind == "user" }?.data.text ?? "Turn \(turn)").lineLimit(1)
                     }
                 }
             }
-            .padding(20)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .navigationTitle(L10n.tr("Full conversation"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) { Button(L10n.tr("Close")) { dismiss() } }
             }
             .defaultScrollAnchor(.bottom)
         }
-        .background(Palette.background)
+        .tint(.primary)
         .tracked(.screenViewed(.trace))
     }
 }

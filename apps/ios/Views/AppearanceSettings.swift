@@ -7,11 +7,10 @@ struct AppearanceSettings: View {
     @AppStorage(Appearance.storageKey) private var appearance = Appearance.system
 
     var body: some View {
-        CardSection("Appearance", footer: "Only changes appearance on this device.") {
-            ValueRow("Theme") {
-                ChoicePicker(selection: $appearance, options: Appearance.allCases.map { (id: $0, label: $0.label) })
-            }
+        Picker(L10n.tr("Theme"), selection: $appearance) {
+            ForEach(Appearance.allCases, id: \.self) { Text(L10n.tr($0.label)).tag($0) }
         }
+        .pickerStyle(.navigationLink)
     }
 }
 

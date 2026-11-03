@@ -59,27 +59,34 @@ struct MemoryFileView: View {
     let memory: MemoryStore
     let target: MemoryFileTarget
     @State private var detail: MemoryFileDetail?
+    @Environment(\.dismissModal) private var dismiss
 
     var body: some View {
-        VStack(spacing: 0) {
-            ModalHeader(target.name)
-            CardForm {
+        NavigationStack {
+            Form {
                 if let error = memory.error {
-                    CardSection { Text(L10n.tr(error)).foregroundStyle(Palette.danger).textSelection(.enabled) }
+                    Section { Text(L10n.tr(error)).foregroundStyle(Palette.danger).textSelection(.enabled) }
                 }
                 if let detail {
-                    CardSection(footer: detail.path) {
+                    Section {
                         Text(detail.content ?? "Deleted.")
                             .font(.footnote.monospaced())
                             .textSelection(.enabled)
                             .frame(maxWidth: .infinity, alignment: .leading)
-                    }
+                    } footer: { Text(detail.path) }
                 } else {
-                    CardSection { Text(L10n.tr("Loading…")).foregroundStyle(Palette.secondary) }
+                    Section { Text(L10n.tr("Loading…")).foregroundStyle(.secondary) }
+                }
+            }
+            .navigationTitle(target.name)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(L10n.tr("Close")) { dismiss() }
                 }
             }
         }
-        .background(Palette.background)
+        .tint(.primary)
         .task { detail = await memory.file(target.name, shared: target.shared) }
     }
 }

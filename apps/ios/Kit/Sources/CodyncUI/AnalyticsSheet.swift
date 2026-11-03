@@ -27,35 +27,38 @@ public struct AnalyticsSheet: View {
     }
 
     public init() {}
+    @Environment(\.dismissModal) private var dismiss
 
     public var body: some View {
-        VStack(spacing: 0) {
-            ModalHeader("Usage analytics")
-            CardForm {
-                CardSection {
+        NavigationStack {
+            Form {
+                Section {
                     ForEach(Self.details, id: \.title) { item in
-                        HStack(alignment: .firstTextBaseline, spacing: 12) {
-                            Image(systemName: item.icon)
-                                .foregroundStyle(Palette.secondary)
-                                .frame(width: 22)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(L10n.tr(item.title))
-                                Text(L10n.tr(item.detail))
-                                    .font(.footnote)
-                                    .foregroundStyle(Palette.secondary)
-                                    .fixedSize(horizontal: false, vertical: true)
-                            }
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(L10n.tr(item.title))
+                            Text(L10n.tr(item.detail))
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
                         }
                     }
                 }
-                Text(Self.policy())
-                    .font(.caption)
-                    .foregroundStyle(Palette.secondary)
-                    .tint(Palette.text)
-                    .padding(.horizontal, 2)
-                    .trackedLinks(.privacy)
+                Section {
+                    Text(Self.policy())
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .tint(Palette.text)
+                        .trackedLinks(.privacy)
+                }
+            }
+            .navigationTitle(L10n.tr("Usage analytics"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(L10n.tr("Close")) { dismiss() }
+                }
             }
         }
-        .background(Palette.background)
+        .tint(.primary)
     }
 }

@@ -13,69 +13,40 @@ struct AgentBrings: View {
     @State private var plugins = false
 
     var body: some View {
-        // A stack, not a Group: `.task` on a Group with nothing in it never runs, so nothing would load.
-        VStack(alignment: .leading, spacing: 0) {
+        NativeFormSection("What the agent brings") {
             if failed {
-                CardSection {
-                    Text(L10n.tr("Couldn't load what this agent brings."))
-                        .font(.footnote)
-                        .foregroundStyle(Palette.danger)
+                Text(L10n.tr("Couldn't load what this agent brings."))
+                    .font(.footnote).foregroundStyle(.red)
+            } else if let gear {
+                if gear.shows {
+                    row("Skills", gear.skills, $skills)
+                    row("Connectors", gear.connectors, $connectors)
+                    row("Rules", gear.rules, $rules)
+                    row("Plugins", gear.plugins, $plugins)
+                } else {
+                    Text(L10n.tr("Nothing installed")).foregroundStyle(.secondary)
                 }
-            } else if let gear, gear.shows {
-                CardSection("What the agent brings") {
-                    VStack(alignment: .leading, spacing: 14) {
-                        row("Skills", gear.skills, $skills)
-                        row("Connectors", gear.connectors, $connectors)
-                        row("Rules", gear.rules, $rules)
-                        row("Plugins", gear.plugins, $plugins)
-                    }
-                }
-            }
+            } else { ProgressView() }
         }
-        // Loaded again when the computer comes back online, so a failed load doesn't stay.
         .task(id: [backendId, model.connection == .online ? "online" : "waiting"]) { await load() }
     }
 
     @ViewBuilder private func row(_ title: String, _ items: [AgentGearItem], _ open: Binding<Bool>) -> some View {
         if !items.isEmpty {
-            Disclosure(isExpanded: open) {
-                VStack(alignment: .leading, spacing: 0) {
-                    ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(item.name).font(.subheadline.weight(.semibold)).lineLimit(1)
-                            let note = item.description.isEmpty ? item.detail : item.description
-                            if !note.isEmpty {
-                                Text(note).font(.caption).foregroundStyle(Palette.secondary).lineLimit(2)
-                            }
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.vertical, 8)
-                        .padding(.leading, 36)
-                        .overlay(alignment: .top) {
-                            if index > 0 {
-                                Rectangle().fill(Palette.border).frame(height: 0.5).padding(.leading, 36)
-                            }
-                        }
+            DisclosureGroup(isExpanded: open) {
+                ForEach(items) { item in
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(item.name).font(.subheadline)
+                        let note = item.description.isEmpty ? item.detail : item.description
+                        if !note.isEmpty { Text(note).font(.caption).foregroundStyle(.secondary) }
                     }
                 }
             } label: {
-                HStack(spacing: 10) {
-                    Image(systemName: icon(title))
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(Palette.text)
-                        .frame(width: 26, height: 26)
-                        .background(Palette.bubbleAgent, in: Circle())
-                    Text(L10n.tr(title))
-                    Spacer(minLength: 8)
-                    Text("\(items.count)")
-                        .font(.caption.weight(.semibold))
-                        .monospacedDigit()
-                        .foregroundStyle(Palette.secondary)
-                        .padding(.horizontal, 7)
-                        .padding(.vertical, 2)
-                        .background(Palette.bubbleAgent, in: Capsule())
+                HStack {
+                    Label(L10n.tr(title), systemImage: icon(title))
+                    Spacer()
+                    Text("\(items.count)").foregroundStyle(.secondary)
                 }
-                .layoutPriority(1)
             }
         }
     }

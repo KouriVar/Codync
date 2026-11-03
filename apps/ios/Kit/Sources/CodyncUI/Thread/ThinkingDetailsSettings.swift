@@ -14,9 +14,7 @@ public struct ThinkingDetailsSettings: View {
     public init() {}
 
     public var body: some View {
-        CardSection("Chat", footer: "Lets you unfold a working bot's thinking and steps from its status in the chat. Only changes this device.") {
-            Toggle(isOn: $details) { Text(L10n.tr("Show thinking details")) }
-                .toggleStyle(.codync)
-        }
+        Toggle(isOn: $details) { Text(L10n.tr("Show thinking details")) }
+            .toggleStyle(.switch)
     }
 }

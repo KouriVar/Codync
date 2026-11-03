@@ -19,29 +19,35 @@ struct ArtifactRenameSheet: View {
     private var trimmed: String { title.trimmingCharacters(in: .whitespacesAndNewlines) }
 
     var body: some View {
-        VStack(spacing: 0) {
-            ModalHeader("Rename artifact") {
-                if saving {
-                    Spinner()
-                } else {
-                    IconButton("Save", systemImage: "checkmark", action: save)
-                        .disabled(trimmed.isEmpty || trimmed == artifact.title)
-                }
-            }
-            CardForm {
-                CardSection {
+        NavigationStack {
+            Form {
+                Section {
                     TextField(L10n.tr("Artifact title"), text: $title)
                         .focused($focused)
                         .submitLabel(.done)
                         .onSubmit(save)
                 }
                 if let error {
-                    Text(L10n.tr(error)).font(.caption).foregroundStyle(Palette.danger).textSelection(.enabled)
+                    Section {
+                        Text(L10n.tr(error)).font(.caption).foregroundStyle(Palette.danger).textSelection(.enabled)
+                    }
                 }
             }
-            .textFieldStyle(.plain)
+            .navigationTitle(L10n.tr("Rename artifact"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(L10n.tr("Cancel")) { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    if saving { ProgressView() } else {
+                        Button(L10n.tr("Save")) { save() }
+                            .disabled(trimmed.isEmpty || trimmed == artifact.title)
+                    }
+                }
+            }
         }
-        .background(Palette.background)
+        .tint(.primary)
         .presentationDetents([.medium])
         .onAppear { focused = true }
     }

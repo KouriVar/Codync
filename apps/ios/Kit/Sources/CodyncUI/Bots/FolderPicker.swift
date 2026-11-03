@@ -6,6 +6,7 @@ struct FolderPicker: View {
     let onPick: (String) -> Void
     @Environment(BotStore.self) private var model
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dismissModal) private var dismiss
     @State private var state = WorkspacePickerState()
     @State private var path: String?
     @State private var request = 0
@@ -15,8 +16,8 @@ struct FolderPicker: View {
     private var noRecent: Bool { state.mode == .recent && !state.busy && (state.listing?.recent ?? []).isEmpty }
 
     var body: some View {
-        VStack(spacing: 0) {
-            ModalHeader("Choose workspace")
+        NavigationStack {
+            VStack(spacing: 0) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     Text("Your bot will work in this folder.").font(.subheadline).foregroundStyle(Palette.secondary)
@@ -53,8 +54,16 @@ struct FolderPicker: View {
                     .disabled(state.saving)
             }.scrollDismissesKeyboard(.interactively)
             footer
+            }
+            .navigationTitle(L10n.tr("Choose workspace"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(L10n.tr("Close")) { dismiss() }
+                }
+            }
         }
-        .background(Palette.background)
+        .tint(.primary)
         .task(id: request) { await state.load(path, model: model) }
         .onChange(of: model.connection) { _, _ in request += 1 }
     }

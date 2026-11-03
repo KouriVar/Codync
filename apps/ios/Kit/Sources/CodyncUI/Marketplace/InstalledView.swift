@@ -3,7 +3,6 @@ import CodyncKit
 import SwiftUI
 
 struct InstalledView: View {
-    let back: () -> Void
     @Environment(BotStore.self) private var model
     @Environment(\.webAuthenticationSession) private var webAuthenticationSession
     @Environment(\.openURL) private var openURL
@@ -18,27 +17,20 @@ struct InstalledView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            ScreenHeader {
-                BackButton(action: back).keyboardShortcut(.cancelAction)
-            } title: {
-                Text(L10n.tr("Connectors & skills")).font(.body.weight(.semibold)).foregroundStyle(Palette.text)
-            } trailing: {
-                EmptyView()
-            }
-            list
-        }
+        list
+        .navigationTitle(L10n.tr("Connectors & skills"))
+        .navigationBarTitleDisplayMode(.inline)
         .background(Palette.background)
         .codyncSheet(item: $viewingSkill) { SkillSheet(skill: $0) }
     }
 
     private var list: some View {
-        CardForm {
+        Form {
             if model.installedConnectors.isEmpty && model.installedSkills.isEmpty {
                 EmptyState(icon: "shippingbox", title: "Nothing installed", detail: "Connectors and skills you add show up here.")
             }
             if !model.installedConnectors.isEmpty {
-                CardSection("Connectors") {
+                NativeFormSection("Connectors") {
                     ForEach(model.installedConnectors) { c in
                         InstalledRow(title: c.name, subtitle: c.needsSignIn ? "Sign in so bots can use it" : c.command ?? c.url ?? c.description) {
                             if c.kind == "composio" {
@@ -48,10 +40,10 @@ struct InstalledView: View {
                             }
                         } accessory: {
                             if signingIn == c.id {
-                                Spinner()
+                                ProgressView()
                             } else if c.needsSignIn {
                                 Button(L10n.tr("Sign in")) { signIn(c.id) }
-                                    .buttonStyle(PrimaryButtonStyle())
+                                    .buttonStyle(.bordered)
                                     .controlSize(.small)
                             }
                         } remove: {
@@ -61,7 +53,7 @@ struct InstalledView: View {
                 }
             }
             if !model.installedSkills.isEmpty {
-                CardSection("Skills") {
+                NativeFormSection("Skills") {
                     ForEach(model.installedSkills) { s in
                         InstalledRow(title: s.name, subtitle: s.description, open: { viewingSkill = SkillRef(s) }) {
                             SkillGlyph().frame(width: 32, height: 32)
@@ -74,21 +66,19 @@ struct InstalledView: View {
                 }
             }
         }
-        .codyncDialog(
-            L10n.tr("Remove {name}?").replacingOccurrences(of: "{name}", with: removing?.name ?? ""),
-            isPresented: Binding(get: { removing != nil }, set: { if !$0 { removing = nil } }),
-            message: removing.map { $0.isSkill ? "Bots stop using this skill." : "Bots lose this connector, and the keys saved for it are deleted." }
-        ) {
-            guard let r = removing else { return [] }
-            return [DialogAction("Remove", destructive: true) {
+        .alert(L10n.tr("Remove {name}?").replacingOccurrences(of: "{name}", with: removing?.name ?? ""),
+               isPresented: Binding(get: { removing != nil }, set: { if !$0 { removing = nil } }),
+               presenting: removing) { r in
+            Button(L10n.tr("Remove"), role: .destructive) {
                 Task {
                     do {
                         if r.isSkill { try await model.removeSkill(r.id) } else { try await model.removeConnector(r.id) }
-                    } catch {
-                        model.lastError = error.localizedDescription
-                    }
+                    } catch { model.lastError = error.localizedDescription }
                 }
-            }]
+            }
+            Button(L10n.tr("Cancel"), role: .cancel) {}
+        } message: { r in
+            Text(L10n.tr(r.isSkill ? "Bots stop using this skill." : "Bots lose this connector, and the keys saved for it are deleted."))
         }
     }
 

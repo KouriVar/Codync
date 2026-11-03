@@ -24,18 +24,9 @@ struct CustomConnectorSheet: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            ModalHeader("Custom connector") {
-                if saving {
-                    Spinner()
-                } else {
-                    IconButton("Add", systemImage: "plus") { save() }
-                        .disabled(!ready)
-                }
-            }
-            form
+        NativeExtensionSheet("Custom connector", busy: saving, actionTitle: "Add", actionEnabled: ready, action: save) {
+            form.disabled(saving)
         }
-        .background(Palette.background)
     }
 
     private var footer: String {
@@ -47,9 +38,13 @@ struct CustomConnectorSheet: View {
     }
 
     private var form: some View {
-        CardForm {
-            CardSection(footer: footer) {
-                SegmentedChoice(selection: $mode, options: [(id: .command, label: "Command"), (id: .url, label: "URL"), (id: .config, label: "Config")])
+        Form {
+            NativeFormSection(footer: footer) {
+                Picker(L10n.tr("Config"), selection: $mode) {
+                    Text(L10n.tr("Command")).tag(Mode.command)
+                    Text("URL").tag(Mode.url)
+                    Text(L10n.tr("Config")).tag(Mode.config)
+                }.pickerStyle(.segmented)
                 if mode == .config {
                     TextField("{ \"mcpServers\": { … } }", text: $config, axis: .vertical)
                         .lineLimit(6...16)
@@ -63,14 +58,14 @@ struct CustomConnectorSheet: View {
                 }
             }
             if mode == .url {
-                CardSection("Headers", footer: L10n.tr("Optional, one Name: value per line. Leave empty if the service has you sign in. Saved on {name} only.").replacingOccurrences(of: "{name}", with: model.hostName)) {
+                NativeFormSection("Headers", footer: L10n.tr("Optional, one Name: value per line. Leave empty if the service has you sign in. Saved on {name} only.").replacingOccurrences(of: "{name}", with: model.hostName)) {
                     TextField("Authorization: Bearer …", text: $envText, axis: .vertical)
                         .lineLimit(2...6)
                         .font(.callout.monospaced())
                         .plainTextInput()
                 }
             } else if mode == .command {
-                CardSection("Environment", footer: L10n.tr("One KEY=value per line. Saved on {name} only.").replacingOccurrences(of: "{name}", with: model.hostName)) {
+                NativeFormSection("Environment", footer: L10n.tr("One KEY=value per line. Saved on {name} only.").replacingOccurrences(of: "{name}", with: model.hostName)) {
                     TextField("API_KEY=…", text: $envText, axis: .vertical)
                         .lineLimit(2...6)
                         .font(.callout.monospaced())
@@ -78,7 +73,7 @@ struct CustomConnectorSheet: View {
                 }
             }
             if let error {
-                CardSection { Text(L10n.tr(error)).foregroundStyle(Palette.danger) }
+                NativeFormSection { Text(L10n.tr(error)).foregroundStyle(Palette.danger) }
             }
         }
         .textFieldStyle(.plain)
@@ -86,6 +81,7 @@ struct CustomConnectorSheet: View {
     }
 
     private func save() {
+        guard !saving, ready else { return }
         saving = true
         error = nil
         let remote = mode == .url

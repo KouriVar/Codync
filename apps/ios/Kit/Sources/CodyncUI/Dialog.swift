@@ -58,31 +58,22 @@ private struct CodyncDialog: ViewModifier {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     func body(content: Content) -> some View {
-        if inPlace {
-            content
-                .allowsHitTesting(!isPresented)
-                .accessibilityHidden(isPresented)
-                .overlay {
-                    if isPresented {
-                        DialogCard(title: title, message: message, field: field, cancel: cancel, actions: actions()) {
-                            isPresented = false
-                            opening += 1
-                        }
-                        .id(opening)
-                        .ignoresSafeArea(.container)
-                        .transition(.opacity)
-                        .onAppear {
-                            // A field takes the focus on the next update: don't race it with a keyboard drop.
-                            guard field == nil else { return }
-                            UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder),
-                                                             to: nil, from: nil, for: nil)
-                        }
-                    }
+        // Native iOS alert (was a hand-drawn card). Supports a text field and dynamic buttons.
+        content.alert(L10n.tr(title), isPresented: $isPresented) {
+            if let field {
+                TextField(L10n.tr(field.placeholder), text: field.text)
+            }
+            ForEach(actions()) { action in
+                Button(L10n.tr(action.title), role: action.destructive ? .destructive : nil) {
+                    action.action()
                 }
-                .animation(Motion.reduced(Motion.fade, reduceMotion), value: isPresented)
-        } else {
-            content.codyncOverlay(isPresented: $isPresented) { close in
-                DialogCard(title: title, message: message, field: field, cancel: cancel, actions: actions(), dismiss: close)
+            }
+            if let cancel {
+                Button(L10n.tr(cancel), role: .cancel) {}
+            }
+        } message: {
+            if let message, !message.isEmpty {
+                Text(L10n.tr(message))
             }
         }
     }

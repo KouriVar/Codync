@@ -64,18 +64,12 @@ struct AgentSheet: View {
     private var setUp: Bool { installed || backend.signedIn != nil || auth != nil }
 
     var body: some View {
-        ZStack {
-            if let route {
-                routed(route).transition(.move(edge: .trailing).combined(with: .opacity))
-            } else {
-                VStack(spacing: 0) {
-                    ModalHeader(backend.name)
-                    overview
+        NativeExtensionSheet(backend.name) {
+            overview
+                .navigationDestination(isPresented: Binding(get: { route != nil }, set: { if !$0 { route = nil } })) {
+                    if let route { routed(route).environment(model) }
                 }
-                .transition(.move(edge: .leading).combined(with: .opacity))
-            }
         }
-        .frame(minWidth: 0, minHeight: 0)
         // A known "signed in" needs no agent start; one set up asks the agent (which can't start
         // without its Node.js). Opening never downloads one: that waits for Set up.
         .task { if recheck || (setUp && backend.signedIn != true), !backend.needsNode { await check() } }
@@ -100,8 +94,8 @@ struct AgentSheet: View {
     }
 
     private var overview: some View {
-        CardForm {
-            CardSection {
+        Form {
+            NativeFormSection {
                 HStack(spacing: 14) {
                     AgentIcon(registry: backend.registry ?? backend.id, size: 30)
                         .frame(width: 52, height: 52)
@@ -116,7 +110,7 @@ struct AgentSheet: View {
                 .padding(.vertical, 4)
             }
             if curated {
-                CardSection {
+                NativeFormSection {
                     SetupStepRow(
                         number: 1,
                         title: "Install",
@@ -129,7 +123,7 @@ struct AgentSheet: View {
                 }
             }
             if backend.node != nil {
-                CardSection {
+                NativeFormSection {
                     SetupStepRow(
                         number: curated ? 2 : 1,
                         title: "Node.js",
@@ -144,13 +138,13 @@ struct AgentSheet: View {
             signInSection
             AgentBrings(backendId: backend.id)
             if let error {
-                CardSection { Text(L10n.tr(error)).foregroundStyle(Palette.danger).textSelection(.enabled) }
+                NativeFormSection { Text(L10n.tr(error)).foregroundStyle(Palette.danger).textSelection(.enabled) }
             }
         }
     }
 
     private var signInSection: some View {
-        CardSection(footer: signedIn != true && auth?.methods.contains(where: { $0.kind == .agent }) == true
+        NativeFormSection(footer: signedIn != true && auth?.methods.contains(where: { $0.kind == .agent }) == true
             ? "Browser sign-ins open on \(model.hostName) itself. Away from it? Use Remote screen to finish there."
             : nil) {
             HStack(spacing: 0) {
@@ -162,7 +156,7 @@ struct AgentSheet: View {
                     action: nil
                 )
                 if checking {
-                    ThinkingOrb(state: .connecting, size: 16, color: Palette.secondary)
+                    ProgressView()
                 } else {
                     Button(L10n.tr("Check again"), systemImage: "arrow.clockwise") { Task { await check() } }
                         .labelStyle(.iconOnly)
@@ -240,7 +234,7 @@ struct AgentSheet: View {
                 }
                 Spacer(minLength: 8)
                 if busy {
-                    ThinkingOrb(size: 16, color: Palette.secondary)
+                    ProgressView()
                 } else {
                     Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(Palette.tertiary)
                 }
@@ -300,28 +294,21 @@ private struct AgentKeysForm: View {
     private var vars: [AuthMethod.Var] { method.vars ?? [] }
 
     var body: some View {
-        VStack(spacing: 0) {
-            ScreenHeader {
-                BackButton(action: back).keyboardShortcut(.cancelAction)
-            } title: {
-                Text(L10n.tr(method.name)).font(.body.weight(.semibold)).foregroundStyle(Palette.text).lineLimit(1)
-            } trailing: {
-                if saving {
-                    Spinner()
-                } else {
-                    IconButton("Save", systemImage: "checkmark") { save(values.filter { !$0.value.isEmpty }) }
-                        .disabled(vars.contains { !$0.optional && (values[$0.name] ?? "").isEmpty && !saved.contains($0.name) })
+        form
+            .disabled(saving)
+            .navigationTitle(L10n.tr(method.name))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(L10n.tr("Save")) { save(values.filter { !$0.value.isEmpty }) }
+                        .disabled(saving || vars.contains { !$0.optional && (values[$0.name] ?? "").isEmpty && !saved.contains($0.name) })
                 }
             }
-            form
-        }
-        .background(Palette.background)
     }
 
     private var form: some View {
-        CardForm {
-            VStack(alignment: .leading, spacing: 6) {
-                CardSection(method.name) {
+        Form {
+            NativeFormSection(method.name) {
                     ForEach(vars, id: \.name) { v in
                         VStack(alignment: .leading, spacing: 4) {
                             let prompt = Text(saved.contains(v.name) ? "Saved (type to replace)" : v.name)
@@ -347,9 +334,8 @@ private struct AgentKeysForm: View {
                 .font(.caption)
                 .foregroundStyle(Palette.tertiary)
                 .padding(.horizontal, 4)
-            }
             if !saved.isEmpty {
-                CardSection {
+                NativeFormSection {
                     Button(L10n.tr("Remove saved keys"), role: .destructive) {
                         save(Dictionary(uniqueKeysWithValues: vars.map { ($0.name, "") }))
                     }
@@ -358,7 +344,7 @@ private struct AgentKeysForm: View {
                 }
             }
             if let error {
-                CardSection { Text(L10n.tr(error)).foregroundStyle(Palette.danger) }
+                NativeFormSection { Text(L10n.tr(error)).foregroundStyle(Palette.danger) }
             }
         }
         .textFieldStyle(.plain)
@@ -409,13 +395,8 @@ private struct SetupStepRow: View {
             Spacer(minLength: 8)
             if let action {
                 Button(L10n.tr(action.label), action: action.run)
-                    .buttonStyle(.plain)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(Palette.text)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 7)
-                    .background(Palette.bubbleAgent, in: Capsule())
-                    .fixedSize()
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
             }
         }
         .padding(.vertical, 4)

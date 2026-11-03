@@ -8,9 +8,17 @@ import UIKit
 public struct ThreadView: View {
     let botId: String
 
-    public init(botId: String) { self.botId = botId }
+    public init(botId: String) {
+        self.botId = botId
+        #if DEBUG
+        if let preview = ProcessInfo.processInfo.environment["CODYNC_PROFILE_PREVIEW"], ["details", "edit"].contains(preview) {
+            _details = State(initialValue: DetailsRequest(tab: preview == "edit" ? .settings : .details))
+        }
+        #endif
+    }
     @Environment(BotStore.self) var model
     @State var showTrace = false
+    @AppStorage("manualUnreadConversations") private var manualUnreadData = Data()
     /// The message the composer's next send quotes.
     @State var replyingTo: Entry?
     @State var botChat: BotChatTarget?
@@ -43,7 +51,6 @@ public struct ThreadView: View {
                         .transition(.opacity)
                 } else {
                     Composer(botId: botId, replyingTo: $replyingTo,
-                             onCall: !calling && bot != nil ? { calling = true } : nil,
                              onInterrupt: callSpeaking ? interruptCall : nil)
                 }
             }
@@ -65,6 +72,11 @@ public struct ThreadView: View {
     var conversation: some View {
         chrome(chat)
             .readingConversation(botId)
+            .onAppear {
+                var marks = ManualUnreadMarks(data: manualUnreadData)
+                marks.set(false, account: model.storage.accountID, computer: model.computer.id, bot: botId)
+                manualUnreadData = marks.data
+            }
             .reviewReading(botId: botId, unobscured: following && !calling && !showTrace && botChat == nil
                            && openArtifact == nil && openCall == nil && details == nil && !editingGroup
                            && model.composerDraft(for: botId).isEmpty && model.fileDownloads.export == nil)
@@ -79,11 +91,13 @@ public struct ThreadView: View {
             .codyncSheet(item: $botChat) { BotConversationView(botId: botId, peerId: $0.id) }
             .codyncSheet(item: $openArtifact) { ArtifactView(target: $0) }
             .codyncSheet(item: $openCall) { CallConversationView(line: $0) }
-            .codyncSheet(item: $details) { request in
+            .navigationDestination(item: $details) { request in
                 BotDetailsView(botId: request.botId ?? botId, request: request) { artifact in
                     details = nil
                     openArtifact = artifact
                 }
+                // Navigation destinations are hosted outside ChatScreen's local environment.
+                .environment(model)
             }
             .codyncSheet(isPresented: $editingGroup) {
                 if let bot { GroupEditorView(group: bot) }
@@ -131,50 +145,12 @@ public struct ThreadView: View {
 
     // MARK: chrome
 
-    var connectionSubtitle: some View {
-        HStack(spacing: 6) {
-            Group {
-                if model.shownConnection == .connecting {
-                    Spinner(size: 8)
-                } else {
-                    Image(systemName: connectionSymbol).font(.system(size: 8, weight: .medium))
-                }
-            }
-            .frame(width: 12)
-            .accessibilityHidden(true)
-            Text(L10n.tr(model.connectionLabel))
-                .lineLimit(1)
-                .truncationMode(.middle)
-        }
-        .font(.system(size: 10, weight: .medium))
-        .foregroundStyle(Palette.secondary)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(model.hostName), \(L10n.tr(connectionDescription))")
-        .help("\(model.hostName) · \(L10n.tr(connectionDescription))")
-    }
-
     private var connectionSymbol: String {
         guard model.connection == .online else { return "wifi.slash" }
         switch model.hostRoute {
         case .relay: return "cloud"
         case .direct: return "wifi"
         case nil: return "network"
-        }
-    }
-
-    private var connectionDescription: String {
-        switch model.shownConnection {
-        case .connecting: return "Connecting"
-        case .computerOffline, .offline: return "Offline"
-        case .unauthorized: return "No access"
-        case .unpaired: return "Not paired"
-        case .online: break
-        }
-        if model.mismatch != nil { return "Needs update" }
-        switch model.hostRoute {
-        case .relay: return RelayCopy.connected(cloud: model.computer.cloud)
-        case .direct: return "Connected over Wi-Fi or Tailscale"
-        case nil: return "Connected"
         }
     }
 
@@ -375,27 +351,26 @@ extension ThreadView {
         }
     }
 
-    /// The system navigation bar: the title opens the bot's details; the corner is the computer.
+    /// The system navigation bar: the title opens details; More holds the computer-screen action.
     func chrome(_ content: some View) -> some View {
         content
             .navigationBarTitleDisplayMode(.inline)
             .toolbar(.visible, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .principal) {
-                    VStack(spacing: 0) {
-                        header
-                        connectionSubtitle
-                    }
+                    header
                 }
-                if model.screen != nil {
-                    ToolbarItem(placement: .topBarTrailing) { computerButton }
-                }
+                ToolbarItem(placement: .topBarTrailing) { moreButton }
             }
     }
 
     /// Like Grok Bot: the bot at the top opens its details (a group's editor for a group).
     var header: some View {
-        Button(action: openDetails) { title }
+        Button(action: openDetails) {
+            title.padding(.horizontal, 12).frame(minHeight: 36)
+        }
+            .buttonStyle(.glass)
+            .buttonBorderShape(.capsule)
             .accessibilityLabel(L10n.tr("{name}, view details").replacingOccurrences(of: "{name}", with: bot?.name ?? ""))
     }
 
@@ -403,12 +378,24 @@ extension ThreadView {
         if bot?.isGroup == true { editingGroup = true } else { details = DetailsRequest() }
     }
 
-    /// Opens the computer's screen; pulses while this bot is operating it (watch, then take over).
-    private var computerButton: some View {
+    /// Keep screen access in the native menu and preserve watching a bot before taking over.
+    private var moreButton: some View {
         let operating = model.screen?.agentBot == botId
-        return Button(L10n.tr("Computer"), systemImage: "desktopcomputer") {
-            model.screenRequest = operating ? ScreenRequest(watching: botId) : ScreenRequest()
+        return Menu {
+            if model.screen != nil {
+                Button(operating ? "查看正在操作的电脑屏幕" : "查看电脑屏幕", systemImage: "desktopcomputer") {
+                    model.screenRequest = operating ? ScreenRequest(watching: botId) : ScreenRequest()
+                }
+            }
+            Label(L10n.tr(model.connectionLabel), systemImage: connectionSymbol)
+            Text(model.hostName)
+        } label: {
+            Image(systemName: "ellipsis")
+                .font(.system(size: 18, weight: .semibold))
         }
-        .symbolEffect(.pulse, options: .repeating, isActive: operating)
+        .menuIndicator(.hidden)
+        .buttonBorderShape(.circle)
+        .accessibilityLabel("更多")
+        .help("更多")
     }
 }

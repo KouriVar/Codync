@@ -7,6 +7,7 @@ struct LibraryView: View {
     let botId: String
     /// Opens an artifact in the chat's viewer (the details sheet closes first).
     let openArtifact: (ArtifactTarget) -> Void
+    var nativeStyle = false
     @Environment(BotStore.self) private var model
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// The files shared in the chat; its artifacts come from the store, where their events keep them current.
@@ -19,20 +20,38 @@ struct LibraryView: View {
 
     var body: some View {
         let items = files + model.artifacts.artifacts(of: botId).map(ChatLibraryItem.init)
-        VStack(alignment: .leading, spacing: 28) {
-            if let error {
-                Text(L10n.tr(error)).font(.caption).foregroundStyle(Palette.danger).textSelection(.enabled)
-            }
-            if !items.isEmpty {
-                ForEach(ChatLibraryItem.sections(items), id: \.period) { section in
-                    CardSection(section.period.rawValue) {
-                        ForEach(section.items) { row($0) }
+        Group {
+            if nativeStyle {
+                List {
+                    if let error { Section { Text(error).foregroundStyle(.red) }.botNativeGroup() }
+                    ForEach(ChatLibraryItem.sections(items), id: \.period) { section in
+                        Section(L10n.tr(section.period.rawValue)) {
+                            ForEach(section.items) { row($0) }
+                        }
+                        .botNativeGroup()
+                    }
+                    if items.isEmpty {
+                        Section { if loaded { empty } else { ProgressView() } }.botNativeGroup()
                     }
                 }
-            } else if loaded {
-                empty
+                .listStyle(.insetGrouped)
             } else {
-                Spinner(size: 20).frame(maxWidth: .infinity).padding(.top, 40)
+                VStack(alignment: .leading, spacing: 28) {
+                    if let error {
+                        Text(L10n.tr(error)).font(.caption).foregroundStyle(Palette.danger).textSelection(.enabled)
+                    }
+                    if !items.isEmpty {
+                        ForEach(ChatLibraryItem.sections(items), id: \.period) { section in
+                            Section {
+                                ForEach(section.items) { row($0) }
+                            }
+                        }
+                    } else if loaded {
+                        empty
+                    } else {
+                        Spinner(size: 20).frame(maxWidth: .infinity).padding(.top, 40)
+                    }
+                }
             }
         }
         .animation(Motion.reduced(Motion.fade, reduceMotion), value: loaded)

@@ -62,6 +62,17 @@ extension BotStore {
         send(text, to: botId, replyTo: nil, nonce: UUID().uuidString, files: files)
     }
 
+    /// Hands a captured photo to a bot's composer (which opens shortly after), so the home
+    /// pull-to-capture gesture can attach it without sending on its own.
+    public func attachPendingFile(_ file: OutgoingFile, to botId: String) {
+        pendingComposerFiles[botId, default: []].append(file)
+    }
+
+    func takePendingFiles(for botId: String) -> [OutgoingFile] {
+        defer { pendingComposerFiles[botId] = nil }
+        return pendingComposerFiles[botId] ?? []
+    }
+
     /// Said on voice call `call` (on-device or speech to text): the chat shows it in the call's conversation.
     public func send(_ text: String, to botId: String, call: String) {
         send(text, to: botId, replyTo: nil, nonce: UUID().uuidString, call: call)

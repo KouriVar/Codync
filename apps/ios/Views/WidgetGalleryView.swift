@@ -146,7 +146,6 @@ struct WidgetGalleryView: View {
             .frame(maxWidth: .infinity)
         }
         .background(Palette.background)
-        .hidesSystemNavigationBar()
         .navigationDestination(item: $page) { page in
             switch page {
             case .lockScreen: LockWidgetGalleryView()

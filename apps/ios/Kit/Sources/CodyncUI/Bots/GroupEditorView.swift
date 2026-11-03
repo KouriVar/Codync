@@ -32,15 +32,7 @@ public struct GroupEditorView: View {
     private var canSave: Bool { !members.isEmpty && !saving }
 
     public var body: some View {
-        VStack(spacing: 0) {
-            ModalHeader("Group chat") {
-                if saving {
-                    Spinner()
-                } else {
-                    IconButton("Save", systemImage: "checkmark") { save() }
-                        .disabled(!canSave)
-                }
-            }
+        NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 28) {
                     VStack(spacing: 10) {
@@ -117,8 +109,20 @@ public struct GroupEditorView: View {
                 .padding(.bottom, 24)
             }
             .scrollDismissesKeyboard(.interactively)
+            .navigationTitle(L10n.tr("Group chat"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(L10n.tr("Close")) { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    if saving { ProgressView() } else {
+                        Button(L10n.tr("Save")) { save() }.disabled(!canSave)
+                    }
+                }
+            }
         }
-        .background(Palette.background)
+        .tint(.primary)
         .deleteBotConfirmation($confirmDelete) { dismiss() }
     }
 

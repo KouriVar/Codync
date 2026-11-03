@@ -28,22 +28,14 @@ struct SetupTerminalView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            ScreenHeader {
-                BackButton(action: back).keyboardShortcut(.cancelAction)
-            } title: {
-                Text(title)
-                    .font(.body.weight(.semibold))
-                    .foregroundStyle(Palette.text)
-                    .lineLimit(1)
-            } trailing: {
-                EmptyView()
-            }
             TerminalSurface(session: session) { openURL($0) }
                 .padding(.horizontal, 10)
                 .padding(.top, 6)
             footer
         }
         .background(Palette.background)
+        .navigationTitle(L10n.tr(title))
+        .navigationBarTitleDisplayMode(.inline)
         .task {
             guard let client = model.client else { return }
             await session.run(client, backend: backend?.id ?? "", step: step, method: method?.id)
@@ -68,7 +60,7 @@ struct SetupTerminalView: View {
             }
             Spacer(minLength: 0)
             if session.exitCode != nil {
-                Button(L10n.tr("Done"), action: back).buttonStyle(.primary)
+                Button(L10n.tr("Done"), action: back).buttonStyle(.borderedProminent)
             }
         }
         .font(.footnote)

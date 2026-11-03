@@ -5,6 +5,7 @@ import SwiftUI
 struct RoutinesView: View {
     let botId: String
     var initialId: String?
+    var nativeStyle = false
     @Environment(BotStore.self) private var model
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var routines: [Routine] = []
@@ -17,22 +18,11 @@ struct RoutinesView: View {
     @State private var loadError: String?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Text(L10n.tr("Routines"))
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(Palette.text)
-                    .padding(.leading, 2)
-                Spacer(minLength: 0)
-                IconButton("Set up a routine", systemImage: "plus") { open(nil) }
-                    .disabled(model.isOffline)
-            }
-            if let loadError { Text(loadError).font(.caption).foregroundStyle(Palette.danger) }
-            if let error { Text(L10n.tr(error)).font(.caption).foregroundStyle(.red).textSelection(.enabled) }
-            listing
+        Group {
+            if nativeStyle { nativeListing } else { legacyListing }
         }
         .foregroundStyle(Palette.text)
-        .font(.system(size: 13))
+        .font(nativeStyle ? .body : .system(size: 13))
         .onChange(of: initialId) { _, id in
             if let id { open(id) }
         }
@@ -58,6 +48,43 @@ struct RoutinesView: View {
             }
             // The list is part of bot details; a routine's editor is the routines screen, as on the desktop.
             .tracked(.screenViewed(.routines))
+        }
+    }
+
+    private var legacyListing: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text(L10n.tr("Routines"))
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(Palette.text)
+                    .padding(.leading, 2)
+                Spacer(minLength: 0)
+                IconButton("Set up a routine", systemImage: "plus") { open(nil) }
+                    .disabled(model.isOffline)
+            }
+            if let loadError { Text(loadError).font(.caption).foregroundStyle(Palette.danger) }
+            if let error { Text(L10n.tr(error)).font(.caption).foregroundStyle(.red).textSelection(.enabled) }
+            listing
+        }
+    }
+
+    private var nativeListing: some View {
+        Form {
+            Section {
+                if routines.isEmpty {
+                    Text(loaded ? "暂无定时任务" : "正在加载…").foregroundStyle(.secondary)
+                }
+                ForEach(routines) { routine in row(routine) }
+            }
+            .botNativeGroup()
+            if let loadError { Section { Text(loadError).font(.footnote).foregroundStyle(.red) }.botNativeGroup() }
+            if let error { Section { Text(error).font(.footnote).foregroundStyle(.red) }.botNativeGroup() }
+        }
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button("添加定时任务", systemImage: "plus") { open(nil) }
+                    .disabled(model.isOffline)
+            }
         }
     }
 
@@ -95,7 +122,7 @@ struct RoutinesView: View {
             }
             .buttonStyle(.plain)
             Toggle(isOn: Binding(get: { routine.enabled }, set: { action("setRoutineEnabled", routine, enabled: $0) })) { EmptyView() }
-                .toggleStyle(.codync)
+                .toggleStyle(.switch)
                 .fixedSize()
                 .accessibilityLabel(routine.name)
                 .disabled(busy || model.isOffline)

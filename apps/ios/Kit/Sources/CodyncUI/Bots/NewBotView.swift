@@ -23,20 +23,23 @@ public struct NewBotView: View {
                    canCreate: !saving && model.connection == .online, error: error, create: save) {
             CharacterAvatar(shape: draft.avatarShape, color: draft.avatarColor, size: 96)
         } content: {
-            AvatarPicker(shape: $draft.avatarShape, color: $draft.avatarColor)
+            Section(L10n.tr("Appearance")) {
+                AvatarPicker(shape: $draft.avatarShape, color: $draft.avatarColor)
+                    .padding(.vertical, 8)
+            }
             if computers.count > 1 || model.connection != .online {
-                VStack(alignment: .leading, spacing: 6) {
+                Section(L10n.tr("Computer")) {
                     if computers.count > 1 {
-                        ValueRow("Computer") {
-                            ChoicePicker(selection: $computer, options: computers, fitsAvailableWidth: true)
-                                .accessibilityLabel("Computer")
+                        Picker(L10n.tr("Computer"), selection: $computer) {
+                            ForEach(computers, id: \.id) { Text($0.label).tag($0.id) }
                         }
+                        .pickerStyle(.navigationLink)
                     }
                     if model.connection != .online {
-                        Text(computers.count > 1
+                        Text(L10n.tr(computers.count > 1
                             ? "Connect this computer to create the bot, or choose another computer."
-                            : "Connect this computer to create the bot.")
-                            .font(.caption).foregroundStyle(Palette.warning)
+                            : "Connect this computer to create the bot."))
+                            .font(.footnote).foregroundStyle(.secondary)
                     }
                 }
             }
@@ -98,18 +101,17 @@ public struct NewGroupView: View {
                 .animation(Motion.layout, value: members)
         } content: {
             let bots = model.roster.filter { !$0.isGroup }
-            VStack(spacing: 14) {
+            Section {
                 if bots.isEmpty {
-                    Text(L10n.tr("No bots yet. Create a bot first.")).font(.subheadline).foregroundStyle(Palette.secondary)
+                    Text(L10n.tr("No bots yet. Create a bot first.")).font(.subheadline).foregroundStyle(.secondary)
                 } else {
                     WrapLayout(spacing: 8) {
                         ForEach(bots) { tile($0) }
                     }
+                    .padding(.vertical, 8)
                 }
+            } header: { Text(L10n.tr("Members")) } footer: {
                 Text(L10n.tr("Everyone answers in turn unless you @mention someone."))
-                    .font(.caption)
-                    .foregroundStyle(Palette.tertiary)
-                    .multilineTextAlignment(.center)
             }
         }
     }
@@ -157,8 +159,7 @@ public struct NewGroupView: View {
     }
 }
 
-/// The create dialogs' layout: a large preview, a centered name field (Return creates), the
-/// pickers, then any save error.
+/// Shared native creation form: avatar preview, name, option sections and save errors.
 private struct CreateForm<Preview: View, Content: View>: View {
     let title: String
     let placeholder: String
@@ -171,46 +172,55 @@ private struct CreateForm<Preview: View, Content: View>: View {
     @ViewBuilder let content: Content
     @FocusState private var naming: Bool
 
+    @Environment(\.dismissModal) private var dismiss
+
     var body: some View {
-        VStack(spacing: 0) {
-            ModalHeader(title) {
-                if saving {
-                    Spinner()
-                } else {
-                    IconButton("Create", systemImage: "checkmark", action: create)
-                        .disabled(!canCreate)
+        NavigationStack {
+            Form {
+                Section {
+                    preview.frame(maxWidth: .infinity).padding(.vertical, 16)
+                        .listRowBackground(Color.clear)
+                }
+                Section(L10n.tr("Name")) {
+                    TextField(L10n.tr(placeholder), text: $name)
+                        .submitLabel(.done)
+                        .focused($naming)
+                        .onSubmit { if canCreate { create() } }
+                }
+                content
+                if let error {
+                    Section { Text(L10n.tr(error)).font(.footnote).foregroundStyle(.red) }
                 }
             }
-            ScrollView {
-                VStack(spacing: 28) {
-                    VStack(spacing: 16) {
-                        preview
-                        TextField(L10n.tr(placeholder), text: $name)
-                            .textFieldStyle(.plain)
-                            .font(.title2.weight(.semibold))
-                            .foregroundStyle(Palette.text)
-                            .multilineTextAlignment(.center)
-                            .submitLabel(.done)
-                            .focused($naming)
-                            .onSubmit(create)
-                    }
-                    content
-                    if let error {
-                        Text(L10n.tr(error))
-                            .font(.footnote)
-                            .foregroundStyle(Palette.danger)
-                            .multilineTextAlignment(.center)
-                            .transition(.opacity)
-                    }
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.horizontal, 20)
-                .padding(.top, 8)
-                .padding(.bottom, 24)
-            }
+            .disabled(saving)
             .scrollDismissesKeyboard(.interactively)
+            .navigationTitle(L10n.tr(title))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(L10n.tr("Cancel"), systemImage: "xmark") { dismiss() }
+                        .labelStyle(.iconOnly).buttonBorderShape(.circle)
+                        .disabled(saving)
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(action: create) {
+                        if saving { ProgressView() } else { Text(L10n.tr("Create")) }
+                    }
+                    .buttonStyle(.glassProminent)
+                    .buttonBorderShape(.capsule)
+                    .tint(.primary)
+                    .foregroundStyle(Color(uiColor: .systemBackground))
+                    .disabled(!canCreate)
+                }
+            }
         }
-        .background(Palette.background)
-        .onAppear { naming = true }
+        .tint(.primary)
+        .interactiveDismissDisabled(saving)
+        .onAppear {
+            #if DEBUG
+            if ProcessInfo.processInfo.environment["CODYNC_CREATE_PREVIEW"] != nil { return }
+            #endif
+            naming = true
+        }
     }
 }

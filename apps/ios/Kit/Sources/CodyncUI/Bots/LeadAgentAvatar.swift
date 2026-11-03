@@ -3,10 +3,11 @@ import SwiftUI
 
 struct LeadAgentAvatar: View {
     let bot: Bot
+    var size: CGFloat = 72
     @State private var showingRole = false
 
     var body: some View {
-        CharacterAvatar(bot: bot, size: 72)
+        CharacterAvatar(bot: bot, size: size)
             .overlay(alignment: .bottomTrailing) {
                 if bot.lead {
                     Button { Motion.animate { showingRole = true } } label: {
@@ -24,18 +25,23 @@ struct LeadAgentAvatar: View {
 }
 
 private struct LeadAgentInfo: View {
+    @Environment(\.dismissModal) private var dismiss
     var body: some View {
-        VStack(spacing: 0) {
-            ModalHeader("Lead agent")
+        NavigationStack {
             ScrollView {
                 Text(L10n.tr("Your lead agent is your first point of contact. It follows your goals and unfinished tasks, suggests useful next steps, and coordinates work with your other bots. The lead Codync sets up has a Check in routine that runs twice a day by default; you can change or pause it in Routines."))
                     .font(.body)
-                    .foregroundStyle(Palette.secondary)
+                    .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(20)
             }
+            .navigationTitle(L10n.tr("Lead agent"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) { Button(L10n.tr("Close")) { dismiss() } }
+            }
         }
-        .background(Palette.background)
+        .tint(.primary)
     }
 }

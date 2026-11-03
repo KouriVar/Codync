@@ -25,7 +25,7 @@ struct ChatRow: View {
         switch entry.kind {
         case "user":
             VStack(alignment: .trailing, spacing: 4) {
-                UserBubble(entry: entry, botWorking: chat?.isWorking == true, reply: reply)
+                UserBubble(entry: entry, botWorking: chat?.isWorking == true, color: chat?.avatarColor, reply: reply)
                 ReactionsRow(entry: entry)
             }
             .animation(Motion.reduced(Motion.layout, reduceMotion), value: entry.data.reactions)
@@ -100,6 +100,7 @@ struct AuthorLabel: View {
 /// The message a reply quotes, as its first line without Markdown markers.
 struct QuoteLine: View {
     let text: String
+    var ink: Color = Palette.secondary
 
     var body: some View {
         Label {
@@ -108,7 +109,7 @@ struct QuoteLine: View {
             Image(systemName: "text.bubble")
         }
         .font(.subheadline)
-        .foregroundStyle(Palette.secondary)
+        .foregroundStyle(ink)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Replying to \(text)")
     }
@@ -117,6 +118,7 @@ struct QuoteLine: View {
 struct UserBubble: View {
     let entry: Entry
     let botWorking: Bool
+    var color: String? = nil
     var reply: (() -> Void)?
     @Environment(BotStore.self) private var model
 
@@ -134,17 +136,17 @@ struct UserBubble: View {
 
     private var text: some View {
             VStack(alignment: .leading, spacing: 4) {
-                if let quote = entry.data.replyTo { QuoteLine(text: quote.text) }
+                if let quote = entry.data.replyTo { QuoteLine(text: quote.text, ink: ChatAccent(color).ink.opacity(0.8)) }
                 if let text = entry.data.text, !text.isEmpty {
                     Text(text)
                         .font(.body)
-                        .foregroundStyle(Palette.text)
+                        .foregroundStyle(ChatAccent(color).ink)
                         .textSelection(.enabled)
                 }
             }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 10)
-                .background(Palette.bubbleUser, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .background(ChatAccent(color).fill, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
                 .contextActions(reactions: model.reactionPick(entry)) {
                     var items = [MenuItem("Copy", icon: "square.on.square") { Pasteboard.copy(entry.data.text) }]
                     if let reply { items.append(MenuItem("Reply", icon: "arrowshape.turn.up.left", action: reply)) }
@@ -411,6 +413,6 @@ struct ReactionsRow: View {
 extension ChatRow: @MainActor Equatable {
     static func == (a: Self, b: Self) -> Bool {
         a.entry == b.entry && a.groupStart == b.groupStart && a.chat?.isGroup == b.chat?.isGroup
-            && a.chat?.isWorking == b.chat?.isWorking && (a.reply == nil) == (b.reply == nil)
+            && a.chat?.isWorking == b.chat?.isWorking && a.chat?.avatarColor == b.chat?.avatarColor && (a.reply == nil) == (b.reply == nil)
     }
 }

@@ -5,6 +5,7 @@ import SwiftUI
 /// own notes when the user kept them on. The user changes memory by telling the bot.
 struct MemoryCard: View {
     let botId: String
+    var nativeStyle = false
     @Environment(BotStore.self) private var host
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     @State private var memory: MemoryStore?
@@ -31,16 +32,8 @@ struct MemoryCard: View {
     }
 
     var body: some View {
-        VStack(spacing: 10) {
-            TabChoice(selection: Binding(get: { section }, set: { value in
-                withAnimation(Motion.layout) { section = value }
-                // Claude Code writes its notes outside Codync, so nothing moves `memoryRev`: read them again on the way in.
-                if value == .harness { Task { await memory?.load() } }
-            }), options: sections(memory?.view))
-            CardSection {
-                if let memory { contents(memory) }
-                else { Text(L10n.tr("Loading memory…")).foregroundStyle(Palette.secondary) }
-            }
+        Group {
+            if nativeStyle { nativeContent } else { legacyContent }
         }
         .tracked(.screenViewed(.memory))
         // Memory changes anywhere move the bot's `memoryRev`: fetch again.
@@ -61,6 +54,41 @@ struct MemoryCard: View {
                         ? .shared : bot.backend == "claude" ? .readable : .hidden)
                 }
             case .dreams: MemoryInfoSheet.dreams
+            }
+        }
+    }
+
+    private var nativeContent: some View {
+        Form {
+            SwiftUI.Section {
+                Picker("记忆类型", selection: $section) {
+                    ForEach(sections(memory?.view), id: \.id) { item in
+                        Text(L10n.tr(item.label)).tag(item.id)
+                    }
+                }
+                .pickerStyle(.segmented)
+            }
+            .listRowBackground(Color.clear)
+            SwiftUI.Section {
+                if let memory { contents(memory) }
+                else { ProgressView() }
+            }
+            .botNativeGroup()
+        }
+        .onChange(of: section) { _, value in
+            if value == MemoryCard.Section.harness { Task { await memory?.load() } }
+        }
+    }
+
+    private var legacyContent: some View {
+        VStack(spacing: 10) {
+            TabChoice(selection: Binding(get: { section }, set: { value in
+                withAnimation(Motion.layout) { section = value }
+                if value == .harness { Task { await memory?.load() } }
+            }), options: sections(memory?.view))
+            SwiftUI.Section {
+                if let memory { contents(memory) }
+                else { Text(L10n.tr("Loading memory…")).foregroundStyle(Palette.secondary) }
             }
         }
     }
@@ -90,7 +118,7 @@ struct MemoryCard: View {
             Toggle(isOn: Binding(get: { bot.sharedMemory ?? view.shared }, set: { host.setSharedMemory(bot, $0) })) {
                 Text(L10n.tr("Use what your bots share"))
             }
-                .toggleStyle(.codync)
+                .toggleStyle(.switch)
         }
         // The harness's own memory: a switch where Codync can turn it off, "Shared" where every bot on it shares it.
         if !shared, let bot, bot.harnessMemory != nil || bot.harnessMemoryShared == true {
@@ -103,7 +131,7 @@ struct MemoryCard: View {
                 }
                 if let on = bot.harnessMemory {
                     Toggle(isOn: Binding(get: { on }, set: { host.setHarnessMemory(bot, $0) })) { EmptyView() }
-                        .toggleStyle(.codync)
+                        .toggleStyle(.switch)
                         .accessibilityLabel(own)
                 } else {
                     Spacer(minLength: 8)

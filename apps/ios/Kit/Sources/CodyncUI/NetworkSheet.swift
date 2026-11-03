@@ -12,55 +12,53 @@ extension Image {
 /// Changes are made at a computer. The computer is the `BotStore` in the environment.
 public struct NetworkSheet: View {
     @Environment(BotStore.self) private var store
+    @Environment(\.dismissModal) private var dismiss
 
     public init() {}
 
     public var body: some View {
-        VStack(spacing: 0) {
-            ModalHeader {
-                HStack(spacing: 8) {
-                    Image.codyncNetwork.resizable().scaledToFit().frame(width: 26, height: 26).accessibilityHidden(true)
-                    Text(L10n.tr("Network"))
-                    // The network is a beta feature.
-                    Text(L10n.tr("Beta"))
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(Palette.secondary)
-                        .padding(.horizontal, 7)
-                        .padding(.vertical, 2)
-                        .background(Palette.bubbleAgent, in: Capsule())
-                }
-            }
-            CardForm {
+        NavigationStack {
+            Form {
                 let networks = store.network?.networks ?? []
                 ForEach(networks) { network in
-                    // One section per network: its computers, then who may message the bots here.
-                    CardSection(network.name) {
+                    Section(network.name) {
                         ForEach(network.computers ?? []) { NetworkComputerRow(computer: $0) }
                     }
                     if let rules = network.rules, !rules.isEmpty {
-                        CardSection("Who may message bots here", footer: "The first rule that matches decides. Without rules, every computer in the network may message every bot here. Answers to this computer's own messages always get in.") {
+                        Section {
                             ForEach(Array(rules.enumerated()), id: \.offset) { _, rule in
                                 Text(network.text(of: rule)).font(.subheadline).foregroundStyle(Palette.text)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .padding(.vertical, 4)
                             }
+                        } header: {
+                            Text(L10n.tr("Who may message bots here"))
+                        } footer: {
+                            Text(L10n.tr("The first rule that matches decides. Without rules, every computer in the network may message every bot here. Answers to this computer's own messages always get in."))
                         }
                     }
                 }
-                // The note that changes happen at a computer closes the networks, after the last one's rules.
                 if !networks.isEmpty {
-                    CardSection(footer: "Changes are made on a computer: in Codync's settings there, or with codync-host network.") {}
+                    Section { } footer: {
+                        Text(L10n.tr("Changes are made on a computer: in Codync's settings there, or with codync-host network."))
+                    }
                 }
                 if store.network?.assistantsAvailable == true {
-                    CardSection(footer: "ChatGPT or Claude in your Codync account can message this computer's bots when it's on. Codync's cloud can read these calls.") {
-                        ValueRow("Cloud assistants", value: store.network?.assistants == true ? "On" : "Off")
+                    Section {
+                        LabeledContent(L10n.tr("Cloud assistants"), value: L10n.tr(store.network?.assistants == true ? "On" : "Off"))
+                    } footer: {
+                        Text(L10n.tr("ChatGPT or Claude in your Codync account can message this computer's bots when it's on. Codync's cloud can read these calls."))
                     }
+                }
+            }
+            .navigationTitle(L10n.tr("Network"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(L10n.tr("Close")) { dismiss() }
                 }
             }
             .animation(Motion.layout, value: store.network)
         }
-        .background(Palette.background)
-        // Presence as of now: the host asks the others when stale, and its event updates this.
+        .tint(.primary)
         .task { await store.refreshNetwork() }
         .tracked(.screenViewed(.network))
     }

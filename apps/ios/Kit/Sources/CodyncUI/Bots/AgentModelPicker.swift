@@ -34,27 +34,12 @@ struct AgentModelPicker: View {
         "\(store.computer.id)/\(backend)/\(store.connection == .online)/\(retry)"
     }
 
-    /// The agent's own "Default (recommended)" entry is the same choice as leaving the model unset,
-    /// so it folds into the single Default row instead of showing twice.
-    private var agentDefault: AgentModels.Model? {
-        catalog?.models.first { $0.name.lowercased().hasPrefix("default") }
-    }
-
-    private var modelChoices: [(String, String)] {
-        let available = (catalog?.models ?? []).filter { $0.id != agentDefault?.id }
-        let current = available.first { $0.id == catalog?.currentModelId }?.name
-        var result = [("", agentDefault?.name ?? current.map { "Default · \($0)" } ?? "Default")]
-        result += available.map { ($0.id, $0.name) }
-        if let selection, !selection.isEmpty, selection != agentDefault?.id,
-           !available.contains(where: { $0.id == selection }) {
-            result.append((selection, selection))
-        }
-        return result
-    }
+    private var modelState: AgentModelSelection { AgentModelSelection(catalog: catalog, selection: selection) }
+    private var modelChoices: [(String, String)] { modelState.choices }
 
     private var value: Binding<String> {
         Binding(
-            get: { selection == agentDefault?.id ? "" : selection ?? "" },
+            get: { modelState.value },
             set: {
                 let model = $0.isEmpty ? nil : $0
                 guard model != selection else { return }
@@ -64,15 +49,8 @@ struct AgentModelPicker: View {
         )
     }
 
-    /// Settings the selected model offers.
-    private var selectedModel: AgentModels.Model? {
-        catalog?.models.first { $0.id == (selection ?? agentDefault?.id ?? catalog?.currentModelId) }
-    }
-
-    private var modelOptions: [AgentModels.Option] {
-        guard !value.wrappedValue.isEmpty || catalog?.defaultModelOptions == true else { return [] }
-        return selectedModel?.options ?? []
-    }
+    private var selectedModel: AgentModels.Model? { modelState.selectedModel }
+    private var modelOptions: [AgentModels.Option] { modelState.options }
 
     private var showsFastMode: Bool {
         guard let fastMode else { return false }
@@ -84,7 +62,7 @@ struct AgentModelPicker: View {
     private var modelName: String { value.wrappedValue.isEmpty ? L10n.tr("Default") : modelChoices.first { $0.0 == value.wrappedValue }?.1 ?? value.wrappedValue }
     private var summary: String {
         let settings = modelOptions.compactMap { option in
-            option.values.first { $0.id == (options[option.id] ?? option.default) }?.name
+            option.values.first { $0.id == (options[option.id] ?? option.default) }.map { option.localizedName(for: $0) }
         }
         return ([agentName, modelName] + settings + (fastMode?.wrappedValue == true ? ["Fast"] : [])).joined(separator: " · ")
     }
@@ -132,19 +110,19 @@ struct AgentModelPicker: View {
                     } else {
                     VStack(alignment: .leading, spacing: 6) {
                         HStack {
-                            Text(option.name).foregroundStyle(Palette.secondary)
+                            Text(option.localizedTitle).foregroundStyle(Palette.secondary)
                             Spacer(minLength: 0)
                             Button {
                                 withAnimation(Motion.reduced(Motion.fade, reduceMotion)) { options[option.id] = nil }
                             } label: {
-                                let fallback = option.values.first { $0.id == option.default }?.name
+                                let fallback = option.values.first { $0.id == option.default }.map { option.localizedName(for: $0) }
                                 Text(L10n.tr("Default") + (fallback.map { " · \($0)" } ?? "") + (options[option.id] == nil ? " ✓" : ""))
                             }
                             .buttonStyle(.plain)
                         }.font(.caption)
                         ScrollView(.horizontal) {
                             SegmentedChoice(selection: Binding(get: { options[option.id] ?? option.default ?? "" }, set: { options[option.id] = $0 }),
-                                            options: option.values.map { ($0.id, $0.name) })
+                                            options: option.values.map { ($0.id, option.localizedName(for: $0)) })
                                 .frame(minWidth: CGFloat(option.values.count) * 65)
                         }.scrollIndicators(.hidden)
                     }

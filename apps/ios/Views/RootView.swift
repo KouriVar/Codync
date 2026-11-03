@@ -38,7 +38,7 @@ struct RootView: View {
                     .transition(.move(edge: .trailing).combined(with: .opacity))
                 }
             } else {
-                tabs
+                home
             }
         }
         .background(Palette.background)
@@ -65,30 +65,17 @@ struct RootView: View {
         }
     }
 
-    /// The system tab bar; every tab stays alive (scroll position, open thread) and the bar hides while a
-    /// thread is open.
-    private var tabs: some View {
-        TabView(selection: Bindable(app).tab) {
-            Tab(L10n.tr("Bots"), systemImage: "bubble.left.and.bubble.right.fill", value: AppTab.bots) {
-                NavigationStack(path: path) {
-                    BotListView()
-                        .safeAreaInset(edge: .bottom, spacing: 0) { AccessBanners() }
-                        .navigationDestination(for: BotReference.self) { ref in
-                            ChatScreen(ref: ref).toolbar(.hidden, for: .tabBar)
-                        }
+    /// State and Settings live in the avatar sheet; the experimental tab remains hidden.
+    private var home: some View {
+        NavigationStack(path: path) {
+            BotListView()
+                .safeAreaInset(edge: .bottom, spacing: 0) { AccessBanners() }
+                .navigationDestination(for: BotReference.self) { ref in
+                    ChatScreen(ref: ref)
                 }
-            }
-            Tab(L10n.tr("State"), systemImage: "rectangle.stack.fill", value: AppTab.state) {
-                StateTab()
-                    .safeAreaInset(edge: .bottom, spacing: 0) { AccessBanners() }
-            }
-            Tab(L10n.tr("Settings"), systemImage: "gearshape", value: AppTab.settings) {
-                SettingsView()
-                    .safeAreaInset(edge: .bottom, spacing: 0) { AccessBanners() }
-            }
         }
         .tint(Palette.text)
-        .tracked(.screenViewed(screen))
+        .tracked(.screenViewed(.bots))
         // Opening a bot (notification, widget, link) always lands on the Bots tab.
         .onChange(of: accounts.selection) { old, ref in
             if ref != nil {
@@ -97,14 +84,6 @@ struct RootView: View {
             } else if let old {
                 ReviewInvitation.shared.returned(from: "\(accounts.storage.id)/\(old.computerId)/\(old.botId)")
             }
-        }
-    }
-
-    private var screen: AnalyticsEvent.Screen {
-        switch app.tab {
-        case .bots: .bots
-        case .state: .state
-        case .settings: .settings
         }
     }
 
@@ -176,7 +155,8 @@ private struct ChatScreen: View {
 
 /// Where your bots show up outside the app: Widget, Live Activity and Dynamic Island,
 /// each designed and switched on here. Usage limits open from the header.
-private struct StateTab: View {
+struct StateTab: View {
+    var active = true
     enum Surface: Hashable { case widget, liveActivity, island }
 
     @Environment(AppStore.self) private var app
@@ -196,22 +176,17 @@ private struct StateTab: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            ScreenHeader {
-                EmptyView()
-            } title: {
-                Text(L10n.tr("State")).font(.body.weight(.semibold)).foregroundStyle(Palette.text)
-            } trailing: {
-                IconButton("Usage limits", systemImage: "chart.bar") { app.showUsage = true }
+            Picker(L10n.tr("State"), selection: $surface) {
+                Text(L10n.tr("Widget")).tag(Surface.widget)
+                Text(L10n.tr("Live Activity")).tag(Surface.liveActivity)
+                Text(L10n.tr("Dynamic Island")).tag(Surface.island)
             }
-            SegmentedChoice(selection: $surface, options: [
-                (.widget, "Widget"), (.liveActivity, "Live Activity"), (.island, "Dynamic Island"),
-            ])
-            .padding(.horizontal, 16)
-            .padding(.bottom, 8)
+            .pickerStyle(.segmented)
+            .padding(.horizontal, 20)
+            .padding(.bottom, 12)
             ZStack {
-                // Holds the gallery's pushes (Lock Screen widgets); no bar shows.
-                NavigationStack { WidgetGalleryView() }
-                    .environment(\.stateSurfaceActive, app.tab == .state && surface == .widget)
+                WidgetGalleryView()
+                    .environment(\.stateSurfaceActive, active && surface == .widget)
                     .tabLayer(surface == .widget)
                 ActivityGalleryView(forms: [.lockScreen])
                     .tabLayer(surface == .liveActivity)
@@ -221,7 +196,16 @@ private struct StateTab: View {
             .animation(Motion.reduced(Motion.fade, reduceMotion), value: surface)
         }
         .background(Palette.background)
-        .codyncSheet(isPresented: Bindable(app).showUsage) { UsageSheet() }
+        .toolbar {
+            if active {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(L10n.tr("Usage limits"), systemImage: "chart.bar") { app.showUsage = true }
+                        .labelStyle(.iconOnly)
+                        .buttonBorderShape(.circle)
+                }
+            }
+        }
+        .codyncSheet(isPresented: Binding(get: { active && app.showUsage }, set: { app.showUsage = $0 })) { UsageSheet() }
     }
 }
 
@@ -235,37 +219,37 @@ private struct UsageSheet: View {
 
     var body: some View {
         let store = picked.flatMap(accounts.store(for:)) ?? app.currentStore
-        VStack(spacing: 0) {
-            ScreenHeader {
-                IconButton("Close", systemImage: "xmark") { dismiss() }
-            } title: {
-                Text(L10n.tr("Usage")).font(.body.weight(.semibold)).foregroundStyle(Palette.text)
-            } trailing: {
-                if let store, accounts.computers.count > 1 {
-                    DropdownMenu {
-                        accounts.computers.map { computer in
-                            MenuItem(computer.name, selected: computer.id == store.computer.id) {
-                                picked = computer.id
-                                accounts.storage.lastComputerId = computer.id
-                                WidgetCenter.shared.reloadTimelines(ofKind: "CodyncUsage")
-                            }
-                        }
-                    } label: {
-                        ComputerBadge(store.computer, size: 28)
-                    }
-                    .accessibilityLabel("Computer: \(store.computer.name)")
+        NavigationStack {
+            Group {
+                if let store { UsageView().environment(store).id(store.computer.id) }
+                else {
+                    ContentUnavailableView(L10n.tr("No computer yet"), systemImage: "chart.bar",
+                                           description: Text(L10n.tr("Usage shows up once a computer is connected.")))
                 }
             }
-            if let store {
-                UsageView()
-                    .environment(store)
-                    .id(store.computer.id)
-            } else {
-                EmptyState(title: "No computer yet", systemImage: "chart.bar",
-                           message: "Usage shows up once a computer is connected.")
+            .navigationTitle(L10n.tr("Usage"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(L10n.tr("Close"), systemImage: "xmark") { dismiss() }
+                        .labelStyle(.iconOnly).buttonBorderShape(.circle)
+                }
+                if store != nil, accounts.computers.count > 1 {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Menu(L10n.tr("Computers"), systemImage: "desktopcomputer") {
+                            ForEach(accounts.computers) { computer in
+                                Button(computer.name) {
+                                    picked = computer.id
+                                    accounts.storage.lastComputerId = computer.id
+                                    WidgetCenter.shared.reloadTimelines(ofKind: "CodyncUsage")
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
-        .background(Palette.background)
+        .tint(.primary)
         .tracked(.screenViewed(.usage))
     }
 }

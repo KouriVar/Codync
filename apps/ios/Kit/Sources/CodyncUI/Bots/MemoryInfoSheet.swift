@@ -12,6 +12,7 @@ struct MemoryInfoSheet: View {
 
     let title: String
     let points: [Point]
+    @Environment(\.dismissModal) private var dismiss
 
     /// How the bot reaches its harness's own memory.
     enum Access {
@@ -51,27 +52,28 @@ struct MemoryInfoSheet: View {
     ])
 
     var body: some View {
-        VStack(spacing: 0) {
-            ModalHeader(title)
-            CardForm {
-                CardSection {
+        NavigationStack {
+            Form {
+                Section {
                     ForEach(points, id: \.title) { item in
-                        HStack(alignment: .firstTextBaseline, spacing: 12) {
-                            Image(systemName: item.icon)
-                                .foregroundStyle(Palette.secondary)
-                                .frame(width: 22)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(L10n.tr(item.title))
-                                Text(L10n.tr(item.detail))
-                                    .font(.footnote)
-                                    .foregroundStyle(Palette.secondary)
-                                    .fixedSize(horizontal: false, vertical: true)
-                            }
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(L10n.tr(item.title))
+                            Text(L10n.tr(item.detail))
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
                         }
                     }
                 }
             }
+            .navigationTitle(L10n.tr(title))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(L10n.tr("Close")) { dismiss() }
+                }
+            }
         }
-        .background(Palette.background)
+        .tint(.primary)
     }
 }

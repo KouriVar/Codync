@@ -94,12 +94,27 @@ struct CodyncApp: App {
                     if let s = ProcessInfo.processInfo.environment["CODYNC_PAIR_URL"], let p = Pairing(string: s) {
                         _ = try? await app.pair(p, via: .link)
                     }
-                    if ProcessInfo.processInfo.environment["CODYNC_OPEN_USAGE"] != nil { app.tab = .state; app.showUsage = true }
-                    if ProcessInfo.processInfo.environment["CODYNC_STATE_SURFACE"] != nil { app.tab = .state }
+                    if ProcessInfo.processInfo.environment["CODYNC_OPEN_USAGE"] != nil { app.accountPane = .state; app.account.showSwitcher = true; app.showUsage = true }
+                    if ProcessInfo.processInfo.environment["CODYNC_STATE_SURFACE"] != nil { app.accountPane = .state; app.account.showSwitcher = true }
+                    if let pane = ProcessInfo.processInfo.environment["CODYNC_ACCOUNT_PANE"].flatMap(AccountPane.init(rawValue:)) {
+                        app.accountPane = pane
+                        app.account.showSwitcher = true
+                    }
+                    if ProcessInfo.processInfo.environment["CODYNC_SHOW_COMPUTERS"] == "1" { app.showComputers = true }
                     // Screenshots: CODYNC_OPEN_URL=codync://bot/<botId>?scope=local&computer=<id>, without the system prompt.
                     if let s = ProcessInfo.processInfo.environment["CODYNC_OPEN_URL"], let url = URL(string: s) {
                         try? await Task.sleep(for: .seconds(1))
                         app.open(url)
+                    }
+                    // Navigation smoke check on a paired device; no Bot configuration or messages are changed.
+                    if let preview = ProcessInfo.processInfo.environment["CODYNC_PROFILE_PREVIEW"], ["details", "edit"].contains(preview) {
+                        for _ in 0..<20 {
+                            if let store = app.currentStore, let bot = store.bots.values.first(where: { $0.lead && !$0.isGroup }) {
+                                app.accounts.selection = BotReference(accountId: app.accounts.accountId, computerId: store.computer.id, botId: bot.id)
+                                break
+                            }
+                            try? await Task.sleep(for: .milliseconds(250))
+                        }
                     }
                     await LiveActivities.shared.previewIfRequested()
                     if ProcessInfo.processInfo.environment["CODYNC_OPEN_SCREEN"] != nil {
@@ -112,7 +127,7 @@ struct CodyncApp: App {
     }
 }
 
-enum AppTab: Hashable { case bots, state, settings }
+enum AppTab: Hashable { case bots, state, test, settings }
 
 /// One `AccountStore` per account context: switching accounts retires the old one so
 /// in-flight work can't land on another user's screen or storage.
@@ -128,6 +143,7 @@ final class AppStore {
     /// Bumped by Start over so the whole UI is rebuilt, even though the local context keeps its id.
     private(set) var generation = 0
     var tab = AppTab.bots
+    var accountPane = AccountPane.account
     var showComputers = false
     /// The usage limits sheet over the State tab.
     var showUsage = false
@@ -176,6 +192,7 @@ final class AppStore {
         storage.bots = []
         contextID = storage.id
         tab = .bots
+        showUsage = false
         showComputers = false
         marketplace = nil
         (accounts, cloud) = Self.makeAccounts(storage, session: account)
@@ -200,6 +217,8 @@ final class AppStore {
         UserDefaults.standard.set(false, forKey: "onboardingCompleted")
         showComputers = false
         account.showSwitcher = false
+        accountPane = .account
+        showUsage = false
         marketplace = nil
         tab = .bots
         contextID = storage.id
@@ -261,7 +280,8 @@ final class AppStore {
             marketplace = currentStore?.computer.id
         case "usage":
             accounts.selection = nil
-            tab = .state
+            accountPane = .state
+            account.showSwitcher = true
             showUsage = true
         case "computers":
             accounts.selection = nil

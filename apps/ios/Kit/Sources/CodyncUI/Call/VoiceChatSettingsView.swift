@@ -11,20 +11,15 @@ public struct VoiceChatSettingsView: View {
     @AppStorage(OnDeviceEngine.rateKey) private var rate = Double(AVSpeechUtteranceDefaultSpeechRate)
     @AppStorage(OnDeviceEngine.languageKey) private var language = ""
     @State private var languages = OnDeviceEngine.languageOptions
+    @Environment(\.dismissModal) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     public init() {}
 
     public var body: some View {
-        VStack(spacing: 0) {
-            ModalHeader {
-                HStack(spacing: 8) {
-                    Image(systemName: "waveform").font(.title2).accessibilityHidden(true)
-                    Text(L10n.tr("Voice chat"))
-                }
-            }
-            CardForm {
-                CardSection("Voice", footer: engineFooter) {
+        NavigationStack {
+            Form {
+                Section {
                     ValueRow("Engine") {
                         ChoicePicker(selection: $engine.animation(Motion.reduced(Motion.layout, reduceMotion)),
                                      options: [("device", "On device")] + VoiceProvider.allCases.map { ($0.rawValue, $0.name) })
@@ -42,7 +37,7 @@ public struct VoiceChatSettingsView: View {
                         }
                         PauseRow()
                     }
-                }
+                } header: { Text(L10n.tr("Voice")) } footer: { Text(L10n.tr(engineFooter)) }
                 if let provider = VoiceProvider(rawValue: engine) {
                     ProviderVoiceSettings(provider: provider).id(provider)
                 }
@@ -50,8 +45,13 @@ public struct VoiceChatSettingsView: View {
                     ProviderVoiceSettings(provider: provider, dictationOnly: true).id("dictation-\(provider.rawValue)")
                 }
             }
+            .navigationTitle(L10n.tr("Voice chat"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) { Button(L10n.tr("Close")) { dismiss() } }
+            }
         }
-        .background(Palette.background)
+        .tint(.primary)
         .tracked(.screenViewed(.voiceSettings))
     }
 
@@ -130,7 +130,7 @@ private struct ProviderVoiceSettings: View {
     private var hasKey: Bool { saved == true }
 
     var body: some View {
-        CardSection(provider.name, footer: footer) {
+        Section {
             VStack(alignment: .leading, spacing: 8) {
                 if hasKey && !replacing {
                     savedKeyRow
@@ -162,7 +162,7 @@ private struct ProviderVoiceSettings: View {
             }
             .disabled(!hasKey)
             .opacity(hasKey ? 1 : 0.55)
-        }
+        } header: { Text(provider.name) } footer: { if let footer { Text(L10n.tr(footer)) } }
         .animation(Motion.reduced(Motion.layout, reduceMotion), value: replacing)
         .animation(Motion.reduced(Motion.fade, reduceMotion), value: result?.text)
 

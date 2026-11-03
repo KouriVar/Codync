@@ -43,22 +43,52 @@ public struct MarketplaceView: View {
     private var installedCount: Int { model.installedConnectors.count + model.installedSkills.count }
 
     public var body: some View {
-        ZStack {
-            if showInstalled {
-                InstalledView { withAnimation(Motion.layout) { showInstalled = false } }
-                    .transition(.move(edge: .trailing).combined(with: .opacity))
-            } else {
-                page.transition(.move(edge: .leading).combined(with: .opacity))
-            }
+        NavigationStack {
+            page
+                .environment(model)
+                .navigationTitle(L10n.tr("Extensions"))
+                .navigationBarTitleDisplayMode(.inline)
+                .searchable(text: $search, placement: .navigationBarDrawer(displayMode: .always),
+                            prompt: Text(L10n.tr("Search agents, connectors and skills")))
+                .toolbar {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button { showCredentials = true } label: {
+                            Label(L10n.tr("Credentials"), systemImage: "lock.shield")
+                        }
+                        .buttonBorderShape(.capsule)
+                    }
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button(L10n.tr("Close"), systemImage: "xmark") { dismiss() }
+                            .labelStyle(.iconOnly)
+                            .buttonBorderShape(.circle)
+                            .keyboardShortcut(.cancelAction)
+                    }
+                }
+                .navigationDestination(isPresented: $showInstalled) {
+                    InstalledView().environment(model)
+                }
         }
-        .background(Palette.background)
+        .tint(.primary)
         .tracked(.screenViewed(.marketplace))
         .task {
             await model.refreshPlugins()
         }
         // Picks up CLIs installed or signed in outside Codync.
-        .task { await model.refreshBackends() }
-        .task { await loadConnectors() }
+        .task {
+            await model.refreshBackends()
+            #if DEBUG
+            switch ProcessInfo.processInfo.environment["CODYNC_MARKET_PREVIEW"] {
+            case "agent": agent = model.hello?.backends.first { $0.installed == true && $0.signedIn == true }
+            case "connector": addingConnector = true
+            case "skill": writingSkill = true
+            default: break
+            }
+            #endif
+        }
+        .task(id: query) {
+            do { try await Task.sleep(for: .milliseconds(300)) } catch { return }
+            await loadConnectors()
+        }
         .task {
             loadingSkills = true
             do { skills = try await model.marketSkills() } catch { report(error) }
@@ -75,121 +105,63 @@ public struct MarketplaceView: View {
         .codyncSheet(item: $viewingSkill) { SkillSheet(skill: $0) }
         .codyncSheet(isPresented: $writingSkill) { NewSkillSheet() }
         .codyncSheet(item: $agent) { b in AgentSheet(initial: b) }
-        .codyncSheet(isPresented: $addingNode) { SetupTerminalView(backend: nil, step: .node) { addingNode = false } }
+        .codyncSheet(isPresented: $addingNode) {
+            NativeExtensionSheet("Add Node.js") {
+                SetupTerminalView(backend: nil, step: .node) { addingNode = false }.environment(model)
+            }
+        }
     }
 
     private var page: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 28) {
-                header
-                searchField
-                if sizeClass == .compact {
-                    VStack(alignment: .leading, spacing: 8) {
-                        TabChoice(selection: $section, options: ExtensionSection.allCases.map { (id: $0, label: $0.title) })
-                        sourceLine
-                    }
-                    tabBody
-                } else {
-                    HStack(alignment: .top, spacing: 20) {
-                        extensionRail
-                        VStack(alignment: .leading, spacing: 12) {
-                            sourceLine
-                            tabBody.frame(maxWidth: .infinity, alignment: .leading)
-                        }
+            VStack(alignment: .leading, spacing: 20) {
+                computerSummary
+                Picker(L10n.tr("Extensions sections"), selection: $section) {
+                    ForEach(ExtensionSection.allCases) { item in
+                        Text(L10n.tr(item.title)).tag(item)
                     }
                 }
+                .pickerStyle(.segmented)
+                sourceLine
+                tabBody
                 if let error = error ?? connectors.error {
                     Text(L10n.tr(error)).font(.footnote).foregroundStyle(Palette.danger)
                 }
             }
-            .padding(.horizontal, 44)
-            .padding(.vertical, 20)
+            .padding(.horizontal, 20)
+            .padding(.top, 12)
+            .padding(.bottom, 20)
             .frame(maxWidth: 980)
             .frame(maxWidth: .infinity)
         }
-        .background(Palette.background)
-        .overlay(alignment: .topTrailing) {
-            // dismissModal slides the sheet away; clearing the binding would cut it off.
-            IconButton("Close", systemImage: "xmark") { dismiss() }
-                .keyboardShortcut(.cancelAction)
-                .padding(8)
-        }
+        .scrollDismissesKeyboard(.interactively)
+        .background(Color(uiColor: .systemGroupedBackground))
     }
 
-    private var header: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            // Everything here lives on one computer; say which.
-            HStack(spacing: 10) {
-                ComputerBadge(model.computer, size: 32)
-                VStack(alignment: .leading, spacing: 0) {
-                    Text(L10n.tr("Extensions"))
-                        .font(.title2.weight(.semibold))
-                        .foregroundStyle(Palette.text)
-                    Text(model.hostName)
-                        .font(.subheadline)
-                        .foregroundStyle(Palette.secondary)
-                }
+    private var computerSummary: some View {
+        HStack(spacing: 10) {
+            ComputerBadge(model.computer, size: 28)
+            Text(model.hostName)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
                 .lineLimit(1)
-                .minimumScaleFactor(0.7)
-                Spacer(minLength: 8)
-                // Beside the title, in the room left of Close, so the list can fill the screen.
-                Button { withAnimation(Motion.layout) { showCredentials = true } } label: {
-                    Label(L10n.tr("Credentials"), systemImage: "lock.shield")
-                }
-                .buttonStyle(SecondaryButtonStyle())
-                .fixedSize()
-                .layoutPriority(1)
-            }
-            .frame(maxWidth: .infinity)
+            Spacer(minLength: 8)
             if installedCount > 0 {
-                Button { withAnimation(Motion.layout) { showInstalled = true } } label: {
-                    HStack(spacing: 8) {
-                        HStack(spacing: -8) {
-                            ForEach(model.installedConnectors.prefix(3)) { c in
-                                ServiceLogo(website: nil, name: c.name, registryName: c.registryName, size: 26)
-                            }
-                        }
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(L10n.tr("{count} installed").replacingOccurrences(of: "{count}", with: String(installedCount)))
-                            Text(L10n.tr("Connectors & skills")).font(.caption)
-                        }
-                        .foregroundStyle(Palette.secondary)
-                        Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(Palette.tertiary)
-                    }
-                    .contentShape(Rectangle())
+                Button { showInstalled = true } label: {
+                    Text(L10n.tr("{count} installed").replacingOccurrences(of: "{count}", with: String(installedCount)))
                 }
-                .buttonStyle(.plain)
+                .font(.subheadline)
+                .buttonStyle(.bordered)
+                .buttonBorderShape(.capsule)
             }
         }
-        .padding(.top, 28)
     }
 
-    /// One sentence for the open section, tucked under its tab.
     private var sourceLine: some View {
         Text(L10n.tr(section.source).replacingOccurrences(of: "{name}", with: model.hostName))
             .font(.footnote)
-            .foregroundStyle(Palette.tertiary)
+            .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
-    }
-
-    private var searchField: some View {
-        HStack(spacing: 10) {
-            Image(systemName: "magnifyingglass").foregroundStyle(Palette.secondary)
-            TextField(L10n.tr("Search agents, connectors and skills"), text: $search)
-                .textFieldStyle(.plain)
-                .plainTextInput()
-                .onSubmit { Task { await loadConnectors() } }
-            if !search.isEmpty {
-                Button { search = ""; Task { await loadConnectors() } } label: {
-                    Image(systemName: "xmark.circle.fill").foregroundStyle(Palette.tertiary)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(L10n.tr("Clear search"))
-            }
-        }
-        .padding(.horizontal, 14)
-        .frame(height: 38)
-        .background(Palette.bubbleAgent, in: Capsule())
     }
 
     func agentCard(_ b: Backend) -> some View {
@@ -223,13 +195,6 @@ enum ExtensionSection: String, CaseIterable, Identifiable {
         case .agents: "Agents"
         case .connectors: "Connectors"
         case .skills: "Skills"
-        }
-    }
-    var icon: String {
-        switch self {
-        case .agents: "terminal"
-        case .connectors: "point.3.connected.trianglepath.dotted"
-        case .skills: "book.pages"
         }
     }
     var source: String {

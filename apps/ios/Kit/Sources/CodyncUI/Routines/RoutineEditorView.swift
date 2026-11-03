@@ -8,6 +8,7 @@ struct RoutineEditorView: View {
     let saved: (Routine?) -> Void
     @Environment(BotStore.self) private var model
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dismissModal) private var dismiss
     @State private var name = ""
     @State private var instruction = ""
     @State private var schedule = RoutineScheduleDraft()
@@ -47,8 +48,8 @@ struct RoutineEditorView: View {
     }
 
     var body: some View {
+        NavigationStack {
         VStack(spacing: 0) {
-            ModalHeader(routine == nil ? "Set up a routine" : "Edit routine")
             Group {
                 ScrollView { form }.scrollDismissesKeyboard(.interactively)
             }
@@ -57,6 +58,10 @@ struct RoutineEditorView: View {
         }
         .font(.system(size: 16))
         .foregroundStyle(Palette.text)
+        .navigationTitle(L10n.tr(routine == nil ? "Set up a routine" : "Edit routine"))
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar { ToolbarItem(placement: .topBarTrailing) { Button(L10n.tr("Close")) { dismiss() } } }
+        }
         .background(Palette.background)
         .codyncDialog("Delete routine?", isPresented: $confirmDelete, message: "This deletes the routine and stops its future runs. This can't be undone.") {
             [DialogAction("Delete routine", destructive: true) {

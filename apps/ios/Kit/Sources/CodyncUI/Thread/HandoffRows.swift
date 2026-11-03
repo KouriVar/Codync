@@ -103,31 +103,37 @@ struct HandoffEditorView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            ModalHeader("Edit the handoff") {
-                if saving {
-                    Spinner()
-                } else {
-                    IconButton("Save", systemImage: "checkmark") {
-                        saving = true
-                        Task {
-                            if await model.editHandoff(entry, text: trimmed) { dismiss() }
-                            saving = false
-                        }
-                    }
-                    .disabled(trimmed.isEmpty)
-                }
-            }
-            CardForm {
-                CardSection(footer: "Your next message starts a fresh conversation that begins with this.") {
+        NavigationStack {
+            Form {
+                Section {
                     TextField("What the new conversation should know", text: $text, axis: .vertical)
                         .lineLimit(10...24)
                         .font(.footnote.monospaced())
+                } footer: {
+                    Text(L10n.tr("Your next message starts a fresh conversation that begins with this."))
                 }
             }
-            .textFieldStyle(.plain)
+            .navigationTitle(L10n.tr("Edit the handoff"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(L10n.tr("Close")) { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    if saving { ProgressView() } else {
+                        Button(L10n.tr("Save")) {
+                            saving = true
+                            Task {
+                                if await model.editHandoff(entry, text: trimmed) { dismiss() }
+                                saving = false
+                            }
+                        }
+                        .disabled(trimmed.isEmpty)
+                    }
+                }
+            }
         }
-        .background(Palette.background)
+        .tint(.primary)
     }
 
     private var trimmed: String { text.trimmingCharacters(in: .whitespacesAndNewlines) }

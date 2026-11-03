@@ -37,27 +37,14 @@ struct SkillSheet: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            ModalHeader(skill.name) {
-                if added {
-                    Image(systemName: "checkmark")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(Palette.secondary)
-                        .frame(width: 32)
-                        .accessibilityLabel("Added")
-                } else if adding {
-                    Spinner()
-                } else {
-                    IconButton("Add", systemImage: "plus") { add() }
-                }
-            }
-            CardForm {
+        NativeExtensionSheet(skill.name, busy: adding, actionTitle: added ? nil : "Add", action: add) {
+            Form {
                 if !skill.description.isEmpty {
-                    CardSection {
+                    NativeFormSection {
                         Text(skill.description).font(.subheadline).foregroundStyle(Palette.secondary)
                     }
                 }
-                CardSection("Instructions", footer: added ? "Bots read these before using the skill." : "Add it to let bots use these instructions.") {
+                NativeFormSection("Instructions", footer: added ? "Bots read these before using the skill." : "Add it to let bots use these instructions.") {
                     if let markdown {
                         if markdown.isEmpty {
                             Text(L10n.tr("No instructions.")).foregroundStyle(Palette.secondary)
@@ -65,17 +52,16 @@ struct SkillSheet: View {
                             MarkdownText(markdown)
                         }
                     } else if error == nil {
-                        Spinner()
+                        ProgressView()
                     }
                 }
                 if let error {
-                    CardSection {
+                    NativeFormSection {
                         Text(L10n.tr(error)).font(.footnote).foregroundStyle(Palette.danger)
                     }
                 }
             }
         }
-        .background(Palette.background)
         .task {
             do {
                 markdown = try await model.skillDetails(skill)
@@ -86,7 +72,7 @@ struct SkillSheet: View {
     }
 
     private func add() {
-        guard let source = skill.source else { return }
+        guard !adding, let source = skill.source else { return }
         adding = true
         error = nil
         Task {

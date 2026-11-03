@@ -76,6 +76,8 @@ public final class BotStore {
     /// Bots whose older history has been fully paged in.
     public internal(set) var historyComplete: Set<String> = []
     var composerDrafts: [String: String] = [:]
+    /// Photos captured from the home pull-to-capture gesture, waiting for that bot's composer.
+    @ObservationIgnored var pendingComposerFiles: [String: [OutgoingFile]] = [:]
     /// What was pasted into each draft, sent along so memory never takes it as the user's own words.
     @ObservationIgnored var composerPasted: [String: [String]] = [:]
     public let fileDownloads = FileDownloads()

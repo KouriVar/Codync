@@ -1,174 +1,211 @@
 import CodyncKit
 import SwiftUI
 
-/// The details sheet's pages, as on the desktop inspector.
-enum DetailsTab: Hashable {
-    case details, library, memory, settings
-}
+// Retain existing deep-link destinations while the profile itself becomes a native page.
+enum DetailsTab: Hashable { case details, library, memory, settings }
 
-/// What to open the details sheet on.
-struct DetailsRequest: Identifiable {
+struct DetailsRequest: Identifiable, Hashable {
     let id = UUID()
     var tab: DetailsTab = .details
-    /// A routine to open in its editor (Details page).
     var routineId: String?
-    /// Another bot's details than the chat's: a group member's, from its notice.
     var botId: String?
 }
 
-/// A bot's details (Grok Bot's): who it is, then its details, library, memory and settings. Settings save
-/// as you edit.
+private enum BotProfilePage: Hashable {
+    case edit, routines, library, computer, memory, agent, workspace, capabilities
+}
+
 struct BotDetailsView: View {
     let botId: String
-    let routineId: String?
-    /// An artifact picked in the Library, for the chat's viewer.
+    let request: DetailsRequest
     let openArtifact: (ArtifactTarget) -> Void
-    @State var tab: DetailsTab
     @Environment(BotStore.self) private var model
-    @Environment(\.dismissModal) private var dismiss
-    @State private var draft: BotDraft?
-    @State private var saveError: String?
-    /// Off once the page closes: a save that fails after that shows over the app instead.
-    @State private var presence = PagePresence()
-    @State private var saving: Task<Void, Never>?
+    @State private var page: BotProfilePage?
     @State private var template: EditorRequest?
+    @State private var enabledRoutines: Int?
+    @State private var routineError: String?
+    @State private var openedRequest = false
 
     init(botId: String, request: DetailsRequest, openArtifact: @escaping (ArtifactTarget) -> Void) {
         self.botId = botId
+        self.request = request
         self.openArtifact = openArtifact
-        routineId = request.routineId
-        _tab = State(initialValue: request.tab)
     }
 
     private var bot: Bot? { model.bots[botId] }
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 0) {
-                if let bot { identity(bot) }
-                TabChoice(selection: $tab, options: [(.details, "Details")] + (model.hasLibrary ? [(.library, "Library")] : [])
-                    + [(.memory, "Memory"), (.settings, "Settings")])
-                    .padding(.top, 18)
-                page.padding(.top, 20)
-                    .environment(\.cardStyle, .outlined)
-                    .environment(\.noteLines, 2)
-            }
-            .padding(.horizontal, 20)
-            .padding(.bottom, 24)
-        }
-        .scrollDismissesKeyboard(.interactively)
-        .background(Palette.background)
-        .overlay(alignment: .topTrailing) { actions }
-        .tracked(.screenViewed(.botDetails))
-        .task(id: botId) { draft = bot.map(BotDraft.init) }
-        // A change made elsewhere (a bot that manages the team, another device) replaces each field not edited here.
-        .onChange(of: bot.map(BotDraft.init)) { base, fresh in
-            if let base, let fresh, base.id == fresh.id { draft = draft?.rebased(from: base, onto: fresh) }
-        }
-        .onChange(of: draft) { _, draft in autosave(draft) }
-        .onAppear { presence.shown = true }
-        .onDisappear { presence.shown = false }
-        .codyncSheet(item: $template) { BotTemplateView(draft: $0.draft) }
-    }
-
-    private var actions: some View {
-        HStack(spacing: 8) {
+        List {
             if let bot {
-                cornerButton("Create template", "square.and.arrow.up") { template = EditorRequest(BotDraft(bot)) }
-            }
-            cornerButton("Close details", "xmark") { dismiss() }
-        }
-        .padding(.top, 14)
-        .padding(.trailing, 14)
-    }
-
-    /// Grok Bot's corner buttons: the page color, ringed by a soft shadow.
-    private func cornerButton(_ title: String, _ symbol: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Image(systemName: symbol)
-                .font(.system(size: 15, weight: .medium))
-                .foregroundStyle(Palette.text)
-                .frame(width: 36, height: 36)
-                .background(Palette.background, in: Circle())
-                .shadow(color: .black.opacity(0.12), radius: 0.5)
-                .shadow(color: .black.opacity(0.04), radius: 2, y: 1)
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(title)
-        .help(title)
-    }
-
-    /// The bot's avatar and name, and what runs it.
-    private func identity(_ bot: Bot) -> some View {
-        VStack(spacing: 4) {
-            LeadAgentAvatar(bot: bot)
-                .padding(.bottom, 10)
-            Text(bot.name)
-                .font(.title3.weight(.semibold))
-                .foregroundStyle(Palette.text)
-                .multilineTextAlignment(.center)
-            HStack(spacing: 5) {
-                AgentIcon(registry: model.agentRegistry(bot.backend), size: 13)
-                Text(bot.model.map { "\(model.backendName(bot.backend)) · \($0)" } ?? model.backendName(bot.backend))
-            }
-            .font(.footnote)
-            .foregroundStyle(Palette.secondary)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.top, 64)
-    }
-
-    @ViewBuilder private var page: some View {
-        switch tab {
-        case .details:
-            VStack(alignment: .leading, spacing: 28) {
-                if let draft = Binding($draft) {
-                    BotSettingsForm(draft: draft, error: saveError, scrolls: false, part: .often)
+                Section {
+                    identity(bot)
+                        .listRowInsets(EdgeInsets())
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
                 }
-                if let screen = model.screen, let bot {
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text(L10n.tr("Computer"))
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(Palette.text)
-                            .padding(.leading, 2)
-                        SwitchRow("Use the computer",
-                                  detail: screen.controlReady == true ? nil : "On that computer, open Codync → Settings → Computer access to set it up first.",
-                                  isOn: Binding(get: { bot.computer }, set: { model.setComputer(bot, $0) }))
-                            .disabled(model.isOffline)
-                            .outlinedCard()
+                Section {
+                    NavigationLink { destination(.routines).environment(model) } label: {
+                        profileRow("定时任务", symbol: "clock.arrow.circlepath", value: enabledRoutines.map { "\($0) 已开启" } ?? "—")
+                    }
+                    NavigationLink { destination(.library).environment(model) } label: {
+                        profileRow("资料库", symbol: "folder")
+                    }
+                    .disabled(!model.hasLibrary)
+                    NavigationLink { destination(.computer).environment(model) } label: {
+                        profileRow("电脑", symbol: "desktopcomputer", value: model.isOffline ? "离线" : model.screen?.agentBot == nil ? "空闲" : "使用中")
                     }
                 }
-                RoutinesView(botId: botId, initialId: routineId)
+                .botNativeGroup()
+                Section {
+                    Toggle("通知", isOn: Binding(get: { model.bots[botId]?.notify ?? true }, set: { model.setNotifications(bot, $0) }))
+                        .tint(.gray)
+                        .disabled(model.isOffline)
+                } footer: {
+                    Text("Bot 完成或需要等待你处理时通知你")
+                }
+                .botNativeGroup()
+                if let routineError {
+                    Section { Text(routineError).font(.footnote).foregroundStyle(.secondary) }.botNativeGroup()
+                }
+            } else {
+                ContentUnavailableView("Bot 暂不可用", systemImage: "person.crop.circle.badge.exclamationmark")
             }
-        case .library:
-            LibraryView(botId: botId, openArtifact: openArtifact)
-        case .memory:
-            MemoryCard(botId: botId)
-        case .settings:
-            if let draft = Binding($draft) {
-                BotSettingsForm(draft: draft, error: saveError, scrolls: false, part: .rarely)
+        }
+        .listStyle(.insetGrouped)
+        .listSectionSpacing(24)
+        .contentMargins(.top, 0, for: .scrollContent)
+        .safeAreaPadding(.horizontal, 4)
+        .environment(\.defaultMinListRowHeight, 52)
+        .botNativePage("")
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button("分享 Bot 模板", systemImage: "square.and.arrow.up") {
+                    if let bot { template = EditorRequest(BotDraft(bot)) }
+                }
+                .buttonBorderShape(.circle)
+                .disabled(bot == nil)
+            }
+            ToolbarSpacer(.fixed, placement: .topBarTrailing)
+            ToolbarItem(placement: .topBarTrailing) {
+                Menu("更多", systemImage: "ellipsis") {
+                    Button("指令与智能体", systemImage: "slider.horizontal.3") { page = .agent }
+                    Button("工作区与权限", systemImage: "folder.badge.gearshape") { page = .workspace }
+                    Button("能力与插件", systemImage: "puzzlepiece.extension") { page = .capabilities }
+                    Button("记忆", systemImage: "brain") { page = .memory }
+                }
+                .menuIndicator(.hidden)
+                .buttonBorderShape(.circle)
+            }
+        }
+        .navigationDestination(item: $page) { destination($0).environment(model) }
+        .codyncSheet(item: $template) { BotTemplateView(draft: $0.draft) }
+        .tracked(.screenViewed(.botDetails))
+        .task(id: model.connection == .online) {
+            if !openedRequest {
+                openedRequest = true
+                if request.routineId != nil { page = .routines }
+                else {
+                    switch request.tab {
+                    case .details: break
+                    case .library: page = .library
+                    case .memory: page = .memory
+                    case .settings: page = .edit
+                    }
+                }
+            }
+            await loadRoutineCount()
+        }
+    }
+
+    private func identity(_ bot: Bot) -> some View {
+        VStack(spacing: 14) {
+            LeadAgentAvatar(bot: bot, size: 88)
+            Text(bot.name).font(.title2.weight(.semibold)).multilineTextAlignment(.center)
+            Button("编辑") { page = .edit }
+                .font(.body.weight(.medium))
+                .buttonStyle(.bordered)
+                .buttonBorderShape(.capsule)
+                .tint(.gray)
+                .foregroundStyle(.primary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.top, 24)
+        .padding(.bottom, 0)
+    }
+
+    private func profileRow(_ title: String, symbol: String, value: String? = nil) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: symbol).foregroundStyle(.secondary).frame(width: 22)
+            Text(title)
+            Spacer(minLength: 8)
+            if let value { Text(value).foregroundStyle(.secondary) }
+        }
+        .padding(.vertical, 4)
+    }
+
+    @ViewBuilder private func destination(_ page: BotProfilePage) -> some View {
+        if let bot {
+            switch page {
+            case .edit: BotProfileEditView(bot: bot)
+            case .routines: RoutinesView(botId: botId, initialId: request.routineId, nativeStyle: true).botNativePage("定时任务")
+            case .library: LibraryView(botId: botId, openArtifact: openArtifact, nativeStyle: true).botNativePage("资料库")
+            case .computer: BotComputerPage(botId: botId)
+            case .memory: MemoryCard(botId: botId, nativeStyle: true).botNativePage("记忆")
+            case .agent: BotNativeSettingsView(bot: bot, part: .agent)
+            case .workspace: BotNativeSettingsView(bot: bot, part: .workspace)
+            case .capabilities: BotNativeSettingsView(bot: bot, part: .capabilities)
             }
         }
     }
 
-    /// Saves a moment after the last change, like the desktop inspector.
-    private func autosave(_ draft: BotDraft?) {
-        saving?.cancel()
-        guard let draft, let bot, draft != BotDraft(bot), draft.isValid else { return }
-        saving = Task {
-            try? await Task.sleep(for: .milliseconds(600))
-            guard !Task.isCancelled else { return }
-            do {
-                _ = try await model.save(draft.normalized)
-                saveError = nil
-            } catch {
-                if presence.shown { saveError = error.localizedDescription } else { model.lastError = error.localizedDescription }
-            }
-        }
+    private func loadRoutineCount() async {
+        do {
+            let client = try await model.ready()
+            enabledRoutines = try await client.routines(botId: botId).routines.filter(\.enabled).count
+            routineError = nil
+        } catch is CancellationError { }
+        catch { routineError = "定时任务暂时无法加载：\(error.localizedDescription)" }
     }
 }
 
-/// Whether a page is on screen, for work that outlives it.
-@MainActor private final class PagePresence {
-    var shown = true
+extension View {
+    func botNativeGroup() -> some View {
+        listRowBackground(Color(uiColor: .tertiarySystemGroupedBackground))
+    }
+
+    func botNativePage(_ title: String) -> some View {
+        navigationTitle(title)
+            .navigationBarTitleDisplayMode(.inline)
+            .scrollContentBackground(.hidden)
+            .background(Color(uiColor: .secondarySystemGroupedBackground))
+            .tint(.primary)
+    }
+}
+
+private struct BotComputerPage: View {
+    let botId: String
+    @Environment(BotStore.self) private var model
+
+    var body: some View {
+        Form {
+            Section {
+                LabeledContent("电脑", value: model.hostName)
+                LabeledContent("状态", value: model.isOffline ? "离线" : "已连接")
+            }
+            .botNativeGroup()
+            if let bot = model.bots[botId], model.screen != nil {
+                Section {
+                    Toggle("允许 Bot 使用电脑", isOn: Binding(get: { model.bots[botId]?.computer ?? false }, set: { model.setComputer(bot, $0) }))
+                        .tint(.gray)
+                        .disabled(model.isOffline)
+                    Button("查看电脑屏幕", systemImage: "desktopcomputer") {
+                        model.screenRequest = model.screen?.agentBot == botId ? ScreenRequest(watching: botId) : ScreenRequest()
+                    }
+                    .disabled(model.isOffline)
+                } footer: { Text("屏幕录制与控制权限在 Mac 的 Codync 设置中管理。") }
+                .botNativeGroup()
+            }
+        }
+        .botNativePage("电脑")
+    }
 }

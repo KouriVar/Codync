@@ -11,9 +11,18 @@ struct AvatarPicker: View {
         VStack(spacing: 16) {
             WrapLayout(spacing: 6) {
                 ForEach(AvatarPalette.shapes, id: \.self) { s in
-                    choice("\(s) shape", chosen: s == shape) { shape = s } label: {
-                        CharacterAvatar(shape: s, color: color, size: 40)
+                    Button { withAnimation(Motion.hover) { shape = s } } label: {
+                        VStack(spacing: 4) {
+                            CharacterAvatar(shape: s, color: color, size: 40)
+                            Capsule().fill(s == shape ? Palette.accent : .clear)
+                                .frame(width: 12, height: 3)
+                        }
+                        .padding(4)
+                        .contentShape(Rectangle())
                     }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("\(s) shape")
+                    .accessibilityAddTraits(s == shape ? .isSelected : [])
                 }
             }
             WrapLayout(spacing: 6) {
@@ -28,7 +37,11 @@ struct AvatarPicker: View {
     }
 
     private func choice(_ title: String, chosen: Bool, pick: @escaping () -> Void, @ViewBuilder label: () -> some View) -> some View {
-        Button { withAnimation(Motion.hover) { pick() } } label: { label().choiceRing(chosen) }
+        Button { withAnimation(Motion.hover) { pick() } } label: {
+            label().choiceRing(chosen)
+                .frame(minWidth: 44, minHeight: 44)
+                .contentShape(Rectangle())
+        }
             .buttonStyle(.plain)
             .accessibilityLabel(title)
             .accessibilityAddTraits(chosen ? .isSelected : [])
@@ -36,7 +49,7 @@ struct AvatarPicker: View {
 }
 
 extension View {
-    /// The accent ring around a chosen shape, color or group member.
+    /// The accent ring around a chosen color or group member.
     func choiceRing(_ chosen: Bool) -> some View {
         padding(4).background(Circle().strokeBorder(chosen ? Palette.accent : .clear, lineWidth: 2))
     }

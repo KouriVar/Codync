@@ -1,0 +1,77 @@
+import CodyncKit
+import CodyncUI
+import SwiftUI
+
+/// Floating home controls, scoped to the roster so a pushed conversation has no bottom bar.
+struct HomeBottomBar: View {
+    @Binding var searchText: String
+    let openCamera: () -> Void
+    let openPlugins: () -> Void
+    private let iconSize: CGFloat = 18
+    private let iconLineWidth: CGFloat = 1.8
+
+    var body: some View {
+        GlassEffectContainer(spacing: 12) {
+            HStack(spacing: 12) {
+                Button(action: openPlugins) {
+                    PluginGlyph(lineWidth: iconLineWidth)
+                    .stroke(style: StrokeStyle(lineWidth: iconLineWidth, lineCap: .round, lineJoin: .round))
+                    .foregroundStyle(Palette.text)
+                    .frame(width: iconSize, height: iconSize)
+                    .frame(width: 48, height: 48)
+                    .glassEffect(.regular.interactive(), in: Circle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("插件")
+                .help("插件")
+
+                SearchField("搜索", text: $searchText, opaqueBackground: false)
+                    .padding(.vertical, 4)
+                    .glassEffect(.regular, in: Capsule())
+                    .submitLabel(.search)
+                    .accessibilityLabel("搜索聊天")
+
+                Button(action: openCamera) {
+                    Image(systemName: "camera.fill")
+                        .font(.system(size: iconSize, weight: .semibold))
+                        .foregroundStyle(Palette.text)
+                        .frame(width: 48, height: 48)
+                        .glassEffect(.regular.interactive(), in: Circle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("拍照")
+                .help("拍照")
+            }
+        }
+        .padding(.horizontal, 24)
+        .padding(.top, 10)
+        .padding(.bottom, 8)
+    }
+}
+
+/// A single outlined glyph: font-weight changes must not change its size or spacing.
+private struct PluginGlyph: Shape {
+    let lineWidth: CGFloat
+
+    func path(in rect: CGRect) -> Path {
+        let bounds = rect.insetBy(dx: lineWidth / 2, dy: lineWidth / 2)
+        let gap: CGFloat = 3
+        let cell = (bounds.width - gap) / 2
+        let origins = [
+            CGPoint(x: bounds.minX, y: bounds.minY),
+            CGPoint(x: bounds.maxX - cell, y: bounds.minY),
+            CGPoint(x: bounds.minX, y: bounds.maxY - cell),
+        ]
+        var path = Path()
+        for origin in origins {
+            path.addRoundedRect(in: CGRect(origin: origin, size: CGSize(width: cell, height: cell)),
+                                cornerSize: CGSize(width: 0.6, height: 0.6))
+        }
+        let plus = CGRect(x: bounds.maxX - cell, y: bounds.maxY - cell, width: cell, height: cell)
+        path.move(to: CGPoint(x: plus.minX, y: plus.midY))
+        path.addLine(to: CGPoint(x: plus.maxX, y: plus.midY))
+        path.move(to: CGPoint(x: plus.midX, y: plus.minY))
+        path.addLine(to: CGPoint(x: plus.midX, y: plus.maxY))
+        return path
+    }
+}

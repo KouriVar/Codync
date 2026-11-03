@@ -141,6 +141,7 @@ struct AttachmentList: View {
 struct AttachmentViewer: View {
     let name: String
     let image: AttachmentImage
+    @Environment(\.dismissModal) private var dismiss
 
     init(file: Attachment, botId: String) {
         name = file.name
@@ -153,13 +154,17 @@ struct AttachmentViewer: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            ModalHeader(name)
+        NavigationStack {
             image
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .padding(12)
+                .navigationTitle(name)
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) { Button(L10n.tr("Close")) { dismiss() } }
+                }
         }
-        .background(Palette.background)
+        .tint(.primary)
     }
 }
 

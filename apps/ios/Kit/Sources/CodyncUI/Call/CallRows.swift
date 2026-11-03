@@ -33,6 +33,7 @@ struct CallLineRow: View {
 struct CallConversationView: View {
     let line: Entry
     @Environment(BotStore.self) private var model
+    @Environment(\.dismissModal) private var dismiss
     /// The call's own messages, which the chat this device holds may not reach back to; nil while they load.
     @State private var fetched: [Entry]?
     @State private var error: String?
@@ -40,8 +41,7 @@ struct CallConversationView: View {
     var body: some View {
         let entry = model.chat(line.botId).first { $0.id == line.id } ?? line
         let messages = model.chat(line.botId).withCallEntries(fetched ?? []).callConversation(entry)
-        VStack(spacing: 0) {
-            ModalHeader(entry.data.text ?? "Voice chat")
+        NavigationStack {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 10) {
                     if let error {
@@ -60,8 +60,13 @@ struct CallConversationView: View {
                 .padding(.bottom, 12)
             }
             .defaultScrollAnchor(.bottom)
+            .navigationTitle(entry.data.text ?? L10n.tr("Voice chat"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) { Button(L10n.tr("Close")) { dismiss() } }
+            }
         }
-        .background(Palette.background)
+        .tint(.primary)
         .task(id: line.id) {
             guard let call = line.data.call else { return }
             do {

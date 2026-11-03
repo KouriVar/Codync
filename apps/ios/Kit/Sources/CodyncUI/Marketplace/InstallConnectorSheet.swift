@@ -32,29 +32,22 @@ struct InstallConnectorSheet: View {
     private var retrying: Bool { installed != nil && !values.values.contains { !$0.isEmpty } }
 
     var body: some View {
-        VStack(spacing: 0) {
-            ModalHeader("Add connector") {
-                if saving {
-                    Spinner()
-                } else {
-                    IconButton("Add", systemImage: "plus") { install() }
-                        .disabled(missing && !retrying)
-                }
-            }
-            form
+        NativeExtensionSheet("Add connector", busy: saving, actionTitle: "Add",
+                             actionEnabled: !missing || retrying, action: install) {
+            form.disabled(saving)
         }
-        .background(Palette.background)
         .task {
             guard !started else { return }
             started = true
+            optionId = item.options.first?.id ?? ""
             if addsAtOnce && item.options.count == 1 && item.options[0].inputs.isEmpty { install() }
         }
         .onDisappear { values.removeAll() }
     }
 
     private var form: some View {
-        CardForm {
-            CardSection {
+        Form {
+            NativeFormSection {
                 VStack(alignment: .leading, spacing: 6) {
                     Text(item.title).font(.title3.weight(.semibold))
                     if let d = item.description { Text(d).foregroundStyle(Palette.secondary) }
@@ -65,17 +58,19 @@ struct InstallConnectorSheet: View {
                 .padding(.vertical, 4)
             }
             if item.options.count > 1 {
-                CardSection("Runs") {
-                    ChoiceList(selection: $optionId, options: item.options.map { o in
-                        (id: o.id, label: o.kind == "remote"
-                            ? L10n.tr("Hosted by {name}").replacingOccurrences(of: "{name}", with: item.title)
-                            : L10n.tr("On {name} ({kind})").replacingOccurrences(of: "{name}", with: model.hostName).replacingOccurrences(of: "{kind}", with: o.kind),
-                         detail: nil)
-                    })
+                NativeFormSection("Runs") {
+                    Picker(L10n.tr("Runs"), selection: $optionId) {
+                        ForEach(item.options) { o in
+                            Text(o.kind == "remote"
+                                ? L10n.tr("Hosted by {name}").replacingOccurrences(of: "{name}", with: item.title)
+                                : L10n.tr("On {name} ({kind})").replacingOccurrences(of: "{name}", with: model.hostName).replacingOccurrences(of: "{kind}", with: o.kind))
+                                .tag(o.id)
+                        }
+                    }.pickerStyle(.navigationLink)
                 }
             }
             if let option {
-                CardSection("Setup", footer: L10n.tr("Keys are saved on {name} only.").replacingOccurrences(of: "{name}", with: model.hostName)) {
+                NativeFormSection("Setup", footer: L10n.tr("Keys are saved on {name} only.").replacingOccurrences(of: "{name}", with: model.hostName)) {
                     if option.inputs.isEmpty {
                         Text(option.kind == "remote"
                             ? L10n.tr("No keys needed here. If {name} wants you to sign in, its sign-in page opens next.").replacingOccurrences(of: "{name}", with: item.title)
@@ -100,11 +95,10 @@ struct InstallConnectorSheet: View {
                 }
             }
             if let error {
-                CardSection { Text(L10n.tr(error)).foregroundStyle(Palette.danger) }
+                NativeFormSection { Text(L10n.tr(error)).foregroundStyle(Palette.danger) }
             }
         }
         .textFieldStyle(.plain)
-        .onAppear { optionId = item.options.first?.id ?? "" }
     }
 
     private func binding(_ input: MarketConnector.Input) -> Binding<String> {
@@ -112,12 +106,13 @@ struct InstallConnectorSheet: View {
     }
 
     private func install() {
-        guard let option else { return }
+        guard !saving, let option else { return }
         saving = true
         error = nil
         Task {
+            defer { saving = false }
             do {
-                guard let client = model.client else { return }
+                guard let client = model.client else { throw HostError.http(503, "Offline") }
                 // The host keeps the connector a try saved unless new values or another way to run it come in.
                 let c = try await model.installConnector(item, option: option.id, inputs: values)
                 installed = c
@@ -136,7 +131,6 @@ struct InstallConnectorSheet: View {
             } catch {
                 self.error = error.localizedDescription
             }
-            saving = false
         }
     }
 }

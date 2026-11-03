@@ -212,6 +212,7 @@ private struct ScanPage: View {
     @State private var pairing = false
     @State private var pasted = ""
     @State private var error: String?
+    @State private var scannerError: String?
     /// The phone couldn't reach the computer (not a refusal from it or the cloud): the network hint helps.
     @State private var unreachable = false
     /// Bumped after a failed pair so the scanner starts looking again.
@@ -235,6 +236,15 @@ private struct ScanPage: View {
                 }
 
                 viewfinder
+
+                if let scannerError {
+                    Text(scannerError).font(.footnote).foregroundStyle(Palette.danger)
+                    Button("重试相机") {
+                        self.scannerError = nil
+                        attempt += 1
+                    }
+                    .buttonStyle(.secondary)
+                }
 
                 HStack {
                     TextField(L10n.tr("Pairing link or code"), text: $pasted)
@@ -288,17 +298,25 @@ private struct ScanPage: View {
         }
         .scrollDismissesKeyboard(.interactively)
         // Coming back from the Tailscale app: show whether it's connected now.
-        .onChange(of: scenePhase) { _, phase in if phase == .active { tailscaleOn = Tailscale.isConnected } }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active {
+                tailscaleOn = Tailscale.isConnected
+                if !pairing {
+                    scannerError = nil
+                    attempt += 1
+                }
+            }
+        }
     }
 
     /// The camera, right on the page: no extra sheet between the instruction and the scan.
     private var viewfinder: some View {
         ZStack {
             if DataScannerViewController.isSupported {
-                QRScanner { code in pair(code) }
+                QRScanner(onCode: pair, onError: { scannerError = $0 })
                     .id(attempt)
                 // VisionKit's own hint follows the app's localizations, which stay English.
-                if !pairing {
+                if !pairing && scannerError == nil {
                     Text(L10n.tr("Find nearby barcodes."))
                         .font(.subheadline)
                         .foregroundStyle(.white)
@@ -363,44 +381,6 @@ private struct ScanPage: View {
         withAnimation(Motion.reduced(Motion.layout, reduceMotion)) {
             self.error = error.localizedDescription
             unreachable = reason == .unreachable || reason == .timeout
-        }
-    }
-}
-
-/// VisionKit live QR scanner.
-struct QRScanner: UIViewControllerRepresentable {
-    let onCode: (String) -> Void
-
-    func makeUIViewController(context: Context) -> DataScannerViewController {
-        let vc = DataScannerViewController(
-            recognizedDataTypes: [.barcode(symbologies: [.qr])],
-            qualityLevel: .fast,
-            isGuidanceEnabled: false,
-            isHighlightingEnabled: true
-        )
-        vc.delegate = context.coordinator
-        try? vc.startScanning()
-        return vc
-    }
-
-    func updateUIViewController(_ vc: DataScannerViewController, context: Context) {}
-
-    func makeCoordinator() -> Coordinator { Coordinator(onCode: onCode) }
-
-    final class Coordinator: NSObject, DataScannerViewControllerDelegate {
-        let onCode: (String) -> Void
-        private var done = false
-
-        init(onCode: @escaping (String) -> Void) { self.onCode = onCode }
-
-        func dataScanner(_ scanner: DataScannerViewController, didAdd items: [RecognizedItem], allItems: [RecognizedItem]) {
-            for case let .barcode(code) in items {
-                if let value = code.payloadStringValue, value.hasPrefix(AppEnvironment.current.urlScheme + "://"), !done {
-                    done = true
-                    scanner.stopScanning()
-                    onCode(value)
-                }
-            }
         }
     }
 }

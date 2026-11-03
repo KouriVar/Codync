@@ -38,27 +38,17 @@ struct ComposioConnectSheet: View {
     @State private var error: String?
 
     var body: some View {
-        VStack(spacing: 0) {
-            ModalHeader("Connect \(app.name)") {
-                if connected {
-                    IconButton("Done", systemImage: "checkmark") { dismiss() }
-                } else if plan?.status == "needsFields" {
-                    if saving {
-                        Spinner()
-                    } else {
-                        IconButton("Connect", systemImage: "checkmark") { submit() }
-                            .disabled(plan?.fields?.contains { $0.required && (values[$0.name] ?? "").isEmpty } ?? true)
-                    }
-                }
-            }
-            form
+        NativeExtensionSheet(app.name, busy: saving,
+                             actionTitle: connected ? "Done" : (plan?.status == "needsFields" ? "Connect" : nil),
+                             actionEnabled: connected || !(plan?.fields?.contains { $0.required && (values[$0.name] ?? "").isEmpty } ?? true),
+                             action: { if connected { dismiss() } else { submit() } }) {
+            form.disabled(saving)
         }
-        .background(Palette.background)
     }
 
     private var form: some View {
-        CardForm {
-            CardSection {
+        Form {
+            NativeFormSection {
                 HStack(spacing: 14) {
                     AppLogo(url: app.logo, name: app.name, size: 52)
                     VStack(alignment: .leading, spacing: 2) {
@@ -71,11 +61,11 @@ struct ComposioConnectSheet: View {
                 .padding(.vertical, 4)
             }
             if connected {
-                CardSection(footer: "Turn \(app.name) on for a bot in the bot's settings, under Connectors.") {
+                NativeFormSection(footer: "Turn \(app.name) on for a bot in the bot's settings, under Connectors.") {
                     Label(L10n.tr("Connected"), systemImage: "checkmark.circle.fill").foregroundStyle(Palette.added)
                 }
             } else if let plan, plan.status == "needsFields" {
-                CardSection(footer: "Sent to Composio, which keeps it for \(app.name).") {
+                NativeFormSection(footer: "Sent to Composio, which keeps it for \(app.name).") {
                     ForEach(plan.fields ?? [], id: \.name) { f in
                         VStack(alignment: .leading, spacing: 4) {
                             Group {
@@ -93,26 +83,26 @@ struct ComposioConnectSheet: View {
                     }
                 }
             } else if let plan, plan.status == "redirect" {
-                CardSection(footer: "Sign in on the page that opened. This updates by itself when you're done.") {
+                NativeFormSection(footer: "Sign in on the page that opened. This updates by itself when you're done.") {
                     if let url = plan.url.flatMap(URL.init(string:)) {
                         Button(L10n.tr("Open the sign-in page"), systemImage: "safari") { openURL(url) }
-                            .buttonStyle(.secondary)
+                            .buttonStyle(.bordered)
                     }
                     HStack(spacing: 8) {
-                        Spinner()
+                        ProgressView()
                         Text(L10n.tr("Waiting for you to finish signing in…")).foregroundStyle(Palette.secondary)
                     }
                 }
             } else if error == nil {
-                CardSection {
+                NativeFormSection {
                     HStack(spacing: 8) {
-                        Spinner()
+                        ProgressView()
                         Text(L10n.tr("Asking Composio…")).foregroundStyle(Palette.secondary)
                     }
                 }
             }
             if let error {
-                CardSection { Text(L10n.tr(error)).foregroundStyle(Palette.danger).textSelection(.enabled) }
+                NativeFormSection { Text(L10n.tr(error)).foregroundStyle(Palette.danger).textSelection(.enabled) }
             }
         }
         .textFieldStyle(.plain)

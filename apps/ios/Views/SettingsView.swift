@@ -13,77 +13,50 @@ struct SettingsView: View {
     @AppStorage(Analytics.enabledKey) private var analyticsEnabled = true
     @State private var confirmStartOver = false
     @State private var aboutAnalytics = false
+    /// Easter egg: ten quick taps on the version reveal Start over, so it can't be hit by mistake.
+    @State private var versionTaps = 0
+    @State private var lastVersionTap = Date.distantPast
+    @State private var showStartOver = false
 
     var body: some View {
-        CardForm {
-            Text(L10n.tr("Settings"))
-                .font(.largeTitle.bold())
-                .foregroundStyle(Palette.text)
-                .accessibilityAddTraits(.isHeader)
+        Group {
+            // Notifications, appearance and language share one grouped card.
+            Section {
+                notificationsRow
+                AppearanceSettings()
+                LanguageSettings()
+            }
 
-            AppearanceSettings()
-
-            LanguageSettings()
-
-            ThinkingDetailsSettings()
+            // Chat (thinking details) and usage analytics share one grouped card.
+            Section {
+                ThinkingDetailsSettings()
+                analyticsRow
+            }
 
             ShortcutLeadSettings()
 
-            CardSection("Notifications", footer: "Get a result summary, a request for input, or a failure notice. Notification previews follow your iOS settings.") {
-                notificationsRow
+            // The version row is the hidden trigger for Start over.
+            Section {
+                LabeledContent(L10n.tr("App version"), value: appVersion)
+                    .contentShape(Rectangle())
+                    .onTapGesture(perform: tappedVersion)
             }
 
-            CardSection(footer: "Which features you use, never your messages, code or files. Helps us spot bugs sooner and make Codync better for you.") {
-                HStack(spacing: 4) {
-                    Text(L10n.tr("Share usage analytics")).lineLimit(1).layoutPriority(1)
-                    IconButton("About usage analytics", systemImage: "info.circle") { aboutAnalytics = true }
-                    Toggle(isOn: Binding(get: { analyticsEnabled }, set: { Analytics.shared.setEnabled($0) })) { EmptyView() }
-                        .toggleStyle(.codync)
-                        .accessibilityLabel(L10n.tr("Share usage analytics"))
+            if showStartOver {
+                Section {
+                    Button(role: .destructive) { confirmStartOver = true } label: {
+                        Label(L10n.tr("Start over"), systemImage: "arrow.counterclockwise")
+                            .foregroundStyle(.red)
+                    }
                 }
-            }
-
-            CardSection {
-                Button {
-                    Analytics.shared.capture(.reviewLinkOpened)
-                    openURL(AppStoreRelease.reviewPage)
-                } label: {
-                    Text(L10n.tr("Rate on the App Store"))
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(Palette.text)
-                Button {
-                    Analytics.shared.capture(.linkOpened(.issues))
-                    openURL(URL(string: "https://github.com/leepokai/Codync/issues")!)
-                } label: {
-                    Text(L10n.tr("Report an issue"))
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(Palette.text)
-                ValueRow("App version", value: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "")
-                Button {
-                    Analytics.shared.capture(.linkOpened(.github))
-                    openURL(URL(string: "https://github.com/leepokai/Codync")!)
-                } label: {
-                    Text(L10n.tr("Source code"))
-                }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(Palette.text)
-            }
-
-            CardSection {
-                Button { confirmStartOver = true } label: {
-                    Label(L10n.tr("Start over"), systemImage: "arrow.counterclockwise")
-                        .foregroundStyle(Palette.danger)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
             }
         }
-        .codyncDialog("Start over?", isPresented: $confirmStartOver,
-                      message: "Signs out of every account and forgets every computer on this iPhone, then shows the welcome again. Your computers keep their bots and chats; pair again to use them.") {
-            [DialogAction("Start over", destructive: true) { Task { await app.startOver() } }]
+        .tint(.primary)
+        .alert(L10n.tr("Start over?"), isPresented: $confirmStartOver) {
+            Button(L10n.tr("Start over"), role: .destructive) { Task { await app.startOver() } }
+            Button(L10n.tr("Cancel"), role: .cancel) {}
+        } message: {
+            Text(L10n.tr("Signs out of every account and forgets every computer on this iPhone, then shows the welcome again. Your computers keep their bots and chats; pair again to use them."))
         }
         .task { notificationsAllowed = await PushRegistrar.shared.isAllowed() }
         // The tab stays alive: coming back from iOS Settings reads the permission again.
@@ -91,6 +64,33 @@ struct SettingsView: View {
             if phase == .active { Task { notificationsAllowed = await PushRegistrar.shared.isAllowed() } }
         }
         .codyncSheet(isPresented: $aboutAnalytics) { AnalyticsSheet() }
+    }
+
+    private var appVersion: String {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? ""
+    }
+
+    /// Ten quick taps on the version row reveal Start over; slow taps restart the count.
+    private func tappedVersion() {
+        let now = Date()
+        versionTaps = now.timeIntervalSince(lastVersionTap) > 2 ? 1 : versionTaps + 1
+        lastVersionTap = now
+        if versionTaps >= 10 && !showStartOver {
+            withAnimation { showStartOver = true }
+            versionTaps = 0
+        }
+    }
+
+    private var analyticsRow: some View {
+        Toggle(isOn: Binding(get: { analyticsEnabled }, set: { Analytics.shared.setEnabled($0) })) {
+            HStack(spacing: 4) {
+                Text(L10n.tr("Share usage analytics"))
+                Button(L10n.tr("About usage analytics"), systemImage: "info.circle") { aboutAnalytics = true }
+                    .labelStyle(.iconOnly).buttonStyle(.borderless)
+            }
+        }
+        .toggleStyle(.switch)
+        .accessibilityLabel(L10n.tr("Share usage analytics"))
     }
 
     private var notificationsRow: some View {
@@ -101,8 +101,13 @@ struct SettingsView: View {
                 Task { notificationsAllowed = await PushRegistrar.shared.requestAuthorization(from: .settings) }
             }
         } label: {
-            ValueRow("Notifications", value: notificationsAllowed == true ? "On" : notificationsAllowed == false ? "Off in Settings" : "Turn on")
-                .contentShape(Rectangle())
+            HStack {
+                Text(L10n.tr("Notifications"))
+                Spacer()
+                Text(L10n.tr(notificationsAllowed == true ? "On" : notificationsAllowed == false ? "Off in Settings" : "Turn on"))
+                    .foregroundStyle(.secondary)
+                Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
+            }
         }
         .buttonStyle(.plain)
     }

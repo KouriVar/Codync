@@ -21,18 +21,21 @@ public struct BotEditorView: View {
     }
 
     public var body: some View {
-        VStack(spacing: 0) {
-            ModalHeader("Settings") {
-                if saving {
-                    Spinner()
-                } else {
-                    IconButton("Save", systemImage: "checkmark") { save() }
-                        .disabled(!draft.isValid || saving || model.connection != .online)
-                }
-            }
+        NavigationStack {
             BotSettingsForm(draft: $draft, error: error)
+                .navigationTitle(L10n.tr("Settings"))
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) { Button(L10n.tr("Close")) { dismiss() } }
+                    ToolbarItem(placement: .confirmationAction) {
+                        if saving { ProgressView() } else {
+                            Button(L10n.tr("Save")) { save() }
+                                .disabled(!draft.isValid || saving || model.connection != .online)
+                        }
+                    }
+                }
         }
-        .background(Palette.background)
+        .tint(.primary)
         // A change made elsewhere (a bot that manages the team, another device) replaces each field not edited here.
         .onChange(of: draft.id.flatMap { model.bots[$0] }.map(BotDraft.init)) { base, fresh in
             if let base, let fresh { draft = draft.rebased(from: base, onto: fresh) }
@@ -61,7 +64,7 @@ enum FormPart {
     case all, often, rarely
 }
 
-/// Bot settings, in sections in the Settings style (`CardSection`). `scrolls` is off where a
+/// Bot settings, in sections in the Settings style. `scrolls` is off where a
 /// surrounding view scrolls (the details sheet).
 struct BotSettingsForm: View {
     @Binding var draft: BotDraft
@@ -80,16 +83,9 @@ struct BotSettingsForm: View {
     private var bot: Bot? { draft.id.flatMap { model.bots[$0] } }
 
     var body: some View {
-        Group {
-            if scrolls {
-                ScrollView { sections.padding(20) }
-                    .scrollDismissesKeyboard(.interactively)
-            } else {
-                sections
-            }
+        Form {
+            sections
         }
-        .font(.body)
-        .background(Palette.background)
         .task { await model.refreshPlugins() }
         .codyncSheet(item: $viewingSkill) { SkillSheet(skill: $0) }
         .codyncSheet(isPresented: $pickingFolder) {
@@ -101,18 +97,18 @@ struct BotSettingsForm: View {
     }
 
     /// What changes often: on the details sheet's Details page.
-    private var oftenSections: some View {
-        VStack(alignment: .leading, spacing: 30) {
-            CardSection("Instructions") { instructions }
-            CardSection("Agent") {
-                fallbackBanner
-                modelPicker
-                fallbackList
-            }
-            .animation(Motion.reduced(Motion.layout, reduceMotion), value: bot?.agentStep)
-            if let error {
-                Text(L10n.tr(error)).font(.footnote).foregroundStyle(Palette.danger)
-            }
+    @ViewBuilder private var oftenSections: some View {
+        Section {
+            instructions
+        } header: { Text(L10n.tr("Instructions")) }
+        Section {
+            fallbackBanner
+            modelPicker
+            fallbackList
+        } header: { Text(L10n.tr("Agent")) }
+        .animation(Motion.reduced(Motion.layout, reduceMotion), value: bot?.agentStep)
+        if let error {
+            Text(L10n.tr(error)).font(.footnote).foregroundStyle(Palette.danger)
         }
     }
 
@@ -149,9 +145,8 @@ struct BotSettingsForm: View {
         if part == .often { oftenSections } else { allSections }
     }
 
-    private var allSections: some View {
-        VStack(alignment: .leading, spacing: 30) {
-            CardSection("Profile") {
+    @ViewBuilder private var allSections: some View {
+        Section {
                 VStack(alignment: .leading, spacing: 12) {
                     Button {
                         withAnimation(Motion.reduced(Motion.layout, reduceMotion)) { pickingAvatar.toggle() }
@@ -180,10 +175,10 @@ struct BotSettingsForm: View {
                 if let bot, let creator = bot.createdBy {
                     ValueRow("Created by", value: "\(model.bots[creator]?.name ?? "A bot") · \(Date(milliseconds: bot.createdAt).formatted(date: .abbreviated, time: .omitted))")
                 }
-            }
+            } header: { Text(L10n.tr("Profile")) }
 
             // On the details sheet the agent and its model are on the Details page; what's left is where it works.
-            CardSection(part == .all ? "Agent" : "Workspace") {
+            Section {
                 if part == .all { fallbackBanner }
                 ValueRow("Computer") {
                     Text(model.hostName).lineLimit(1)
@@ -215,10 +210,10 @@ struct BotSettingsForm: View {
                     .help(draft.cwd.isEmpty ? "A persistent workspace allocated for this bot" : draft.cwd)
                 }
                 ApprovalPicker(draft: $draft, reload: modelReload)
-            }
+            } header: { Text(L10n.tr(part == .all ? "Agent" : "Workspace")) }
             .animation(Motion.reduced(Motion.layout, reduceMotion), value: bot?.agentStep)
 
-            CardSection("Activity") {
+            Section {
                 SwitchRow("Notifications", detail: "Get notified when this bot finishes or needs you",
                           isOn: Binding(get: { draft.notify ?? true }, set: { draft.notify = $0 }))
                 if model.screen != nil, part == .all {
@@ -245,7 +240,7 @@ struct BotSettingsForm: View {
                     SwitchRow("Reachable by cloud assistants", detail: "ChatGPT or Claude in your Codync account can see and message this bot.",
                               isOn: Binding(get: { draft.reachableByAssistants ?? true }, set: { draft.reachableByAssistants = $0 }))
                 }
-            }
+            } header: { Text(L10n.tr("Activity")) }
 
             PluginToggles(
                 title: "Connectors",
@@ -263,7 +258,6 @@ struct BotSettingsForm: View {
             if let error {
                 Text(L10n.tr(error)).font(.footnote).foregroundStyle(Palette.danger)
             }
-        }
     }
 }
 

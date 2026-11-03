@@ -10,12 +10,12 @@ struct LanguageSettings: View {
     }
 
     var body: some View {
-        CardSection("Language", footer: "Choose the language for this device. Unsupported system languages use English.") {
-            ValueRow("App language") {
-                ChoicePicker(selection: selection, options: AppLanguage.allCases.map {
-                    ($0, AppLanguage.menuTitle($0, preference: selection.wrappedValue, systemIsChinese: AppLanguage.systemIsChinese()))
-                })
+        Picker(L10n.tr("App language"), selection: selection) {
+            ForEach(AppLanguage.allCases) { language in
+                Text(AppLanguage.menuTitle(language, preference: selection.wrappedValue, systemIsChinese: AppLanguage.systemIsChinese()))
+                    .tag(language)
             }
         }
+        .pickerStyle(.navigationLink)
     }
 }

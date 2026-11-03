@@ -5,42 +5,40 @@ import SwiftUI
 struct TimeZonePicker: View {
     let selection: String
     let onPick: (String) -> Void
+    @Environment(\.dismissModal) private var dismiss
     @State private var query = ""
     private static let top = "top"
 
     var body: some View {
-        VStack(spacing: 0) {
-            ModalHeader("Time zone")
-            SearchField("Search time zones", text: $query)
-                .padding(.horizontal, 20)
-                .padding(.bottom, 12)
-            ScrollViewReader { proxy in
-                ScrollView {
-                    let zones = TimeZones.search(query)
-                    VStack(spacing: 0) {
-                        Color.clear.frame(height: 0).id(Self.top)
-                        if zones.isEmpty {
-                            Text(L10n.tr("No matching time zones")).foregroundStyle(Palette.secondary).padding(.top, 8)
-                        }
-                        LazyVStack(alignment: .leading, spacing: 0) {
-                            ForEach(zones, id: \.self) { zone in
-                                row(zone)
-                                if zone != zones.last { Hairline().padding(.horizontal, 16) }
-                            }
-                        }
-                        .background(Palette.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                    }
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 20)
+        NavigationStack {
+            List {
+                let zones = TimeZones.search(query)
+                if zones.isEmpty {
+                    Text(L10n.tr("No matching time zones")).foregroundStyle(.secondary)
                 }
-                .scrollDismissesKeyboard(.interactively)
-                .onAppear { proxy.scrollTo(selection, anchor: .center) }
-                // A shorter list from a deep scroll position would otherwise show blank.
-                .onChange(of: query) { proxy.scrollTo(Self.top, anchor: .top) }
+                ForEach(zones, id: \.self) { zone in
+                    Button { onPick(zone) } label: {
+                        HStack(spacing: 10) {
+                            Text(zone).foregroundStyle(Palette.text).lineLimit(1)
+                            Spacer(minLength: 8)
+                            Text(TimeZones.offset(zone)).foregroundStyle(.secondary)
+                            Image(systemName: "checkmark").font(.callout.weight(.semibold)).foregroundStyle(Palette.accent)
+                                .opacity(zone == selection ? 1 : 0)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .searchable(text: $query, prompt: Text(L10n.tr("Search time zones")))
+            .navigationTitle(L10n.tr("Time zone"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(L10n.tr("Close")) { dismiss() }
+                }
             }
         }
-        .font(.body)
-        .background(Palette.background)
+        .tint(.primary)
     }
 
     private func row(_ zone: String) -> some View {

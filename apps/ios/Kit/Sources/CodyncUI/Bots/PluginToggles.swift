@@ -11,7 +11,7 @@ struct PluginToggles: View {
     var info: ((_ id: String) -> Void)?
 
     var body: some View {
-        CardSection(title) {
+        Section {
             if items.isEmpty {
                 Text(L10n.tr(empty)).foregroundStyle(Palette.secondary)
             }
@@ -29,6 +29,6 @@ struct PluginToggles: View {
                     }
                 }
             }
-        }
+        } header: { Text(L10n.tr(title)) }
     }
 }

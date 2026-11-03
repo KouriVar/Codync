@@ -19,14 +19,16 @@ public enum HostConnector {
     /// Proves the QR's one-time code inside a channel to the QR's host key, with the account's `certificate`;
     /// the host then authorizes this device and closes with `4100 paired`. A computer in no account asks its
     /// user first, then signs `claim` and returns it (as JSON) for the phone to complete with the cloud.
+    /// Local-only clients omit the certificate for hosts such as 2.34.2 that support QR-only pairing.
+    /// The host still authorizes the device; newer hosts can refuse account-free pairing.
     public static func pair(_ pairing: Pairing, identity: DeviceIdentity, deviceName: String, platform: String,
-                            certificate: DeviceCertificate, claim: CloudClaim?) async throws -> (computer: Computer, claim: Data?) {
+                            certificate: DeviceCertificate?, claim: CloudClaim?) async throws -> (computer: Computer, claim: Data?) {
         try await pair(pairing, identity: identity, deviceName: deviceName, platform: platform,
                        certificate: certificate, claim: claim, dial: URLSessionSocket.dial)
     }
 
     static func pair(_ pairing: Pairing, identity: DeviceIdentity, deviceName: String, platform: String,
-                     certificate: DeviceCertificate, claim: CloudClaim?, dial: @escaping Dialer) async throws -> (computer: Computer, claim: Data?) {
+                     certificate: DeviceCertificate?, claim: CloudClaim?, dial: @escaping Dialer) async throws -> (computer: Computer, claim: Data?) {
         let transport = ChannelTransport(computer: pairing.computer, identity: identity, pairingCode: pairing.code, dial: dial)
         await transport.start()
         do {
@@ -34,7 +36,7 @@ public enum HostConnector {
                 var code: String
                 var name: String
                 var platform: String
-                var certificate: DeviceCertificate
+                var certificate: DeviceCertificate?
                 var claim: CloudClaim?
             }
             struct Res: Decodable { var computerId: ComputerID; var name: String? }
