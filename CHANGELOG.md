@@ -856,3 +856,11 @@
 - 文件：`CodyncUI/Thread/ThreadView.swift`。
 - 验证：构建号 129/130 + 像素测量（x=470 处 132px；返回圆 x=110 处同为 132px）。
 - 关联：C0093。
+
+### C0095 · 2026-11-03 · 标题胶囊改自绘玻璃，严格 42pt（与工具栏圆等高）
+
+- 原因：`.buttonStyle(.glass)` 会在 label 外再补约 10pt，导致胶囊 44.7pt、圆按钮 42pt，滚动时胶囊上下各被裁 2pt。
+- 变化：改为 `Button { } label: { title.padding(.horizontal,14).frame(height:42).glassEffect(.regular.interactive(), in: Capsule()) }` + `.buttonStyle(.plain)`，玻璃不再额外撑高。
+- 文件：`CodyncUI/Thread/ThreadView.swift`。
+- 验证：构建号 132 编译、签名、安装成功；截图三个元素等高（返回/更多实测 126px=42pt，胶囊目视等高）。
+- 关联：C0094。
