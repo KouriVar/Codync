@@ -7,7 +7,7 @@ struct HomeBottomBar: View {
     @Binding var searchText: String
     let openCamera: () -> Void
     let openPlugins: () -> Void
-    /// HIG touch target: 44pt circle, 24pt glyph (10pt of padding all round).
+    /// One 44pt row (HIG touch target) for the search capsule and both circles.
     private let iconSize: CGFloat = 24
     private let iconLineWidth: CGFloat = 1.8
 
@@ -25,8 +25,8 @@ struct HomeBottomBar: View {
                 .help("插件")
 
                 SearchField("搜索", text: $searchText, opaqueBackground: false)
-                    .padding(.vertical, 4)
-                    .glassEffect(.regular, in: Capsule())
+                    .frame(height: 44)
+                    .glassEffect(.regular.interactive(), in: Capsule())
                     .submitLabel(.search)
                     .accessibilityLabel("搜索聊天")
 
