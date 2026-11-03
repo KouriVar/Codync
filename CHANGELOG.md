@@ -831,3 +831,11 @@
 - 验证：构建号 124 编译、签名、安装成功；截图确认（截图为 OFF 态，灰色轨道）。
 - 限制/待办：ON 态为黑色轨道，深色卡片对比度偏低，若观感不佳可改 `Palette.text`/`Color(white:0.2)`。
 - 关联：C0084。
+
+### C0092 · 2026-11-03 · 设置页按组重构 + 版本页脚 + 相机页按钮 24/44
+
+- 原因：用户要求精简设置页：删配对（电脑管理里有入口）、凭证与连接应用同组、排序上移改名、思考细节归入系统组并改名、删共享用量分析、版本改成 App 图标页脚（保留连点 Start over）；相机页返回/更多图标偏小。
+- 变化：第一组 = 头像/电脑/状态/排序；连接组 = 凭证/连接应用；系统组 = 通知/主题/语言/思考细节；页脚 = AppMark 68pt + 半句 + 版本号（连点 10 次）；新增 `apps/ios/Resources/AppMark.png`（256px，xcodegen 重新生成工程）。`QuickCapture` 返回/更多改 `RemixIcon(..., size: 24)`（44 圆）。
+- 文件：`Views/AccountSwitcherView.swift`、`Views/SettingsView.swift`、`ThinkingDetailsSettings.swift`、`Views/QuickCapture.swift`、`Resources/AppMark.png`。
+- 验证：构建号 125/126 编译、签名、安装成功；截图确认分组、黑色开关、页脚图标、相机页按钮尺寸。
+- 关联：C0091。

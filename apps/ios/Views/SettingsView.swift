@@ -1,6 +1,7 @@
 import CodyncKit
 import CodyncUI
 import SwiftUI
+import UIKit
 
 /// The Settings tab: what belongs to this iPhone alone (appearance, language, the lead shortcuts call,
 /// notification permission, analytics, Start over). Each computer's own settings (voice chat, push, connection, hidden bots) are in
@@ -11,9 +12,7 @@ struct SettingsView: View {
     @Environment(\.openURL) private var openURL
     @Environment(\.scenePhase) private var scenePhase
     @State private var notificationsAllowed: Bool?
-    @AppStorage(Analytics.enabledKey) private var analyticsEnabled = true
     @State private var confirmStartOver = false
-    @State private var aboutAnalytics = false
     /// Easter egg: ten quick taps on the version reveal Start over, so it can't be hit by mistake.
     @State private var versionTaps = 0
     @State private var lastVersionTap = Date.distantPast
@@ -26,23 +25,31 @@ struct SettingsView: View {
                 notificationsRow
                 AppearanceRow { path.append(.appearance) }
                 LanguageRow { path.append(.language) }
-            }
-            .listRowSeparator(.hidden)
-
-            // Chat (thinking details) and usage analytics share one grouped card.
-            Section {
                 ThinkingDetailsSettings()
-                analyticsRow
             }
             .listRowSeparator(.hidden)
 
             ShortcutLeadSettings()
 
-            // The version row is the hidden trigger for Start over.
+            // The app mark, name and version: the hidden trigger for Start over.
             Section {
-                SettingsRow("information-line", title: L10n.tr("App version"), value: appVersion, chevron: false)
-                    .contentShape(Rectangle())
-                    .onTapGesture(perform: tappedVersion)
+                VStack(spacing: 10) {
+                    if let mark = UIImage(named: "AppMark") {
+                        Image(uiImage: mark)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 68, height: 68)
+                            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    }
+                    Text(appName).font(.headline)
+                    Text(appVersion).font(.footnote).foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 16)
+                .contentShape(Rectangle())
+                .onTapGesture(perform: tappedVersion)
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
             }
             .listRowSeparator(.hidden)
 
@@ -67,7 +74,10 @@ struct SettingsView: View {
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { Task { notificationsAllowed = await PushRegistrar.shared.isAllowed() } }
         }
-        .codyncSheet(isPresented: $aboutAnalytics) { AnalyticsSheet() }
+    }
+
+    private var appName: String {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String ?? "半句"
     }
 
     private var appVersion: String {
@@ -83,22 +93,6 @@ struct SettingsView: View {
             withAnimation { showStartOver = true }
             versionTaps = 0
         }
-    }
-
-    private var analyticsRow: some View {
-        Toggle(isOn: Binding(get: { analyticsEnabled }, set: { Analytics.shared.setEnabled($0) })) {
-            HStack(spacing: 12) {
-                RemixIcon("bar-chart-line", size: 18).frame(width: 22).foregroundStyle(.primary)
-                HStack(spacing: 4) {
-                    Text(L10n.tr("Share usage analytics"))
-                    Button(action: {  aboutAnalytics = true  }) { RemixIcon("information-line") }.accessibilityLabel(Text(L10n.tr("About usage analytics"))).buttonStyle(.borderless)
-                }
-            }
-        }
-        .listRowSeparator(.hidden)
-        .toggleStyle(.switch)
-        .tint(.black)
-        .accessibilityLabel(L10n.tr("Share usage analytics"))
     }
 
     private var notificationsRow: some View {

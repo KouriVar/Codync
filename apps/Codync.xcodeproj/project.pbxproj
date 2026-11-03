@@ -26,6 +26,7 @@
 		2CC074683AE086D6C77CC1E8 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B274A0195CB3B2409EA4C194 /* WidgetKit.framework */; };
 		2CDF3DF16A13DAF83CA42168 /* CodyncWidgets.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAB9BDB52C3A9F7B2568A750 /* CodyncWidgets.swift */; };
 		311D682B777D90EB9E32938F /* OrderingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CC287193FD50B9E97D3138A /* OrderingView.swift */; };
+		353468006F23544D00819A8A /* AppMark.png in Resources */ = {isa = PBXBuildFile; fileRef = 8AAD255F1E3E92316C5A8F38 /* AppMark.png */; };
 		35CFB641A4F10C0EBD21CB14 /* LaunchSplash.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6FC76D28AB02DF1427D530ED /* LaunchSplash.swift */; };
 		3BCC04815E5CA8953E0DDCAD /* WidgetPreviews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 305DDCC18BB8AA6CD9D19CEF /* WidgetPreviews.swift */; };
 		48DAAA1384E5B8D0BA27C895 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1E47C60032C326157E0386B8 /* SwiftUI.framework */; };
@@ -181,6 +182,7 @@
 		7EE1650956F689AF85F136C1 /* HomeBottomBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeBottomBar.swift; sourceTree = "<group>"; };
 		887BD26FA63A162B0A1ABB17 /* remixicon-LICENSE.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "remixicon-LICENSE.txt"; sourceTree = "<group>"; };
 		89A0D530BEF30AF36F9DBEA8 /* CodyncBot-hex-Ink.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "CodyncBot-hex-Ink.ttf"; sourceTree = "<group>"; };
+		8AAD255F1E3E92316C5A8F38 /* AppMark.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = AppMark.png; sourceTree = "<group>"; };
 		8BA06CEE98A7CDED62678522 /* Input.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Input.swift; sourceTree = "<group>"; };
 		8CC3E47D480A5F15CA95C504 /* HostLink.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HostLink.swift; sourceTree = "<group>"; };
 		8D16AD9979C77D976BC832D1 /* Driver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Driver.swift; sourceTree = "<group>"; };
@@ -446,6 +448,7 @@
 		C2E4BC991A101B97C0E4F058 /* Resources */ = {
 			isa = PBXGroup;
 			children = (
+				8AAD255F1E3E92316C5A8F38 /* AppMark.png */,
 				4815867922559696EDCA47FD /* Assets.xcassets */,
 				F21AEC12DC761C28A997BEF3 /* Info.plist */,
 				52A96030D47F1B9678095909 /* iOS.entitlements */,
@@ -637,6 +640,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				353468006F23544D00819A8A /* AppMark.png in Resources */,
 				8157F3E9CFB390CBCB1A9F9A /* Assets.xcassets in Resources */,
 				C7ED489193AC0934515D2E85 /* PrivacyInfo.xcprivacy in Resources */,
 				663B04025C7E0C8BD3AF9E93 /* remixicon-LICENSE.txt in Resources */,

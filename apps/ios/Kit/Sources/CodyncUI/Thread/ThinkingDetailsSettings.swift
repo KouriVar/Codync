@@ -17,7 +17,7 @@ public struct ThinkingDetailsSettings: View {
         Toggle(isOn: $details) {
             HStack(spacing: 12) {
                 RemixIcon("brain-line", size: 18).frame(width: 22).foregroundStyle(.primary)
-                Text(L10n.tr("Show thinking details"))
+                Text("思考细节")
             }
         }
             .toggleStyle(.switch)

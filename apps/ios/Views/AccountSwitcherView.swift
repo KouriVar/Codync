@@ -166,10 +166,6 @@ private struct AccountProfileView: View {
                 }
                 .listRowSeparator(.hidden)
 
-                Button { showPairing = true } label: {
-                    SettingsRow("qr-scan-line", title: "配对")
-                }
-
                 Button { showComputersSheet = true } label: {
                     SettingsRow("computer-line", title: "电脑",
                                 value: accounts.computers.isEmpty ? nil : "\(accounts.computers.count) 台已连接")
@@ -179,26 +175,23 @@ private struct AccountProfileView: View {
                     SettingsRow("pulse-line", title: "状态")
                 }
 
+                Button { path.append(.ordering) } label: {
+                    SettingsRow("arrow-up-down-line", title: "排序")
+                }
+            }
+            .listRowSeparator(.hidden)
+
+            // The connection group: this iPhone's credentials and its connected apps.
+            Section {
                 Button { showVault = true } label: {
                     SettingsRow("shield-keyhole-line", title: "凭证")
                 }
                 .disabled(app.currentStore == nil)
-            }
-            .listRowSeparator(.hidden)
 
-            // A separate list that opens the Extensions (marketplace) page.
-            Section {
                 Button { showExtensions = true } label: {
                     SettingsRow("plug-line", title: "连接应用")
                 }
                 .disabled(app.currentStore == nil)
-            }
-            .listRowSeparator(.hidden)
-
-            Section {
-                Button { path.append(.ordering) } label: {
-                    SettingsRow("arrow-up-down-line", title: "列表排序")
-                }
             }
             .listRowSeparator(.hidden)
 

@@ -254,8 +254,7 @@ struct QuickCaptureSheet: View {
                 Spacer()
                 HStack {
                     Button { dismiss() } label: {
-                        RemixIcon("arrow-left-s-line")
-                            .font(.system(size: 17, weight: .semibold))
+                        RemixIcon("arrow-left-s-line", size: 24)
                             .foregroundStyle(.white)
                             .frame(width: 44, height: 44)
                             .glassEffect(.regular.interactive(), in: Circle())
@@ -270,8 +269,7 @@ struct QuickCaptureSheet: View {
                     Menu {
                         // Placeholder for now; nothing in it yet.
                     } label: {
-                        RemixIcon("more-line")
-                            .font(.system(size: 17, weight: .semibold))
+                        RemixIcon("more-line", size: 24)
                             .foregroundStyle(.white)
                             .frame(width: 44, height: 44)
                             .glassEffect(.regular.interactive(), in: Circle())
