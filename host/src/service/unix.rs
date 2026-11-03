@@ -86,6 +86,63 @@ fn systemd_quote(s: &str, exec: bool) -> String {
     format!("\"{}\"", if exec { s.replace('$', "$$") } else { s })
 }
 
+/// The environment keys a rewrite must carry over so the owner's settings survive an install.
+const PRESERVED_ENV: [&str; 2] = ["CODYNC_CLOUD", "CODYNC_EXTERNAL_URL"];
+
+/// `key`'s raw (already XML-escaped) value in an existing plist's `EnvironmentVariables`.
+fn env_value_in(text: &str, key: &str) -> Option<String> {
+    let marker = format!("<key>{key}</key>");
+    let start = text.find(&marker)? + marker.len();
+    let rest = &text[start..];
+    let open = rest.find("<string>")? + "<string>".len();
+    let close = rest[open..].find("</string>")?;
+    Some(rest[open..open + close].to_owned())
+}
+
+/// The environment variables to keep when rewriting the plist: the values already in it, else the
+/// ones in this process's environment. Only `CODYNC_CLOUD` and `CODYNC_EXTERNAL_URL` are carried.
+fn preserved_env(existing: Option<&str>) -> Vec<(String, String)> {
+    PRESERVED_ENV
+        .iter()
+        .filter_map(|key| {
+            if let Some(text) = existing {
+                if let Some(value) = env_value_in(text, key) {
+                    return Some(((*key).to_owned(), value));
+                }
+            }
+            std::env::var(key).ok().filter(|value| !value.is_empty()).map(|value| ((*key).to_owned(), xml_escape(&value)))
+        })
+        .collect()
+}
+
+/// The launchd agent's plist text. `extra` holds preserved `key`/`value` pairs whose values are
+/// already XML-escaped; they are appended to `EnvironmentVariables`.
+fn launchd_plist_xml(exe: &str, path: &str, data: &str, log: &str, port: u16, extra: &[(String, String)]) -> String {
+    let extra: String =
+        extra.iter().map(|(key, value)| format!("<key>{key}</key><string>{value}</string>")).collect();
+    format!(
+        r#"<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>{LABEL}</string>
+  <key>ProgramArguments</key><array><string>{exe}</string><string>serve</string><string>--port</string><string>{port}</string></array>
+  <key>EnvironmentVariables</key><dict><key>PATH</key><string>{path}</string><key>CODYNC_HOME</key><string>{data}</string>{extra}</dict>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>ProcessType</key><string>Interactive</string>
+  <key>StandardOutPath</key><string>{log}</string>
+  <key>StandardErrorPath</key><string>{log}</string>
+</dict>
+</plist>
+"#,
+        exe = xml_escape(exe),
+        path = xml_escape(path),
+        data = xml_escape(data),
+        log = xml_escape(log),
+    )
+}
+
 /// Installs and starts the host as a per-user background service. The current
 /// PATH is captured so the service finds `npx`, `claude`, `codex`, …
 pub fn install(port: u16) -> Result<()> {
@@ -95,28 +152,19 @@ pub fn install(port: u16) -> Result<()> {
     let log = data_dir().join("host.log");
     std::fs::create_dir_all(data_dir()).context("creating the data directory")?;
     if cfg!(target_os = "macos") {
-        let plist = format!(
-            r#"<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-  <key>Label</key><string>{LABEL}</string>
-  <key>ProgramArguments</key><array><string>{exe}</string><string>serve</string><string>--port</string><string>{port}</string></array>
-  <key>EnvironmentVariables</key><dict><key>PATH</key><string>{path}</string><key>CODYNC_HOME</key><string>{data}</string></dict>
-  <key>RunAtLoad</key><true/>
-  <key>KeepAlive</key><true/>
-  <key>ProcessType</key><string>Interactive</string>
-  <key>StandardOutPath</key><string>{log}</string>
-  <key>StandardErrorPath</key><string>{log}</string>
-</dict>
-</plist>
-"#,
-            exe = xml_escape(&exe),
-            path = xml_escape(&path),
-            data = xml_escape(&data_dir().to_string_lossy()),
-            log = xml_escape(&log.to_string_lossy()),
-        );
         let file = launchd_plist();
+        // A rewrite must not drop the owner's settings that live only in this plist
+        // (`CODYNC_CLOUD`, `CODYNC_EXTERNAL_URL`).
+        let existing = std::fs::read_to_string(&file).ok();
+        let extra = preserved_env(existing.as_deref());
+        let plist = launchd_plist_xml(
+            &exe,
+            &path,
+            &data_dir().to_string_lossy(),
+            &log.to_string_lossy(),
+            port,
+            &extra,
+        );
         create_parent(&file)?;
         let uid = current_uid();
         // Not loaded yet is the normal case here.
@@ -174,7 +222,7 @@ fn current_uid() -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::systemd_quote;
+    use super::{launchd_plist_xml, preserved_env, systemd_quote};
 
     #[test]
     fn unit_values_stay_one_word() {
@@ -187,5 +235,32 @@ mod tests {
         assert_eq!(exe, r#""/home/me/My $$bin/codync-host""#);
         let parsed = shlex::split(&format!("{exe} serve")).unwrap();
         assert_eq!(parsed[0].replace("%%", "%").replace("$$", "$"), "/home/me/My $bin/codync-host");
+    }
+
+    #[test]
+    fn a_rewrite_keeps_the_owners_cloud_and_url_settings() {
+        let old = r#"<plist version="1.0"><dict>
+  <key>EnvironmentVariables</key><dict><key>PATH</key><string>/bin</string>
+  <key>CODYNC_HOME</key><string>/Users/me/.codync</string>
+  <key>CODYNC_CLOUD</key><string>off</string>
+  <key>CODYNC_EXTERNAL_URL</key><string>https://bot.suiyk.link</string></dict>
+</dict></plist>"#;
+        let extra = preserved_env(Some(old));
+        assert!(extra.iter().any(|(k, v)| k == "CODYNC_CLOUD" && v == "off"));
+        assert!(extra.iter().any(|(k, v)| k == "CODYNC_EXTERNAL_URL" && v == "https://bot.suiyk.link"));
+        let xml = launchd_plist_xml("/x/codync-host", "/bin", "/Users/me/.codync", "/Users/me/.codync/host.log", 19222, &extra);
+        assert!(xml.contains("<key>CODYNC_CLOUD</key><string>off</string>"), "{xml}");
+        assert!(xml.contains("<key>CODYNC_EXTERNAL_URL</key><string>https://bot.suiyk.link</string>"), "{xml}");
+        // The other variables are still there.
+        assert!(xml.contains("<key>CODYNC_HOME</key><string>/Users/me/.codync</string>"), "{xml}");
+    }
+
+    #[test]
+    fn preserved_values_are_not_escaped_twice() {
+        let old = r#"<dict><key>CODYNC_EXTERNAL_URL</key><string>https://x.test/?a=1&amp;b=2</string></dict>"#;
+        let extra = preserved_env(Some(old));
+        let xml = launchd_plist_xml("/x", "/bin", "/d", "/d/log", 1, &extra);
+        assert!(xml.contains("https://x.test/?a=1&amp;b=2"), "{xml}");
+        assert!(!xml.contains("&amp;amp;"), "{xml}");
     }
 }

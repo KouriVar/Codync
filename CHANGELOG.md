@@ -969,3 +969,14 @@
 - 验证：host `cargo build` 成功、`cargo test` 全绿（单元 666 passed + 全部 e2e 通过）；iOS Simulator（iPhone 18 Pro，DevDebug）`BUILD SUCCEEDED`。真机 Google 登录 → 配对 → `https://bot.suiyk.link` 收发、换号被拒由用户验证。
 - 限制：真机需重新生成 host 二进制并替换 App 内 `codync-host` 才启用新校验；CloudClient / 账号证书相关代码保留但未使用。
 - 关联：C0106。
+
+### C0108 · 2026-11-04 · host 安装保留 plist 环境变量；本地重建 Codync.app（ad-hoc、默认关自动更新）
+
+- 原因：`codync-host install` 重写 LaunchAgent 时只写 `PATH`/`CODYNC_HOME`，会丢掉 `CODYNC_CLOUD`/`CODYNC_EXTERNAL_URL`；换入自定义 host 后 `/Applications/Codync.app` 签名失效、版本仍 2.34.2。
+- 变化：
+  - `host/src/service/unix.rs`：抽出 `launchd_plist_xml`；`install` 重写 plist 时保留旧 plist 里的 `CODYNC_CLOUD`/`CODYNC_EXTERNAL_URL`（没有则取当前进程 env），并补两条单测。
+  - `apps/desktop`：`updates.ts` 默认 `autoCheck/autoDownload = false`；`resources/entitlements.mac.plist` 增加 `com.apple.security.cs.disable-library-validation`（ad-hoc 构建需要）；`package.json` 记录 npm `allowScripts`。
+- 文件：`host/src/service/unix.rs`、`apps/desktop/src/main/updates.ts`、`apps/desktop/resources/entitlements.mac.plist`、`apps/desktop/package.json`。
+- 验证：`cargo test --bin codync-host` 668 passed；release 重编；`codync-host install` 后 plist 仍含两项；本地 `npm ci` + `electron-vite build` + `electron-builder --mac --dir --arm64`（ad-hoc）产出 2.36.0，替换 `/Applications/Codync.app`（原版备份 `~/Backups/Codync.app.bak-20261104-002447`）；`/health` 2.36.0/main、host 环境含 `CODYNC_CLOUD=off`/`CODYNC_EXTERNAL_URL`、`cloudStatus.enabled=false`、`codesign --verify --deep --strict` 通过、autoCheck/autoDownload=false。
+- 限制：本机只有 Apple Development 证书（无 Developer ID / 公证凭据）→ App 为 ad-hoc 签名、arm64-only，`spctl` 仍 rejected；可分发需另行签名公证。
+- 关联：C0107。

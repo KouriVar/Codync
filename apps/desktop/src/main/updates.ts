@@ -55,9 +55,9 @@ export class Updates extends EventEmitter<{ change: []; upToDate: []; setAutoChe
     downloadPercent: null,
     staged: false,
     installing: false,
-    autoCheck: prefs.get('updatesAutoCheck') !== false,
-    // On unless turned off: installs still wait until Codync is idle.
-    autoDownload: prefs.get('updatesAutoDownload') !== false,
+    autoCheck: prefs.get('updatesAutoCheck') === true,
+    // Off unless explicitly turned on (this fork builds with updates off by default).
+    autoDownload: prefs.get('updatesAutoDownload') === true,
     lastCheck: (prefs.get('updatesLastCheck') as number | undefined) ?? null,
     error: null,
   }
