@@ -377,7 +377,8 @@ extension ThreadView {
     /// Like Grok Bot: the bot at the top opens its details (a group's editor for a group).
     var header: some View {
         Button(action: openDetails) {
-            title.padding(.horizontal, 12).frame(height: 38)
+            // .glass adds about 9pt of padding around this frame: 35 + 9 ≈ the 44pt bar row.
+            title.padding(.horizontal, 12).frame(height: 35)
         }
             .buttonStyle(.glass)
             .buttonBorderShape(.capsule)
