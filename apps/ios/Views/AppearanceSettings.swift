@@ -7,8 +7,13 @@ struct AppearanceSettings: View {
     @AppStorage(Appearance.storageKey) private var appearance = Appearance.system
 
     var body: some View {
-        Picker(L10n.tr("Theme"), selection: $appearance) {
+        Picker(selection: $appearance) {
             ForEach(Appearance.allCases, id: \.self) { Text(L10n.tr($0.label)).tag($0) }
+        } label: {
+            HStack(spacing: 12) {
+                RemixIcon("palette-line", size: 18).frame(width: 22).foregroundStyle(.primary)
+                Text(L10n.tr("Theme"))
+            }
         }
         .pickerStyle(.navigationLink)
     }

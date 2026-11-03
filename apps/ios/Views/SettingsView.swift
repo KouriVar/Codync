@@ -37,7 +37,14 @@ struct SettingsView: View {
 
             // The version row is the hidden trigger for Start over.
             Section {
-                LabeledContent(L10n.tr("App version"), value: appVersion)
+                LabeledContent {
+                    Text(appVersion)
+                } label: {
+                    HStack(spacing: 12) {
+                        RemixIcon("information-line", size: 18).frame(width: 22).foregroundStyle(.primary)
+                        Text(L10n.tr("App version"))
+                    }
+                }
                     .contentShape(Rectangle())
                     .onTapGesture(perform: tappedVersion)
             }
@@ -83,9 +90,12 @@ struct SettingsView: View {
 
     private var analyticsRow: some View {
         Toggle(isOn: Binding(get: { analyticsEnabled }, set: { Analytics.shared.setEnabled($0) })) {
-            HStack(spacing: 4) {
-                Text(L10n.tr("Share usage analytics"))
-                Button(action: {  aboutAnalytics = true  }) { RemixIcon("information-line") }.accessibilityLabel(Text(L10n.tr("About usage analytics"))).buttonStyle(.borderless)
+            HStack(spacing: 12) {
+                RemixIcon("bar-chart-line", size: 18).frame(width: 22).foregroundStyle(.primary)
+                HStack(spacing: 4) {
+                    Text(L10n.tr("Share usage analytics"))
+                    Button(action: {  aboutAnalytics = true  }) { RemixIcon("information-line") }.accessibilityLabel(Text(L10n.tr("About usage analytics"))).buttonStyle(.borderless)
+                }
             }
         }
         .toggleStyle(.switch)
@@ -100,12 +110,13 @@ struct SettingsView: View {
                 Task { notificationsAllowed = await PushRegistrar.shared.requestAuthorization(from: .settings) }
             }
         } label: {
-            HStack {
+            HStack(spacing: 12) {
+                RemixIcon("notification-3-line", size: 18).frame(width: 22).foregroundStyle(.primary)
                 Text(L10n.tr("Notifications"))
                 Spacer()
                 Text(L10n.tr(notificationsAllowed == true ? "On" : notificationsAllowed == false ? "Off in Settings" : "Turn on"))
                     .foregroundStyle(.secondary)
-                RemixIcon("arrow-right-s-line").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
+                RemixIcon("arrow-right-s-line", size: 14).foregroundStyle(.tertiary)
             }
         }
         .buttonStyle(.plain)

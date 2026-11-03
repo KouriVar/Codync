@@ -44,7 +44,8 @@ struct HomeBottomBar: View {
                 .help("拍照")
             }
         }
-        .padding(.horizontal, 24)
+        // One 16pt margin with the toolbar and the list rows.
+        .padding(.horizontal, 16)
         .padding(.top, 10)
         // Match the 12pt spacing between the search field and the two circles.
         .padding(.bottom, keyboardUp ? 12 : 28)

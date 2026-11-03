@@ -154,37 +154,43 @@ private struct AccountProfileView: View {
                 }
 
                 Button { showPairing = true } label: {
-                    HStack {
+                    HStack(spacing: 12) {
+                        RemixIcon("qr-scan-line", size: 18).frame(width: 22).foregroundStyle(.primary)
                         Text("配对")
                         Spacer(minLength: 8)
-                        RemixIcon("arrow-right-s-line").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
+                        RemixIcon("arrow-right-s-line", size: 14).foregroundStyle(.tertiary)
                     }
                 }
 
                 Button { showComputersSheet = true } label: {
-                    HStack {
+                    HStack(spacing: 12) {
+                        RemixIcon("computer-line", size: 18).frame(width: 22).foregroundStyle(.primary)
                         Text("电脑")
                         Spacer(minLength: 8)
                         if !accounts.computers.isEmpty {
                             Text("\(accounts.computers.count) 台已连接").foregroundStyle(.secondary)
                         }
-                        RemixIcon("arrow-right-s-line").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
+                        RemixIcon("arrow-right-s-line", size: 14).foregroundStyle(.tertiary)
                     }
                 }
 
                 NavigationLink(value: AccountRoute.state) {
-                    Text("状态")
+                    HStack(spacing: 12) {
+                        RemixIcon("pulse-line", size: 18).frame(width: 22).foregroundStyle(.primary)
+                        Text("状态")
+                    }
                 }
 
                 Button { showVault = true } label: {
-                    HStack {
+                    HStack(spacing: 12) {
+                        RemixIcon("shield-keyhole-line", size: 18).frame(width: 22).foregroundStyle(.primary)
                         VStack(alignment: .leading, spacing: 2) {
                             Text("凭证")
                             Text("可以使用的登录信息、卡片和联系信息")
                                 .font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
                         }
                         Spacer(minLength: 8)
-                        RemixIcon("arrow-right-s-line").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
+                        RemixIcon("arrow-right-s-line", size: 14).foregroundStyle(.tertiary)
                     }
                 }
                 .disabled(app.currentStore == nil)
@@ -193,14 +199,15 @@ private struct AccountProfileView: View {
             // A separate list that opens the Extensions (marketplace) page.
             Section {
                 Button { showExtensions = true } label: {
-                    HStack {
+                    HStack(spacing: 12) {
+                        RemixIcon("plug-line", size: 18).frame(width: 22).foregroundStyle(.primary)
                         VStack(alignment: .leading, spacing: 2) {
                             Text("连接应用")
                             Text("搜索插件")
                                 .font(.subheadline).foregroundStyle(.secondary)
                         }
                         Spacer(minLength: 8)
-                        RemixIcon("arrow-right-s-line").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
+                        RemixIcon("arrow-right-s-line", size: 14).foregroundStyle(.tertiary)
                     }
                 }
                 .disabled(app.currentStore == nil)
@@ -208,7 +215,10 @@ private struct AccountProfileView: View {
 
             Section {
                 NavigationLink(value: AccountRoute.ordering) {
-                    Text("列表排序")
+                    HStack(spacing: 12) {
+                        RemixIcon("arrow-up-down-line", size: 18).frame(width: 22).foregroundStyle(.primary)
+                        Text("列表排序")
+                    }
                 }
             }
 

@@ -804,3 +804,12 @@
 - 文件：`Views/HomeBottomBar.swift`。
 - 验证：构建号 110/111 编译、签名、安装成功；键盘状态观感待用户确认。
 - 关联：C0078。
+
+### C0086 · 2026-11-03 · 统一设置页行尾箭头大小（自定义 17 → 14）
+
+- 原因：NavigationLink 行用系统箭头（约 13pt），手写行用 `RemixIcon("arrow-right-s-line")` 且 `.font(...)` 对 RemixIcon 无效（内部字号固定），导致 13/17 两种箭头并存。
+- 变化：手写行的箭头改为 `RemixIcon("arrow-right-s-line", size: 14)`，与系统箭头视觉一致（settings 内 5 处）。
+- 文件：`Views/AccountSwitcherView.swift`、`Views/SettingsView.swift`。
+- 验证：构建号 115 编译、签名、安装成功；截图确认箭头一致。
+- 限制/待办：分隔线右侧是否顶死、线宽是否变细：已调研（见下），未改。
+- 关联：C0084。
