@@ -30,6 +30,8 @@ struct Composer: View {
     @State private var pickingFiles = false
     @State private var pickingPhotos = false
     @State private var photoItems: [PhotosPickerItem] = []
+    /// Keyboard up: sit just above it; down: keep the same 28pt gap as the home bar.
+    @State private var keyboardUp = false
     @FocusState private var focused: Bool
 
     private var bot: Bot? { model.bots[botId] }
@@ -107,8 +109,10 @@ struct Composer: View {
     }
 
     private var fieldPadding: CGFloat { 6 }
-    private var buttonSize: CGFloat { 32 }
-    private var buttonHitSize: CGFloat { 44 }
+    /// Send/stop circle inside the 48pt capsule.
+    private var buttonSize: CGFloat { 36 }
+    /// The row height, matching the home bar's 48pt search field and circles.
+    private var buttonHitSize: CGFloat { 48 }
 
     private var field: some View {
         HStack(alignment: .bottom, spacing: 8) {
@@ -122,11 +126,17 @@ struct Composer: View {
                 }
                 box
             }
-            .glass(in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .glass(in: RoundedRectangle(cornerRadius: 24, style: .continuous))
             // Lines, not the text: an animated transaction on every keystroke breaks IME composition.
             .animation(Motion.layout, value: draft.count(where: \.isNewline))
         }
         .animation(Motion.layout, value: files.map(\.id))
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
+            keyboardUp = true
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
+            keyboardUp = false
+        }
         .animation(Motion.reduced(Motion.layout, reduceMotion), value: replyingTo?.id)
         .dropDestination(for: PickedFile.self) { picked, _ in
             guard canAttach else { return false }
@@ -145,7 +155,8 @@ struct Composer: View {
             }
         .padding(.horizontal, 16)
         .padding(.top, 6)
-        .padding(.bottom, 8)
+        .padding(.bottom, keyboardUp ? 12 : 28)
+        .ignoresSafeArea(.container, edges: keyboardUp ? [] : .bottom)
     }
 
     private enum Trailing: Equatable {
@@ -163,9 +174,9 @@ struct Composer: View {
         let state = trailing
         let enabled = state != .send || canSend
         let (symbol, label, size): (String, String, CGFloat) = switch state {
-        case .interrupt: ("stop.fill", "Interrupt", 12)
-        case .stop: ("stop.fill", "Stop", 12)
-        case .send: ("arrow.up", "Send", 14)
+        case .interrupt: ("stop-fill", "Interrupt", 14)
+        case .stop: ("stop-fill", "Stop", 14)
+        case .send: ("arrow-up-line", "Send", 20)
         }
         let fill: Color = switch state {
         case .interrupt: Palette.danger
@@ -184,9 +195,8 @@ struct Composer: View {
             case .send: submit()
             }
         } label: {
-            Image(systemName: symbol)
-                .font(.system(size: size, weight: .bold))
-                .contentTransition(.symbolEffect(.replace))
+            RemixIcon(symbol, size: size)
+                .contentTransition(.opacity)
                 .foregroundStyle(ink)
                 .frame(width: buttonSize, height: buttonSize)
                 .background(fill, in: Circle())
@@ -261,8 +271,7 @@ struct Composer: View {
     }
 
     private var addLabel: some View {
-        RemixIcon("add-line")
-            .font(.system(size: 18, weight: .medium))
+        RemixIcon("add-line", size: 24)
             .foregroundStyle(Palette.text)
             .frame(width: buttonHitSize, height: buttonHitSize)
             .glass(in: Circle())

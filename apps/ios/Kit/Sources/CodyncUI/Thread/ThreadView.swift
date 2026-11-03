@@ -376,12 +376,12 @@ extension ThreadView {
 
     /// Like Grok Bot: the bot at the top opens its details (a group's editor for a group).
     var header: some View {
-        // .buttonStyle(.glass) adds its own padding around the label and made the capsule a few
-        // points taller than the toolbar circles. Draw the glass ourselves at exactly 42pt.
+        // Draw the glass ourselves: .buttonStyle(.glass) adds its own padding and grew the
+        // capsule past the toolbar row. An explicit 44pt frame matches the toolbar buttons.
         Button(action: openDetails) {
             title
                 .padding(.horizontal, 14)
-                .frame(height: 42)
+                .frame(height: 44)
                 .glassEffect(.regular.interactive(), in: Capsule())
                 .contentShape(Capsule())
         }

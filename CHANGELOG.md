@@ -864,3 +864,11 @@
 - 文件：`CodyncUI/Thread/ThreadView.swift`。
 - 验证：构建号 132 编译、签名、安装成功；截图三个元素等高（返回/更多实测 126px=42pt，胶囊目视等高）。
 - 关联：C0094。
+
+### C0096 · 2026-11-03 · 对话输入区与首页底栏统一（48 高 + 24 加号 + Remix 发送）
+
+- 原因：输入框/加号与首页搜索框、扩展按钮规格不一致；加号偏小；发送仍是 SF。
+- 变化：`buttonHitSize` 44→48、`buttonSize` 32→36；胶囊圆角 22→24；加号 `RemixIcon("add-line", 24)` + 48 圆；标题胶囊改严格 44（`.glassEffect` 显式 frame，去掉 `.buttonStyle(.glass)` 的隐式内边距）；发送/停止改 Remix（`arrow-up-line` 20 / `stop-fill` 14）；底部间距键盘收起 28、弹起 12（与首页一致）。
+- 文件：`CodyncUI/Thread/Composer.swift`、`CodyncUI/Thread/ThreadView.swift`。
+- 验证：构建号 133–135 编译、签名、安装成功；截图确认输入区与首页同规格。
+- 关联：C0094、C0095。
