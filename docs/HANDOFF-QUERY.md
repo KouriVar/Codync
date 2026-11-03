@@ -55,11 +55,20 @@ apps/
 - 玻璃按钮：`.buttonStyle(.glass)` 会在 label 外**再加约 10pt**；需要精确高度时改用 `.frame(height:).glassEffect(...)` + `.buttonStyle(.plain)`。
 
 ## 5. 构建 / 设备（仅供理解，不要执行）
-- Xcode 27.1，必须 `export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer`。
-- 工程由 XcodeGen 生成：`xcodegen generate --spec apps/project.yml`。
+
+> 原则：**任何值都以代码为准，别照抄本文**。先搜再答。
+
+- 工程由 XcodeGen 生成：`xcodegen generate --spec apps/project.yml`；Xcode 27.1，需 `export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer`。
 - scheme `iOS Dev`，配置 `DevDebug`，产物 `build/dd/Build/Products/DevDebug-iphoneos/半句.app`。
-- 设备 iPhone 16 Pro，UDID `00008140-000A31311AE3001C`；bundle id `com.suiyikou.codync.uipreview`；Team `KQQ6SD2P4C`。
-- 最近构建号：**137**。
+- 设备 iPhone 16 Pro，UDID `00008140-000A31311AE3001C`，Team `KQQ6SD2P4C`。
+
+### 怎么自己查这些值
+| 要查什么 | 搜索命令 | 当前结论 |
+| --- | --- | --- |
+| Bundle ID | `grep -rn "PRODUCT_BUNDLE_IDENTIFIER\|CODYNC_IOS_BUNDLE_ID" apps/project.yml` | 不是硬编码：`PRODUCT_BUNDLE_IDENTIFIER = $(CODYNC_IOS_BUNDLE_ID)`；默认 `com.pokai.Codync.ios`，Dev 配置 `com.pokai.Codync.ios.dev`；本机调试构建用命令行覆盖为 `com.suiyikou.codync.uipreview` |
+| 构建号 | `grep -rn "CURRENT_PROJECT_VERSION\|MARKETING_VERSION" apps/project.yml` | 每次构建用 `CURRENT_PROJECT_VERSION=<n>` 覆盖；最近一次 **137** |
+| App 显示名 | `grep -rn "CODYNC_APP_NAME" apps/project.yml` | 本机用 `CODYNC_APP_NAME=半句` 覆盖 |
+| 证书/Team | `grep -rn "DEVELOPMENT_TEAM\|CODE_SIGN" apps/project.yml` | Team `KQQ6SD2P4C`（个人免费签名） |
 
 ## 6. 调试入口（理解行为时有用）
 - `CODYNC_OPEN_URL=codync://bot/<botId>?scope=local&computer=<hostId>` 启动直接进某个对话。

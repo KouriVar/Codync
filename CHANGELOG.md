@@ -896,3 +896,10 @@
 - 文件：`docs/HANDOFF-QUERY.md`。
 - 验证：文件写入成功；内容与当前代码/构建号 137 一致。
 - 关联：C0098。
+
+### C0100 · 2026-11-03 · 交接单修正：构建参数改为"以代码为准 + 搜索命令"
+
+- 原因：Bundle ID 等参数在工程里是变量（`PRODUCT_BUNDLE_IDENTIFIER = $(CODYNC_IOS_BUNDLE_ID)`），交接单直接写死具体值会误导新会话。
+- 变化：第 5 节改成"原则：以代码为准"，并给出 4 条自查命令与结论（Bundle ID 默认 `com.pokai.Codync.ios` / Dev `com.pokai.Codync.ios.dev`，本机覆盖为 `com.suiyikou.codync.uipreview`；构建号 137；显示名 半句）。
+- 文件：`docs/HANDOFF-QUERY.md`。
+- 关联：C0099。
