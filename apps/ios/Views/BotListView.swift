@@ -390,12 +390,12 @@ struct BotListView: View {
         if store.supportsSections {
             header.contextActions {
                 [
-                    MenuItem("Rename section…", icon: "pencil") {
+                    MenuItem("Rename section…", icon: "edit-line") {
                         naming = SectionNaming(title: "Rename section", name: section.name) {
                             renameSection(section.name, to: $0, on: store)
                         }
                     },
-                    MenuItem("Remove section", icon: "xmark.circle") { renameSection(section.name, to: nil, on: store) },
+                    MenuItem("Remove section", icon: "close-circle-line") { renameSection(section.name, to: nil, on: store) },
                 ]
             }
         } else {
@@ -450,31 +450,31 @@ struct BotListView: View {
     private func botMenuItems(_ item: RosterItem, store: BotStore) -> [MenuItem] {
         let bot = item.bot
         let unread = bot.unread > 0 || manuallyUnread(item)
-        var items = [MenuItem(unread ? "Mark as read" : "Mark as unread", icon: unread ? "checkmark.message" : "message.badge") {
+        var items = [MenuItem(unread ? "Mark as read" : "Mark as unread", icon: unread ? "mail-open-line" : "mail-unread-line") {
             setManuallyUnread(!unread, item: item)
             if unread { store.markAllRead(bot.id) }
-        }, MenuItem(bot.pinned ? "Unpin" : "Pin", icon: bot.pinned ? "pin.slash" : "pin") { store.setPinned(bot, !bot.pinned) }]
+        }, MenuItem(bot.pinned ? "Unpin" : "Pin", icon: bot.pinned ? "unpin-line" : "pushpin-2-line") { store.setPinned(bot, !bot.pinned) }]
         if store.supportsSections {
-            items.append(MenuItem("New section", icon: "folder.badge.plus") {
+            items.append(MenuItem("New section", icon: "folder-add-line") {
                 naming = SectionNaming(title: "New section", name: "") { store.setSection(bot, to: $0) }
             })
         }
-        items.append(MenuItem("Share as template", icon: "square.and.arrow.up") { sharingTemplate = EditTarget(computerId: item.ref.computerId, draft: BotDraft(bot)) })
+        items.append(MenuItem("Share as template", icon: "share-forward-line") { sharingTemplate = EditTarget(computerId: item.ref.computerId, draft: BotDraft(bot)) })
         if !bot.lead {
-            items.append(MenuItem("Hide", icon: "eye.slash", destructive: true) { store.setHidden(bot, true) })
+            items.append(MenuItem("Hide", icon: "eye-off-line", destructive: true) { store.setHidden(bot, true) })
         }
-        var more = [MenuItem("Copy ID", icon: "square.on.square") { UIPasteboard.general.string = bot.id }]
+        var more = [MenuItem("Copy ID", icon: "file-copy-line") { UIPasteboard.general.string = bot.id }]
         more.append(bot.isGroup
-            ? MenuItem("Edit group", icon: "person.2") { editingGroup = GroupTarget(computerId: item.ref.computerId, group: bot) }
-            : MenuItem("Edit profile", icon: "pencil") { editing = EditTarget(computerId: item.ref.computerId, draft: BotDraft(bot)) })
+            ? MenuItem("Edit group", icon: "group-line") { editingGroup = GroupTarget(computerId: item.ref.computerId, group: bot) }
+            : MenuItem("Edit profile", icon: "edit-line") { editing = EditTarget(computerId: item.ref.computerId, draft: BotDraft(bot)) })
         if store.supportsSections { more.append(sectionMenu(bot, store: store)) }
         if !bot.lead && !bot.isGroup && store.supportsLeadChoice {
-            more.append(MenuItem("Make lead agent", icon: "star") { store.setLead(bot) })
+            more.append(MenuItem("Make lead agent", icon: "star-line") { store.setLead(bot) })
         }
         if !bot.lead || store.supportsLeadChoice {
-            more.append(MenuItem("Delete", icon: "trash", destructive: true, divider: true) { confirmDelete = item })
+            more.append(MenuItem("Delete", icon: "delete-bin-line", destructive: true, divider: true) { confirmDelete = item })
         }
-        items.append(MenuItem("More", icon: "ellipsis", submenu: more))
+        items.append(MenuItem("More", icon: "more-line", submenu: more))
         return items
     }
 
@@ -501,15 +501,15 @@ struct BotListView: View {
     /// translated), a new one, and out of its own.
     private func sectionMenu(_ bot: Bot, store: BotStore) -> MenuItem {
         var rows = store.sections.filter { $0 != bot.section }.map { name in
-            MenuItem(name, icon: "tray", verbatim: true) { store.setSection(bot, to: name) }
+            MenuItem(name, icon: "inbox-line", verbatim: true) { store.setSection(bot, to: name) }
         }
-        rows.append(MenuItem("New section…", icon: "plus", divider: !rows.isEmpty) {
+        rows.append(MenuItem("New section…", icon: "add-line", divider: !rows.isEmpty) {
             naming = SectionNaming(title: "New section", name: "") { store.setSection(bot, to: $0) }
         })
         if bot.section != nil {
-            rows.append(MenuItem("Remove from section", icon: "minus.circle") { store.setSection(bot, to: nil) })
+            rows.append(MenuItem("Remove from section", icon: "indeterminate-circle-line") { store.setSection(bot, to: nil) })
         }
-        return MenuItem("Move to section", icon: "tray", submenu: rows)
+        return MenuItem("Move to section", icon: "inbox-line", submenu: rows)
     }
 
     /// The system asks for a row's item as it lifts; the row shows as lifted until it lets go.

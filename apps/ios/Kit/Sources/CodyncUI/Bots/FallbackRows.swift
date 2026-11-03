@@ -122,7 +122,7 @@ struct FallbackList: View {
         var items: [MenuItem] = []
         if i > 0 { items.append(MenuItem("Move up", icon: "arrow.up") { change { $0.swapAt(i, i - 1) } }) }
         if i < fallbacks.count - 1 { items.append(MenuItem("Move down", icon: "arrow.down") { change { $0.swapAt(i, i + 1) } }) }
-        items.append(MenuItem("Remove", icon: "trash", destructive: true, divider: !items.isEmpty) { change { $0.remove(at: i) } })
+        items.append(MenuItem("Remove", icon: "delete-bin-line", destructive: true, divider: !items.isEmpty) { change { $0.remove(at: i) } })
         return items
     }
 

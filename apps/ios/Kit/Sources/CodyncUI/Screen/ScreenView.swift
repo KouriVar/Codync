@@ -136,7 +136,7 @@ public struct ScreenView: View {
                 if let displays = screen?.displays, displays.count > 1 {
                     DropdownMenu {
                         displays.map { d in
-                            MenuItem(d.name, icon: "display", selected: d.id == display?.id) {
+                            MenuItem(d.name, icon: "computer-line", selected: d.id == display?.id) {
                                 display = d
                                 session?.switchDisplay(d)
                                 resetToken += 1

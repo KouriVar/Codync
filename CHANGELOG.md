@@ -945,3 +945,11 @@
 - 文件：`Views/HomeBottomBar.swift`。
 - 验证：构建号 142 编译、签名、安装成功；流畅度需真机确认。
 - 关联：C0102–C0104。
+
+### C0106 · 2026-11-03 · 长按菜单图标全量换 Remix（首页 Bot 菜单 + 更多子菜单）
+
+- 原因：首页 Bot 长按菜单与「更多」子菜单仍传 SF 名，`MenuGlyph` 回退成系统图标，与全 App 图标体系不一致。
+- 变化：17 处 `MenuItem` 图标改为 Remix（edit-line / close-circle-line / mail-open-line / mail-unread-line / pushpin-2-line / unpin-line / folder-add-line / share-forward-line / eye-off-line / file-copy-line / group-line / star-line / delete-bin-line / more-line / inbox-line / add-line / indeterminate-circle-line）；顺带修 4 处其它菜单（回退项删除、作品重命名/分享、屏幕选择）。
+- 文件：`Views/BotListView.swift`、`CodyncUI/Bots/FallbackRows.swift`、`CodyncUI/Artifacts/LibraryView.swift`、`CodyncUI/Screen/ScreenView.swift`。
+- 验证：构建号 143 编译、签名、安装成功；菜单展开需真机确认。
+- 关联：C0098（菜单图标必须是 Image）。

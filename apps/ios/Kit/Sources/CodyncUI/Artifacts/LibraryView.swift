@@ -79,8 +79,8 @@ struct LibraryView: View {
             .buttonStyle(.plain)
             .contextActions {
                 [MenuItem("Open", icon: "arrow.up.forward.square") { show(artifact) },
-                 MenuItem("Rename artifact", icon: "pencil") { renaming = artifact },
-                 MenuItem("Share artifact", icon: "square.and.arrow.up") { share(artifact) }]
+                 MenuItem("Rename artifact", icon: "edit-line") { renaming = artifact },
+                 MenuItem("Share artifact", icon: "share-forward-line") { share(artifact) }]
             }
         case .file(let file, let entryId):
             Button { download(file, entryId: entryId) } label: {
