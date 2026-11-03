@@ -116,7 +116,7 @@ struct SettingsView: View {
                 Spacer()
                 Text(L10n.tr(notificationsAllowed == true ? "On" : notificationsAllowed == false ? "Off in Settings" : "Turn on"))
                     .foregroundStyle(.secondary)
-                RemixIcon("arrow-right-s-line", size: 14).foregroundStyle(.tertiary)
+                Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
             }
         }
         .buttonStyle(.plain)

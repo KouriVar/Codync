@@ -813,3 +813,12 @@
 - 验证：构建号 115 编译、签名、安装成功；截图确认箭头一致。
 - 限制/待办：分隔线右侧是否顶死、线宽是否变细：已调研（见下），未改。
 - 关联：C0084。
+
+### C0087 · 2026-11-03 · 设置页箭头统一为系统 chevron；分隔线调淡
+
+- 原因：NavigationLink / `.pickerStyle(.navigationLink)` 行由系统绘制 disclosure 箭头，手写 Button 行用 Remix `arrow-right-s-line`，字形与尺寸天然不同，无法只用 size 调一致。
+- 变化：手写行箭头改为 `Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)`（与系统箭头同源同参）；Form 加 `.listRowSeparatorTint(Color.white.opacity(0.08))` 让分隔线更淡。
+- 文件：`Views/AccountSwitcherView.swift`、`Views/SettingsView.swift`。
+- 验证：构建号 116–119 编译、签名、安装成功；截图确认箭头大小一致。
+- 限制/待办：`.alignmentGuide(.listRowSeparatorTrailing)` 在当前 iOS 27 SDK 的 Form 上不生效（行级与 Form 级都试过），分隔线右侧仍留 16pt；若要顶死右侧需改为自绘分隔线（隐藏系统线 + overlay 1px hairline）。
+- 关联：C0086。

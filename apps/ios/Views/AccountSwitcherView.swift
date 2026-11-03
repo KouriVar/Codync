@@ -65,6 +65,8 @@ struct AccountSwitcherView: View {
                 AccountProfileView(showPairing: $showPairing, showVault: $showVault, showExtensions: $showExtensions, showComputersSheet: $showComputersSheet)
                 SettingsView()
             }
+            // A hairline separator, softened, that runs to the card's right edge.
+            .listRowSeparatorTint(Color.white.opacity(0.08))
             .codyncSheet(isPresented: $showPairing) { PairingView(inModal: true) }
             .codyncSheet(isPresented: $showVault) {
                 if let store = app.currentStore {
@@ -158,7 +160,7 @@ private struct AccountProfileView: View {
                         RemixIcon("qr-scan-line", size: 18).frame(width: 22).foregroundStyle(.primary)
                         Text("配对")
                         Spacer(minLength: 8)
-                        RemixIcon("arrow-right-s-line", size: 14).foregroundStyle(.tertiary)
+                        Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
                     }
                 }
 
@@ -170,7 +172,7 @@ private struct AccountProfileView: View {
                         if !accounts.computers.isEmpty {
                             Text("\(accounts.computers.count) 台已连接").foregroundStyle(.secondary)
                         }
-                        RemixIcon("arrow-right-s-line", size: 14).foregroundStyle(.tertiary)
+                        Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
                     }
                 }
 
@@ -190,7 +192,7 @@ private struct AccountProfileView: View {
                                 .font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
                         }
                         Spacer(minLength: 8)
-                        RemixIcon("arrow-right-s-line", size: 14).foregroundStyle(.tertiary)
+                        Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
                     }
                 }
                 .disabled(app.currentStore == nil)
@@ -207,7 +209,7 @@ private struct AccountProfileView: View {
                                 .font(.subheadline).foregroundStyle(.secondary)
                         }
                         Spacer(minLength: 8)
-                        RemixIcon("arrow-right-s-line", size: 14).foregroundStyle(.tertiary)
+                        Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
                     }
                 }
                 .disabled(app.currentStore == nil)
