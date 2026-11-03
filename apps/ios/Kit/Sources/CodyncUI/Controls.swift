@@ -450,17 +450,23 @@ public struct SearchField: View {
     let prompt: String
     @Binding var text: String
     private let opaqueBackground: Bool
+    /// Optional two-way focus: the bar hides its other buttons while the field is active.
+    private let active: Binding<Bool>?
+    @FocusState private var focused: Bool
 
-    public init(_ prompt: String = "Search", text: Binding<String>, opaqueBackground: Bool = true) {
+    public init(_ prompt: String = "Search", text: Binding<String>,
+                opaqueBackground: Bool = true, active: Binding<Bool>? = nil) {
         self.prompt = prompt
         _text = text
         self.opaqueBackground = opaqueBackground
+        self.active = active
     }
 
     public var body: some View {
         HStack(spacing: 8) {
             RemixIcon("search-line").foregroundStyle(Palette.secondary)
             TextField(prompt, text: $text).textFieldStyle(.plain).plainTextInput()
+                .focused($focused)
             if !text.isEmpty {
                 Button { text = "" } label: {
                     RemixIcon("close-circle-fill").foregroundStyle(Palette.tertiary)
@@ -473,6 +479,10 @@ public struct SearchField: View {
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
         .background(opaqueBackground ? Palette.bubbleAgent : Color.clear, in: Capsule())
+        .onChange(of: focused) { _, isFocused in active?.wrappedValue = isFocused }
+        .onChange(of: active?.wrappedValue) { _, wanted in
+            if let wanted, wanted != focused { focused = wanted }
+        }
     }
 }
 

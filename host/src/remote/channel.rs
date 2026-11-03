@@ -537,10 +537,18 @@ mod tests {
         Hub::new(store, "host".into(), identity, "token".into(), 0)
     }
 
-    /// A `pair` body for `p`, signed in to `user`.
-    fn pair_body(p: &Phone, code: &str, name: &str, platform: &str, user: &str) -> Value {
+    /// A `pair` body carrying a Google ID token for the allowed account (the `user` arg is kept
+    /// only so older call sites read the same).
+    fn pair_body(_p: &Phone, code: &str, name: &str, platform: &str, _user: &str) -> Value {
+        let email = crate::remote::google_auth::allowed_emails()[0].clone();
         json!({"code": code, "name": name, "platform": platform,
-               "certificate": crate::remote::certificate::test_certificate(&p.dk(), user)})
+               "google_id_token": crate::remote::google_auth::test_token(&email)})
+    }
+
+    /// A `pair` body carrying a Google ID token for a specific email (for the refusal tests).
+    fn pair_body_as(_p: &Phone, code: &str, name: &str, platform: &str, email: &str) -> Value {
+        json!({"code": code, "name": name, "platform": platform,
+               "google_id_token": crate::remote::google_auth::test_token(email)})
     }
 
     /// The device end of a channel, over in-memory pipes.
@@ -821,6 +829,7 @@ mod tests {
             created_at: now_ms(),
             last_seen_at: None,
             account: None,
+            email: None,
         };
         hub.store.put_device(&device).unwrap();
         let mut p = Phone::direct(&hub, key.clone());

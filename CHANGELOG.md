@@ -903,3 +903,11 @@
 - 变化：第 5 节改成"原则：以代码为准"，并给出 4 条自查命令与结论（Bundle ID 默认 `com.pokai.Codync.ios` / Dev `com.pokai.Codync.ios.dev`，本机覆盖为 `com.suiyikou.codync.uipreview`；构建号 137；显示名 半句）。
 - 文件：`docs/HANDOFF-QUERY.md`。
 - 关联：C0099。
+
+### C0101 · 2026-11-03 · 首页搜索态：左键隐藏、相机变关闭（带弹簧动画）
+
+- 原因：点击搜索框时希望收起无关按钮，并提供一键关闭搜索的入口。
+- 变化：`SearchField` 增加可选 `active: Binding<Bool>` 焦点双向同步；`HomeBottomBar` 增加 `searching` 状态：搜索激活时左侧扩展按钮 `scale+opacity` 过渡移除、右侧相机变 `close-line`，点它清空搜索并收起键盘；HStack 加 `.animation(.snappy(0.26))`（尊重 Reduce Motion）。
+- 文件：`CodyncUI/Controls.swift`、`Views/HomeBottomBar.swift`。
+- 验证：构建号 138 编译、签名、安装成功；交互需真机点按确认。
+- 关联：C0096。

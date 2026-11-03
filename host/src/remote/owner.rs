@@ -122,6 +122,7 @@ mod tests {
                 created_at: 1,
                 last_seen_at: None,
                 account: account.map(Into::into),
+                email: None,
             })
             .unwrap();
     }

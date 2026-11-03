@@ -197,6 +197,7 @@ mod tests {
             created_at: 1,
             last_seen_at: None,
             account: None,
+            email: None,
         };
         hub.store.put_device(&phone).unwrap();
         hub.store.put_device(&Device { key: "other".into(), ..phone.clone() }).unwrap();

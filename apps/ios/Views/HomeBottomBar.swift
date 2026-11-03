@@ -8,6 +8,9 @@ struct HomeBottomBar: View {
     @Binding var searchText: String
     /// Keyboard up: sit just above it; down: keep the 28pt gap to the screen edge.
     @State private var keyboardUp = false
+    /// The search field is active: hide the extensions button and turn the camera into Close.
+    @State private var searching = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let openCamera: () -> Void
     let openPlugins: () -> Void
     /// One 48pt row for the search capsule and both circles.
@@ -17,32 +20,36 @@ struct HomeBottomBar: View {
     var body: some View {
         GlassEffectContainer(spacing: 12) {
             HStack(spacing: 12) {
-                Button(action: openPlugins) {
-                    RemixIcon("apps-2-line", size: iconSize)
-                        .foregroundStyle(Palette.text)
-                        .frame(width: 48, height: 48)
-                        .glassEffect(.regular.interactive(), in: Circle())
+                if !searching {
+                    Button(action: openPlugins) {
+                        RemixIcon("apps-2-line", size: iconSize)
+                            .foregroundStyle(Palette.text)
+                            .frame(width: 48, height: 48)
+                            .glassEffect(.regular.interactive(), in: Circle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("插件")
+                    .help("插件")
+                    .transition(.scale(scale: 0.55).combined(with: .opacity))
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel("插件")
-                .help("插件")
 
-                SearchField("搜索", text: $searchText, opaqueBackground: false)
+                SearchField("搜索", text: $searchText, opaqueBackground: false, active: $searching)
                     .frame(height: 48)
                     .glassEffect(.regular.interactive(), in: Capsule())
                     .submitLabel(.search)
                     .accessibilityLabel("搜索聊天")
 
-                Button(action: openCamera) {
-                    RemixIcon("camera-fill", size: iconSize)
+                Button(action: searching ? closeSearch : openCamera) {
+                    RemixIcon(searching ? "close-line" : "camera-fill", size: iconSize)
                         .foregroundStyle(Palette.text)
                         .frame(width: 48, height: 48)
                         .glassEffect(.regular.interactive(), in: Circle())
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("拍照")
-                .help("拍照")
+                .accessibilityLabel(searching ? "关闭搜索" : "拍照")
+                .help(searching ? "关闭搜索" : "拍照")
             }
+            .animation(Motion.reduced(.snappy(duration: 0.26), reduceMotion), value: searching)
         }
         // One 16pt margin with the toolbar and the list rows.
         .padding(.horizontal, 16)
@@ -56,6 +63,12 @@ struct HomeBottomBar: View {
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
             keyboardUp = false
         }
+    }
+
+    /// The Close button while searching: clear the field and drop the keyboard.
+    private func closeSearch() {
+        searchText = ""
+        searching = false
     }
 }
 
