@@ -880,3 +880,11 @@
 - 文件：`CodyncUI/Thread/Composer.swift`、`CodyncUI/Chrome.swift`、`CodyncUI/MenuItem.swift`、`Views/RootView.swift`。
 - 验证：构建号 136 编译、签名、安装成功（菜单交互需真机点按确认）。
 - 关联：C0096。
+
+### C0098 · 2026-11-03 · 系统菜单图标改 RemixImage（菜单只接受 Image）
+
+- 原因：系统 `Menu`/`UIMenu` 只保留 `Image` 类型的图标；`RemixIcon` 是 Text 字形，被系统丢弃，所以加号菜单三项没图标。
+- 变化：`MenuGlyph` 改用 `RemixImage`（template UIImage），同时保留 SF 回退；影响全 App 所有系统菜单项。
+- 文件：`CodyncUI/MenuItem.swift`。
+- 验证：构建号 137 编译、签名、安装成功；菜单展开需真机确认。
+- 关联：C0097。

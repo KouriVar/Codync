@@ -168,11 +168,13 @@ private struct MenuGlyph: View {
     let destructive: Bool
 
     var body: some View {
+        // System menus only keep Image icons; a Text glyph (RemixIcon) is dropped, so render
+        // the glyph into a template UIImage instead.
         if RemixFont.has(symbol) {
-            RemixIcon(symbol, size: 17)
+            RemixImage(symbol, size: 17)
                 .foregroundStyle(destructive ? Color.red : Color.primary)
         } else if let remix = RemixSymbolMap.remix(for: symbol) {
-            RemixIcon(remix, size: 17)
+            RemixImage(remix, size: 17)
                 .foregroundStyle(destructive ? Color.red : Color.primary)
         } else {
             Image(systemName: symbol)
