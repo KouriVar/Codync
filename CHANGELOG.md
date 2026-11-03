@@ -839,3 +839,12 @@
 - 文件：`Views/AccountSwitcherView.swift`、`Views/SettingsView.swift`、`ThinkingDetailsSettings.swift`、`Views/QuickCapture.swift`、`Resources/AppMark.png`。
 - 验证：构建号 125/126 编译、签名、安装成功；截图确认分组、黑色开关、页脚图标、相机页按钮尺寸。
 - 关联：C0091。
+
+### C0093 · 2026-11-03 · 对话页顶部工具栏：24/44 返回与更多、标题固定高度
+
+- 原因：系统返回箭头约 17pt；更多图标写了 `.font(.system(size: 18))` 对 RemixIcon 无效；标题胶囊用 `minHeight: 36` + 内边距，总高 > 44 被工具栏裁切。
+- 变化：`navigationBarBackButtonHidden(true)` + 自定义 `ToolbarItem(.topBarLeading)`（`RemixImage("arrow-left-s-line", 24)`，44 圆），并用 `SwipeBackEnabler` 恢复侧滑返回；更多按钮改 `RemixImage("more-line", 24)`；标题 `.frame(height: 38)`（先 44 偏大，按用户反馈收回到 38）。
+- 文件：`CodyncUI/Thread/ThreadView.swift`。
+- 验证：构建号 127/128 编译、签名、安装成功；通过 `CODYNC_OPEN_URL=codync://bot/...` 深链接进入对话页截图确认。
+- 限制/待办：侧滑返回需真机确认（隐藏系统返回键会默认禁用边缘手势）。
+- 关联：C0092。

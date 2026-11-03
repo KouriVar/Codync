@@ -33,6 +33,7 @@ public struct ThreadView: View {
     @State var following = true
     @State var loadingEarlier = false
     @Environment(\.accessibilityReduceMotion) var reduceMotion
+    @Environment(\.dismiss) var dismiss
 
     var bot: Bot? { model.bots[botId] }
 
@@ -355,19 +356,28 @@ extension ThreadView {
     func chrome(_ content: some View) -> some View {
         content
             .navigationBarTitleDisplayMode(.inline)
+            // Our own 44pt back circle; the system one draws a 17pt chevron.
+            .navigationBarBackButtonHidden(true)
             .toolbar(.visible, for: .navigationBar)
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button { dismiss() } label: { RemixImage("arrow-left-s-line", size: 24) }
+                        .buttonBorderShape(.circle)
+                        .accessibilityLabel("返回")
+                }
                 ToolbarItem(placement: .principal) {
                     header
                 }
                 ToolbarItem(placement: .topBarTrailing) { moreButton }
             }
+            // The hidden system back button takes the edge swipe with it: put it back.
+            .background(SwipeBackEnabler().frame(width: 0, height: 0))
     }
 
     /// Like Grok Bot: the bot at the top opens its details (a group's editor for a group).
     var header: some View {
         Button(action: openDetails) {
-            title.padding(.horizontal, 12).frame(minHeight: 36)
+            title.padding(.horizontal, 12).frame(height: 38)
         }
             .buttonStyle(.glass)
             .buttonBorderShape(.capsule)
@@ -390,8 +400,7 @@ extension ThreadView {
             Label(L10n.tr(model.connectionLabel), systemImage: connectionSymbol)
             Text(model.hostName)
         } label: {
-            RemixIcon("more-line")
-                .font(.system(size: 18, weight: .semibold))
+            RemixImage("more-line", size: 24)
         }
         .menuIndicator(.hidden)
         .buttonBorderShape(.circle)
