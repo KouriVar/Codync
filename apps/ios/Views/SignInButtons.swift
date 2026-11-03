@@ -2,22 +2,14 @@ import CodyncKit
 import CodyncUI
 import SwiftUI
 
-/// Equal access to every account provider at every sign-in entry point.
+/// The one account provider this build offers: Google.
 struct SignInButtons: View {
     var body: some View {
         VStack(spacing: 10) {
-            ProviderButton(provider: .apple, title: "Continue with Apple") {
-                RemixIcon("apple-fill").font(.system(size: 20))
-            }
-            .buttonStyle(.primary)
             ProviderButton(provider: .google, title: "Continue with Google") {
                 Image("google").resizable().frame(width: 20, height: 20)
             }
-            .buttonStyle(.secondary)
-            ProviderButton(provider: .github, title: "Continue with GitHub") {
-                Image("github").resizable().frame(width: 20, height: 20)
-            }
-            .buttonStyle(.secondary)
+            .buttonStyle(.primary)
         }
     }
 }

@@ -77,7 +77,7 @@ struct SettingsView: View {
     }
 
     private var appName: String {
-        Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String ?? "半句"
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String ?? "Sully Coe"
     }
 
     private var appVersion: String {

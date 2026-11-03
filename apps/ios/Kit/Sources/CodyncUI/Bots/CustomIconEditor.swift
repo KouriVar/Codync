@@ -59,9 +59,7 @@ struct CustomIconEditor: View {
         .frame(maxWidth: .infinity)
         .disabled(editor.busy || account?.loading == true || store.connection != .online)
         .codyncDialog("Sign in required", isPresented: $needsSignIn, message: "Sign in to use custom images.") {
-            [DialogAction("Continue with Apple") { account?.signIn(.apple) },
-             DialogAction("Continue with Google") { account?.signIn(.google) },
-             DialogAction("Continue with GitHub") { account?.signIn(.github) }]
+            [DialogAction("Continue with Google") { account?.signIn(.google) }]
         }
         .fileImporter(isPresented: $choosing, allowedContentTypes: [.png, .jpeg, .webP, .svg]) { result in
             switch result {

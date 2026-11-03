@@ -6,6 +6,7 @@
     <key>CodyncAppGroup</key><string>$(CODYNC_APP_GROUP)</string>
     <key>CodyncURLScheme</key><string>$(CODYNC_URL_SCHEME)</string>
     <key>CodyncAPNSEnvironment</key><string>$(CODYNC_APNS_ENVIRONMENT)</string>
+    <key>GIDClientID</key><string>$(CODYNC_GOOGLE_CLIENT_ID)</string>
 	<key>CodyncKeychainGroup</key>
 	<string>$(AppIdentifierPrefix)$(CODYNC_KEYCHAIN_GROUP)</string>
 	<key>CFBundleURLTypes</key>
@@ -17,6 +18,14 @@
 			<array>
 				<string>$(CODYNC_URL_SCHEME)</string>
 				<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+			</array>
+		</dict>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>GoogleSignIn</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>$(CODYNC_GOOGLE_URL_SCHEME)</string>
 			</array>
 		</dict>
 	</array>

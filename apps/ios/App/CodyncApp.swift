@@ -71,7 +71,10 @@ struct CodyncApp: App {
                         }
                     }
                 }
-                .onOpenURL { url in app.open(url) }
+                .onOpenURL { url in
+                    if app.account.handle(url) { return }
+                    app.open(url)
+                }
                 .onChange(of: scenePhase, initial: true) { _, phase in
                     ReviewInvitation.shared.setActive(phase == .active)
                     switch phase {
@@ -258,10 +261,7 @@ final class AppStore {
     }
 
     func open(_ url: URL) {
-        if url.scheme == Bundle.main.bundleIdentifier {
-            Task { await account.handle(url) }
-            return
-        }
+        if account.handle(url) { return }
         guard url.scheme == AppEnvironment.current.urlScheme else { return }
         switch url.host() {
         case "pair":
@@ -297,7 +297,8 @@ final class AppStore {
     private static func makeAccounts(_ storage: SharedStore.Context, session: AccountSession) -> (AccountStore, CloudClient?) {
         let identity = storage.accountID == nil ? nil : try? DeviceIdentity.load(context: storage)
         let cloud = session.cloudClient(for: storage.accountID, identity: identity)
-        let accounts = AccountStore(storage: storage, cloud: cloud)
+        let accounts = AccountStore(storage: storage, cloud: cloud,
+                                    googleIDToken: { try await session.googleIDToken() })
         accounts.onConnected = { store in
             PushRegistrar.shared.syncDevice(with: store)
             store.onUsageChanged = { _, _ in WidgetCenter.shared.reloadTimelines(ofKind: "CodyncUsage") }

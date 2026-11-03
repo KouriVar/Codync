@@ -953,3 +953,19 @@
 - 文件：`Views/BotListView.swift`、`CodyncUI/Bots/FallbackRows.swift`、`CodyncUI/Artifacts/LibraryView.swift`、`CodyncUI/Screen/ScreenView.swift`。
 - 验证：构建号 143 编译、签名、安装成功；菜单展开需真机确认。
 - 关联：C0098（菜单图标必须是 Image）。
+
+### C0107 · 2026-11-03 · 配对身份改用 Google 登录（ID token 校验），移除 Clerk
+
+- 原因：用 Google 登录替代 Clerk / 上游云端证书，作为 codync 配对时的身份验证；配对后沿用现有设备签名 + E2E 通道，不改每请求流程。
+- 变化（host，Rust）：
+  - 新增 `remote/google_auth.rs`：从 Google JWKS 以 RS256 验签，校验 `iss` / `aud` / `exp` / `email_verified` / 邮箱白名单；Client ID 与允许邮箱可用 `CODYNC_GOOGLE_CLIENT_IDS` / `CODYNC_ALLOWED_EMAILS` 覆盖。
+  - `channel/pairing.rs` 用 `google_auth` 替换 `certificate::check`；配对请求新增 `google_id_token`；一次性配对码、TTL、限频保留；设备记录新增 `email`（schema v8）。
+  - 云依赖“关而不删”：host LaunchAgent 增加 `CODYNC_CLOUD=off`（与 `CODYNC_EXTERNAL_URL` 并存，改前已备份）。
+- 变化（iOS）：
+  - 移除 Clerk（`project.yml`、`AccountSession`）；新增 GoogleSignIn SPM；`Info.plist` 加 `GIDClientID` 与 Google URL scheme；删除 Sign in with Apple entitlement；登录界面仅保留 Continue with Google。
+  - 配对请求带 `google_id_token`（过期先 `refreshTokensIfNeeded`）；`cloudClient` 返回 nil；PostHog 与 APNs relay 用开关关闭（`Analytics.remoteDisabled`、`PushRegistrar.relayDisabled`），代码不删。
+  - 三个 target 的 bundle / team / app group 以真机可签名那套为准：`com.suiyikou.codync.uipreview`（+ `.LiveActivity` / `.NotificationService`）、Team `KQQ6SD2P4C`、App Group / Keychain 同名；未新增 App ID。
+- 文件：`host/src/remote/google_auth.rs`（新增）、`host/src/remote/channel/pairing.rs`、`host/src/remote/mod.rs`、`host/src/store/devices.rs`、`host/src/store/schema.rs`、`host/src/api/remote.rs`、`host/src/remote/{owner,cloud,relay}.rs`、`host/src/analytics/observe/tests.rs`、`host/tests/{common/mod.rs,e2e.rs}`；`apps/project.yml`、`apps/ios/Resources/{Info.plist,iOS.entitlements}`、`apps/ios/App/{AccountSession,CodyncApp,Push}.swift`、`apps/ios/Kit/Sources/CodyncKit/{Client/HostConnector.swift,Analytics/Analytics.swift}`、`apps/ios/Kit/Sources/CodyncUI/{Store/AccountStore.swift,Bots/CustomIconEditor.swift}`、`apps/ios/Views/SignInButtons.swift`、`apps/ios/Kit/Tests/CodyncKitTests/ChannelTransportTests.swift`。
+- 验证：host `cargo build` 成功、`cargo test` 全绿（单元 666 passed + 全部 e2e 通过）；iOS Simulator（iPhone 18 Pro，DevDebug）`BUILD SUCCEEDED`。真机 Google 登录 → 配对 → `https://bot.suiyk.link` 收发、换号被拒由用户验证。
+- 限制：真机需重新生成 host 二进制并替换 App 内 `codync-host` 才启用新校验；CloudClient / 账号证书相关代码保留但未使用。
+- 关联：C0106。

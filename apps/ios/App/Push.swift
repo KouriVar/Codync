@@ -35,6 +35,8 @@ private func relayTicket(token: Data, kind: String) async throws -> String {
 @MainActor
 final class PushRegistrar {
     static let shared = PushRegistrar()
+    /// APNs through the relay (`SharedStore.relayURL`) is off in this build; code kept behind this switch.
+    static let relayDisabled = true
 
     private var deviceToken: Data?
     private var stores: [ComputerID: WeakStore] = [:]
@@ -107,6 +109,7 @@ final class PushRegistrar {
     }
 
     func didRegister(token: Data) {
+        guard !Self.relayDisabled else { return }
         deviceToken = token
         resync()
     }
@@ -118,6 +121,7 @@ final class PushRegistrar {
     /// Sends our ticket to a computer whenever we have both a token and a connection to it; a computer
     /// whose switch is off in Computer management is asked to stop alerting this phone.
     func syncDevice(with store: BotStore) {
+        guard !Self.relayDisabled else { return }
         let id = store.computer.id
         stores[id] = WeakStore(store: store)
         LiveActivities.shared.resume(with: store)

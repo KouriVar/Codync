@@ -10,9 +10,9 @@ options:
     icon:
       file: true
 packages:
-  Clerk:
-    url: https://github.com/clerk/clerk-ios
-    exactVersion: 1.5.6
+  GoogleSignIn:
+    url: https://github.com/google/GoogleSignIn-iOS
+    exactVersion: "8.0.0"
   CodyncKit:
     path: ios/Kit
   WebRTC:
@@ -30,18 +30,20 @@ settings:
     SWIFT_VERSION: "6.0"
     SWIFT_STRICT_CONCURRENCY: complete
     CODE_SIGN_STYLE: Automatic
-    DEVELOPMENT_TEAM: 7FUM8A8H72
+    DEVELOPMENT_TEAM: KQQ6SD2P4C
     DEAD_CODE_STRIPPING: YES
     ENABLE_USER_SCRIPT_SANDBOXING: NO
     CODYNC_ENV: main
     CODYNC_APP_NAME: Codync
-    CODYNC_IOS_BUNDLE_ID: com.pokai.Codync.ios
-    CODYNC_APP_GROUP: group.com.pokai.Codync
-    CODYNC_KEYCHAIN_GROUP: com.pokai.Codync
+    CODYNC_IOS_BUNDLE_ID: com.suiyikou.codync.uipreview
+    CODYNC_APP_GROUP: group.com.suiyikou.codync.uipreview
+    CODYNC_KEYCHAIN_GROUP: com.suiyikou.codync.uipreview
     CODYNC_URL_SCHEME: codync
     CODYNC_SCREEN_NAME: CodyncScreen
     CODYNC_SCREEN_BUNDLE_ID: com.pokai.Codync.screen
     CODYNC_DATA_FOLDER: .codync
+    CODYNC_GOOGLE_CLIENT_ID: 930074396465-fg6ftdlkn4n3cvj7kvtb9ptc13225qpe.apps.googleusercontent.com
+    CODYNC_GOOGLE_URL_SCHEME: com.googleusercontent.apps.930074396465-fg6ftdlkn4n3cvj7kvtb9ptc13225qpe
   configs:
     Debug:
       CODYNC_APNS_ENVIRONMENT: sandbox
@@ -49,10 +51,10 @@ settings:
       CODYNC_APNS_ENVIRONMENT: production
     DevDebug:
       CODYNC_ENV: dev
-      CODYNC_APP_NAME: Codync Dev
-      CODYNC_IOS_BUNDLE_ID: com.pokai.Codync.ios.dev
-      CODYNC_APP_GROUP: group.com.pokai.Codync.dev
-      CODYNC_KEYCHAIN_GROUP: com.pokai.Codync.dev
+      CODYNC_APP_NAME: Sully Coe
+      CODYNC_IOS_BUNDLE_ID: com.suiyikou.codync.uipreview
+      CODYNC_APP_GROUP: group.com.suiyikou.codync.uipreview
+      CODYNC_KEYCHAIN_GROUP: com.suiyikou.codync.uipreview
       CODYNC_URL_SCHEME: codync-dev
       CODYNC_SCREEN_NAME: CodyncDevScreen
       CODYNC_SCREEN_BUNDLE_ID: com.pokai.Codync.dev.screen
@@ -60,10 +62,10 @@ settings:
       CODYNC_APNS_ENVIRONMENT: sandbox
     DevRelease:
       CODYNC_ENV: dev
-      CODYNC_APP_NAME: Codync Dev
-      CODYNC_IOS_BUNDLE_ID: com.pokai.Codync.ios.dev
-      CODYNC_APP_GROUP: group.com.pokai.Codync.dev
-      CODYNC_KEYCHAIN_GROUP: com.pokai.Codync.dev
+      CODYNC_APP_NAME: Sully Coe
+      CODYNC_IOS_BUNDLE_ID: com.suiyikou.codync.uipreview
+      CODYNC_APP_GROUP: group.com.suiyikou.codync.uipreview
+      CODYNC_KEYCHAIN_GROUP: com.suiyikou.codync.uipreview
       CODYNC_URL_SCHEME: codync-dev
       CODYNC_SCREEN_NAME: CodyncDevScreen
       CODYNC_SCREEN_BUNDLE_ID: com.pokai.Codync.dev.screen
@@ -151,8 +153,8 @@ targets:
       - ios/Widgets/OpenBotIntent.swift
       - ios/Widgets/CallControlIntents.swift
     dependencies:
-      - package: Clerk
-        product: ClerkKit
+      - package: GoogleSignIn
+        product: GoogleSignIn
       - package: CodyncKit
         product: CodyncKit
       - package: CodyncKit
@@ -192,6 +194,18 @@ targets:
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         # Black / white instead of the system blue in menus, alerts and system sheets.
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+      # Build the Dev scheme the same way the working device build is invoked (no CLI overrides):
+      # ui-preview environment, the matching URL scheme, and the entitlement set without Apple
+      # sign-in / push. This keeps pairing's `codync://` scheme consistent from Xcode's GUI.
+      configs:
+        DevDebug:
+          CODYNC_ENV: ui-preview
+          CODYNC_URL_SCHEME: codync-ui-preview
+          CODE_SIGN_ENTITLEMENTS: ios/Resources/UIPreview.entitlements
+        DevRelease:
+          CODYNC_ENV: ui-preview
+          CODYNC_URL_SCHEME: codync-ui-preview
+          CODE_SIGN_ENTITLEMENTS: ios/Resources/UIPreview.entitlements
   Widgets:
     type: app-extension
     platform: iOS

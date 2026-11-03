@@ -90,7 +90,7 @@
 		E1C181D77EA48DCDFEC2F15D /* CustomActivityIcon.swift in Sources */ = {isa = PBXBuildFile; fileRef = 365F24B61AEDCFE6C389E904 /* CustomActivityIcon.swift */; };
 		E695251CFD06AC6F4E3396B7 /* OpenBotIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C4EB0DBA2F08CD7C0E25E30 /* OpenBotIntent.swift */; };
 		E78E3B5FAFEB79F31AAC104D /* CodyncBot-teardrop-Tint.ttf in Resources */ = {isa = PBXBuildFile; fileRef = C8F46BD8301E7E2C83C35111 /* CodyncBot-teardrop-Tint.ttf */; };
-		EBB0417A5FB2CE6D514D21BE /* ClerkKit in Frameworks */ = {isa = PBXBuildFile; productRef = D9AB2F442A5F243653EAE936 /* ClerkKit */; };
+		EBB0417A5FB2CE6D514D21BE /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = 126601E503A8BD04CF7A5765 /* GoogleSignIn */; };
 		ECE1339FED40D7D5D8806608 /* CallLiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5B2717A8DFD43DC6DAA9D8C /* CallLiveActivity.swift */; };
 		F171F16563D1FF6308697173 /* CodyncUI in Frameworks */ = {isa = PBXBuildFile; productRef = 06C9F37C6502131CAF0F145E /* CodyncUI */; };
 		F6A380E8A026CA849620F2F7 /* Driver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D16AD9979C77D976BC832D1 /* Driver.swift */; };
@@ -254,7 +254,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				EBB0417A5FB2CE6D514D21BE /* ClerkKit in Frameworks */,
+				EBB0417A5FB2CE6D514D21BE /* GoogleSignIn in Frameworks */,
 				52CF04B855C6AAEC47B75B8F /* CodyncKit in Frameworks */,
 				F171F16563D1FF6308697173 /* CodyncUI in Frameworks */,
 			);
@@ -534,7 +534,7 @@
 			);
 			name = iOS;
 			packageProductDependencies = (
-				D9AB2F442A5F243653EAE936 /* ClerkKit */,
+				126601E503A8BD04CF7A5765 /* GoogleSignIn */,
 				1285DDFA0390A76ECDAAD6C0 /* CodyncKit */,
 				06C9F37C6502131CAF0F145E /* CodyncUI */,
 			);
@@ -591,19 +591,19 @@
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
 					907F1F4A709111FC7178EAE9 = {
-						DevelopmentTeam = 7FUM8A8H72;
+						DevelopmentTeam = KQQ6SD2P4C;
 						ProvisioningStyle = Automatic;
 					};
 					913BDA9F79CE8C35A9E35830 = {
-						DevelopmentTeam = 7FUM8A8H72;
+						DevelopmentTeam = KQQ6SD2P4C;
 						ProvisioningStyle = Automatic;
 					};
 					A27E4E88D6A5B9850734B594 = {
-						DevelopmentTeam = 7FUM8A8H72;
+						DevelopmentTeam = KQQ6SD2P4C;
 						ProvisioningStyle = Automatic;
 					};
 					C42E5E078332C6C2B35AF5FA = {
-						DevelopmentTeam = 7FUM8A8H72;
+						DevelopmentTeam = KQQ6SD2P4C;
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -618,7 +618,7 @@
 			mainGroup = C9B7D3953422AE726DDC6347;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				2C830647014432C6F20C557C /* XCRemoteSwiftPackageReference "clerk-ios" */,
+				7783B78673BEF42F6305B25E /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */,
 				979123F21565A4068586B502 /* XCRemoteSwiftPackageReference "WebRTC" */,
 				1971A679A8497DA8D0C8B77A /* XCLocalSwiftPackageReference "ios/Kit" */,
 			);
@@ -863,12 +863,14 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				CODYNC_APNS_ENVIRONMENT = sandbox;
-				CODYNC_APP_GROUP = group.com.pokai.Codync.dev;
-				CODYNC_APP_NAME = "Codync Dev";
+				CODYNC_APP_GROUP = group.com.suiyikou.codync.uipreview;
+				CODYNC_APP_NAME = "Sully Coe";
 				CODYNC_DATA_FOLDER = ".codync-dev";
 				CODYNC_ENV = dev;
-				CODYNC_IOS_BUNDLE_ID = com.pokai.Codync.ios.dev;
-				CODYNC_KEYCHAIN_GROUP = com.pokai.Codync.dev;
+				CODYNC_GOOGLE_CLIENT_ID = "930074396465-fg6ftdlkn4n3cvj7kvtb9ptc13225qpe.apps.googleusercontent.com";
+				CODYNC_GOOGLE_URL_SCHEME = "com.googleusercontent.apps.930074396465-fg6ftdlkn4n3cvj7kvtb9ptc13225qpe";
+				CODYNC_IOS_BUNDLE_ID = com.suiyikou.codync.uipreview;
+				CODYNC_KEYCHAIN_GROUP = com.suiyikou.codync.uipreview;
 				CODYNC_SCREEN_BUNDLE_ID = com.pokai.Codync.dev.screen;
 				CODYNC_SCREEN_NAME = CodyncDevScreen;
 				CODYNC_URL_SCHEME = "codync-dev";
@@ -876,7 +878,7 @@
 				CURRENT_PROJECT_VERSION = 24;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
-				DEVELOPMENT_TEAM = 7FUM8A8H72;
+				DEVELOPMENT_TEAM = KQQ6SD2P4C;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
@@ -967,12 +969,14 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				CODYNC_APNS_ENVIRONMENT = production;
-				CODYNC_APP_GROUP = group.com.pokai.Codync;
+				CODYNC_APP_GROUP = group.com.suiyikou.codync.uipreview;
 				CODYNC_APP_NAME = Codync;
 				CODYNC_DATA_FOLDER = .codync;
 				CODYNC_ENV = main;
-				CODYNC_IOS_BUNDLE_ID = com.pokai.Codync.ios;
-				CODYNC_KEYCHAIN_GROUP = com.pokai.Codync;
+				CODYNC_GOOGLE_CLIENT_ID = "930074396465-fg6ftdlkn4n3cvj7kvtb9ptc13225qpe.apps.googleusercontent.com";
+				CODYNC_GOOGLE_URL_SCHEME = "com.googleusercontent.apps.930074396465-fg6ftdlkn4n3cvj7kvtb9ptc13225qpe";
+				CODYNC_IOS_BUNDLE_ID = com.suiyikou.codync.uipreview;
+				CODYNC_KEYCHAIN_GROUP = com.suiyikou.codync.uipreview;
 				CODYNC_SCREEN_BUNDLE_ID = com.pokai.Codync.screen;
 				CODYNC_SCREEN_NAME = CodyncScreen;
 				CODYNC_URL_SCHEME = codync;
@@ -980,7 +984,7 @@
 				CURRENT_PROJECT_VERSION = 24;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
-				DEVELOPMENT_TEAM = 7FUM8A8H72;
+				DEVELOPMENT_TEAM = KQQ6SD2P4C;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
@@ -1158,8 +1162,10 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = ios/Resources/iOS.entitlements;
+				CODE_SIGN_ENTITLEMENTS = ios/Resources/UIPreview.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CODYNC_ENV = "ui-preview";
+				CODYNC_URL_SCHEME = "codync-ui-preview";
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = ios/Resources/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "$(CODYNC_APP_NAME)";
@@ -1220,12 +1226,14 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				CODYNC_APNS_ENVIRONMENT = sandbox;
-				CODYNC_APP_GROUP = group.com.pokai.Codync;
+				CODYNC_APP_GROUP = group.com.suiyikou.codync.uipreview;
 				CODYNC_APP_NAME = Codync;
 				CODYNC_DATA_FOLDER = .codync;
 				CODYNC_ENV = main;
-				CODYNC_IOS_BUNDLE_ID = com.pokai.Codync.ios;
-				CODYNC_KEYCHAIN_GROUP = com.pokai.Codync;
+				CODYNC_GOOGLE_CLIENT_ID = "930074396465-fg6ftdlkn4n3cvj7kvtb9ptc13225qpe.apps.googleusercontent.com";
+				CODYNC_GOOGLE_URL_SCHEME = "com.googleusercontent.apps.930074396465-fg6ftdlkn4n3cvj7kvtb9ptc13225qpe";
+				CODYNC_IOS_BUNDLE_ID = com.suiyikou.codync.uipreview;
+				CODYNC_KEYCHAIN_GROUP = com.suiyikou.codync.uipreview;
 				CODYNC_SCREEN_BUNDLE_ID = com.pokai.Codync.screen;
 				CODYNC_SCREEN_NAME = CodyncScreen;
 				CODYNC_URL_SCHEME = codync;
@@ -1233,7 +1241,7 @@
 				CURRENT_PROJECT_VERSION = 24;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
-				DEVELOPMENT_TEAM = 7FUM8A8H72;
+				DEVELOPMENT_TEAM = KQQ6SD2P4C;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
@@ -1376,12 +1384,14 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				CODYNC_APNS_ENVIRONMENT = production;
-				CODYNC_APP_GROUP = group.com.pokai.Codync.dev;
-				CODYNC_APP_NAME = "Codync Dev";
+				CODYNC_APP_GROUP = group.com.suiyikou.codync.uipreview;
+				CODYNC_APP_NAME = "Sully Coe";
 				CODYNC_DATA_FOLDER = ".codync-dev";
 				CODYNC_ENV = dev;
-				CODYNC_IOS_BUNDLE_ID = com.pokai.Codync.ios.dev;
-				CODYNC_KEYCHAIN_GROUP = com.pokai.Codync.dev;
+				CODYNC_GOOGLE_CLIENT_ID = "930074396465-fg6ftdlkn4n3cvj7kvtb9ptc13225qpe.apps.googleusercontent.com";
+				CODYNC_GOOGLE_URL_SCHEME = "com.googleusercontent.apps.930074396465-fg6ftdlkn4n3cvj7kvtb9ptc13225qpe";
+				CODYNC_IOS_BUNDLE_ID = com.suiyikou.codync.uipreview;
+				CODYNC_KEYCHAIN_GROUP = com.suiyikou.codync.uipreview;
 				CODYNC_SCREEN_BUNDLE_ID = com.pokai.Codync.dev.screen;
 				CODYNC_SCREEN_NAME = CodyncDevScreen;
 				CODYNC_URL_SCHEME = "codync-dev";
@@ -1389,7 +1399,7 @@
 				CURRENT_PROJECT_VERSION = 24;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
-				DEVELOPMENT_TEAM = 7FUM8A8H72;
+				DEVELOPMENT_TEAM = KQQ6SD2P4C;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
@@ -1471,8 +1481,10 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = ios/Resources/iOS.entitlements;
+				CODE_SIGN_ENTITLEMENTS = ios/Resources/UIPreview.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CODYNC_ENV = "ui-preview";
+				CODYNC_URL_SCHEME = "codync-ui-preview";
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = ios/Resources/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "$(CODYNC_APP_NAME)";
@@ -1586,12 +1598,12 @@
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCRemoteSwiftPackageReference section */
-		2C830647014432C6F20C557C /* XCRemoteSwiftPackageReference "clerk-ios" */ = {
+		7783B78673BEF42F6305B25E /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */ = {
 			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/clerk/clerk-ios";
+			repositoryURL = "https://github.com/google/GoogleSignIn-iOS";
 			requirement = {
 				kind = exactVersion;
-				version = 1.5.6;
+				version = 8.0.0;
 			};
 		};
 		979123F21565A4068586B502 /* XCRemoteSwiftPackageReference "WebRTC" */ = {
@@ -1609,6 +1621,11 @@
 			isa = XCSwiftPackageProductDependency;
 			productName = CodyncUI;
 		};
+		126601E503A8BD04CF7A5765 /* GoogleSignIn */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 7783B78673BEF42F6305B25E /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
+			productName = GoogleSignIn;
+		};
 		1285DDFA0390A76ECDAAD6C0 /* CodyncKit */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = CodyncKit;
@@ -1625,11 +1642,6 @@
 		59F5D19A417A7A50596902FA /* CodyncKit */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = CodyncKit;
-		};
-		D9AB2F442A5F243653EAE936 /* ClerkKit */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 2C830647014432C6F20C557C /* XCRemoteSwiftPackageReference "clerk-ios" */;
-			productName = ClerkKit;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

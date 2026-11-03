@@ -54,6 +54,8 @@ public final class AccountStore {
     public var onRosterChanged: (@MainActor ([RosterItem]) -> Void)?
 
     private let cloud: CloudClient?
+    /// Supplies a Google ID token for pairing (nil only in tests that never pair).
+    private let googleIDToken: (@Sendable () async throws -> String)?
     private let computerOrder: ComputerOrderStore
     private let makeStore: @MainActor (Computer) -> BotStore
     /// Persisted in the context (channel route).
@@ -68,16 +70,19 @@ public final class AccountStore {
     private var isActive = true
     private var retired = false
 
-    public convenience init(storage: SharedStore.Context, cloud: CloudClient?) {
-        self.init(storage: storage, cloud: cloud) { computer in
+    public convenience init(storage: SharedStore.Context, cloud: CloudClient?,
+                            googleIDToken: (@Sendable () async throws -> String)? = nil) {
+        self.init(storage: storage, cloud: cloud, googleIDToken: googleIDToken) { computer in
             BotStore(computer: computer, storage: storage)
         }
     }
 
     init(storage: SharedStore.Context, cloud: CloudClient?,
+         googleIDToken: (@Sendable () async throws -> String)? = nil,
          makeStore: @escaping @MainActor (Computer) -> BotStore) {
         self.storage = storage
         self.cloud = cloud
+        self.googleIDToken = googleIDToken
         computerOrder = ComputerOrderStore(storage: storage)
         self.makeStore = makeStore
         saved = storage.computers.filter(\.isConsistent)
@@ -102,40 +107,25 @@ public final class AccountStore {
 
     // MARK: computers
 
-    /// QR pairing (§4.1), with an account certificate when cloud accounts are configured.
-    /// Local-only builds use the host's QR-only pairing support and save its device key locally.
+    /// QR pairing (§4.1): the phone shows the host a Google ID token for the allowed account, and the
+    /// host authorizes this device's key locally. The device key and E2E channel are the existing ones.
     public func pair(_ pairing: Pairing, deviceName: String, platform: String) async throws -> Computer {
         let identity = try DeviceIdentity.load(context: storage)
-        let certificate: DeviceCertificate?
-        let claim: CloudClaim?
-        if let cloud {
-            certificate = try await pairingCertificate(cloud, deviceName: deviceName, platform: platform)
-            // Without a claim the computer still pairs; it just doesn't join the account.
-            do { claim = try await cloud.createClaim() } catch {
-                log.info("pairing without a claim: \(error.localizedDescription, privacy: .public)")
-                claim = nil
-            }
-        } else {
-            certificate = nil
-            claim = nil
-        }
+        guard let token = try await googleIDToken?() else { throw Self.noCertificate }
         pairingCheck = pairing.checkCode(for: identity)
         defer { pairingCheck = nil }
         let paired = try await HostConnector.pair(pairing, identity: identity, deviceName: deviceName, platform: platform,
-                                                  certificate: certificate, claim: claim)
+                                                  googleIDToken: token)
         guard !retired else { throw CancellationError() }
         var computer = paired.computer
         if let previous = saved.first(where: { $0.id == computer.id }) { computer.keepDevicePicks(from: previous) }
         save(computer)
         open(computer)
-        if let cloud, let claim, let signed = paired.claim {
-            Task { await joinAccount(claimId: claim.claimId, signed: signed, cloud: cloud) }
-        }
         return computer
     }
 
-    public static let noCertificate = CloudError(status: 0, code: "noCertificate",
-                                          message: "Connect to the internet to pair, so Codync can confirm your account.")
+    public static let noCertificate = CloudError(status: 0, code: "signedOut",
+                                          message: "Sign in with Google to pair with your computer.")
 
     /// This device's certificate: the one held while more than a day is left, else a new one, registering
     /// the device again if the cloud doesn't know it. Offline, one that is still valid will do.

@@ -420,22 +420,19 @@ private func waitFor(_ states: AsyncStream<LinkState>, _ match: (LinkState) -> B
     var direct = v.computer
     direct.urls = ["http://127.0.0.1:1"]
     let computer = direct
-    let certificate = DeviceCertificate(payload: #"{"v":1,"exp":1}"#, sig: "c2ln")
+    let googleToken = "test-google-id-token"
     async let paired = HostConnector.pair(Pairing(computer: computer, code: v.str("pairing", "code")), identity: v.identity,
-                                          deviceName: "iPhone", platform: "ios", certificate: certificate,
-                                          claim: CloudClaim(claimId: "clm_1", nonce: "n1"), dial: dial)
+                                          deviceName: "iPhone", platform: "ios", googleIDToken: googleToken, dial: dial)
     var it = sockets.makeAsyncIterator()
     var host = HostSide(try #require(await it.next()))
     try await host.accept()
     let request = try await host.receive()
     let body = try #require(request["b"] as? [String: Any])
-    #expect(body["certificate"] as? [String: String] == ["payload": certificate.payload, "sig": certificate.sig])
-    #expect(body["claim"] as? [String: String] == ["claimId": "clm_1", "nonce": "n1"])
-    let signed = ["computerId": computer.id, "signKey": computer.signKey, "version": "2.36.0", "sig": "s"]
-    try await host.send(["id": request["id"] ?? 0, "ok": ["computerId": computer.id, "name": "Studio", "claim": signed]])
+    #expect(body["google_id_token"] as? String == googleToken)
+    try await host.send(["id": request["id"] ?? 0, "ok": ["computerId": computer.id, "name": "Studio"]])
     let result = try await paired
     #expect(result.computer.name == "Studio")
-    #expect(try JSONSerialization.jsonObject(with: try #require(result.claim)) as? [String: String] == signed)
+    #expect(result.claim == nil)
 }
 
 @Test func lapsedLeaseIsRetriedNotARevocation() throws {

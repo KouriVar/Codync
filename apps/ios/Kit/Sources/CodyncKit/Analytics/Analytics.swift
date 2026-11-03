@@ -38,6 +38,8 @@ public final class Analytics {
 
     nonisolated static let endpoint = URL(string: "https://us.i.posthog.com/batch/")!
     static let apiKey = "phc_rQHvxdSFKnMquPfMjmiMhXhM4tqJ5qCYsWuVEoFxCCWX"
+    /// PostHog uploads are off in this build (kept behind this switch; code intact).
+    public static let remoteDisabled = true
     /// `Bool`, absent = on.
     public static let enabledKey = "analyticsEnabled"
     private static let installKey = "analyticsInstallID"
@@ -68,7 +70,7 @@ public final class Analytics {
         lastLaunchSession = defaults.string(forKey: Self.sessionKey)
     }
 
-    public var isEnabled: Bool { defaults.object(forKey: Self.enabledKey) as? Bool ?? true }
+    public var isEnabled: Bool { !Self.remoteDisabled && (defaults.object(forKey: Self.enabledKey) as? Bool ?? true) }
 
     /// Turning it off drops everything not yet sent.
     public func setEnabled(_ enabled: Bool) {
