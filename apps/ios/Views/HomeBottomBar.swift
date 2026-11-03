@@ -18,8 +18,10 @@ struct HomeBottomBar: View {
     private let iconLineWidth: CGFloat = 1.8
 
     var body: some View {
-        HStack(spacing: 12) {
-            if !searching {
+        GlassEffectContainer(spacing: 12) {
+            HStack(spacing: 12) {
+                // Stays in the container (so the glass keeps merging) but only fades: the layout
+                // never changes, which is what made the morph stutter before.
                 Button(action: openPlugins) {
                     RemixIcon("apps-2-line", size: iconSize)
                         .foregroundStyle(Palette.text)
@@ -29,26 +31,28 @@ struct HomeBottomBar: View {
                 .buttonStyle(.plain)
                 .accessibilityLabel("插件")
                 .help("插件")
-                .transition(.opacity)
-            }
+                .opacity(searching ? 0 : 1)
+                .allowsHitTesting(!searching)
+                .accessibilityHidden(searching)
 
-            SearchField("搜索", text: $searchText, opaqueBackground: false, active: $searching)
-                .frame(height: 48)
-                .glassEffect(.regular.interactive(), in: Capsule())
-                .submitLabel(.search)
-                .accessibilityLabel("搜索聊天")
+                SearchField("搜索", text: $searchText, opaqueBackground: false, active: $searching)
+                    .frame(height: 48)
+                    .glassEffect(.regular.interactive(), in: Capsule())
+                    .submitLabel(.search)
+                    .accessibilityLabel("搜索聊天")
 
-            Button(action: searching ? closeSearch : openCamera) {
-                RemixIcon(searching ? "close-line" : "camera-fill", size: iconSize)
-                    .foregroundStyle(Palette.text)
-                    .frame(width: 48, height: 48)
-                    .glassEffect(.regular.interactive(), in: Circle())
+                Button(action: searching ? closeSearch : openCamera) {
+                    RemixIcon(searching ? "close-line" : "camera-fill", size: iconSize)
+                        .foregroundStyle(Palette.text)
+                        .frame(width: 48, height: 48)
+                        .glassEffect(.regular.interactive(), in: Circle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(searching ? "关闭搜索" : "拍照")
+                .help(searching ? "关闭搜索" : "拍照")
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel(searching ? "关闭搜索" : "拍照")
-            .help(searching ? "关闭搜索" : "拍照")
+            .animation(Motion.reduced(.easeInOut(duration: 0.2), reduceMotion), value: searching)
         }
-        .animation(Motion.reduced(.snappy(duration: 0.26), reduceMotion), value: searching)
         // One 16pt margin with the toolbar and the list rows.
         .padding(.horizontal, 16)
         .padding(.top, 10)
