@@ -34,14 +34,33 @@ impl Drop for Host {
     }
 }
 
-/// A device certificate as the cloud signs it (`cloud/src/certificate.ts`), with the test host's trusted key.
-fn test_certificate(device_key: &str, user_id: &str) -> Value {
-    let exp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis() + 60_000;
-    let payload = json!({"v": 1, "deviceKey": device_key, "userId": user_id, "email": "kevin@example.com", "exp": exp})
-        .to_string();
-    let key = SigningKey::from_bytes(&common::TEST_CLOUD_SEED);
-    let sig = crypto::sign(&key, format!("codync/device-cert/v1\n{payload}").as_bytes());
-    json!({"payload": payload, "sig": crypto::b64(&sig)})
+/// A Google ID token the test host trusts: signed with the committed test key, for the test
+/// client/email the test host was told to allow.
+fn test_google_token() -> String {
+    #[derive(serde::Serialize)]
+    struct C<'a> {
+        iss: &'a str,
+        aud: &'a str,
+        sub: &'a str,
+        email: &'a str,
+        email_verified: bool,
+        exp: i64,
+    }
+    let pem = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/src/remote/google_auth_test_priv.pem"))
+        .expect("test key");
+    let key = jsonwebtoken::EncodingKey::from_rsa_pem(pem.as_bytes()).expect("rsa key");
+    let exp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs() as i64 + 3600;
+    let mut header = jsonwebtoken::Header::new(jsonwebtoken::Algorithm::RS256);
+    header.kid = Some(common::TEST_GOOGLE_KID.to_owned());
+    let claims = C {
+        iss: "https://accounts.google.com",
+        aud: common::TEST_GOOGLE_CLIENT_ID,
+        sub: "sub_test",
+        email: common::TEST_GOOGLE_EMAIL,
+        email_verified: true,
+        exp,
+    };
+    jsonwebtoken::encode(&header, &claims, &key).expect("encode token")
 }
 
 async fn start_host() -> Host {
@@ -373,20 +392,9 @@ async fn phone_pairs_and_chats_over_the_direct_channel() {
 
     let mut phone = Phone::connect(&host, &key, &sk, true).await;
     let code = query_param(url, "code");
-    let certificate = test_certificate(&crypto::b64(key.verifying_key().as_bytes()), "user_1");
     phone
-        .send(json!({"id": 1, "m": "pair", "b": {"code": code, "name": "Test iPhone", "platform": "ios", "certificate": certificate}}))
+        .send(json!({"id": 1, "m": "pair", "b": {"code": code, "name": "Test iPhone", "platform": "ios", "google_id_token": test_google_token()}}))
         .await;
-    // A computer in no account asks first; the test answers for it.
-    let request = loop {
-        let list = host.call("pairingRequests", json!({})).await;
-        if let Some(r) = list["requests"].as_array().and_then(|r| r.first()) {
-            break r.clone();
-        }
-        tokio::time::sleep(Duration::from_millis(50)).await;
-    };
-    assert_eq!(request["deviceName"], "Test iPhone");
-    host.call("decidePairing", json!({"requestId": request["requestId"], "approve": true})).await;
     assert_eq!(phone.inner().await["ok"]["computerId"], crypto::computer_id(&sk));
     assert!(matches!(phone.recv().await, Frame::Closed(4100)));
 

@@ -937,3 +937,11 @@
 - 文件：`Views/HomeBottomBar.swift`。
 - 验证：构建号 141 编译、签名、安装成功；流畅度需真机确认。
 - 关联：C0102、C0103。
+
+### C0105 · 2026-11-03 · 用 iOS 26 官方玻璃转场（glassEffectID + materialize）替代普通过渡
+
+- 原因：搜索框变宽必须伴随布局动画，普通 `.transition` 会让容器逐帧重排玻璃导致卡顿。
+- 变化：容器内三个玻璃元素加 `glassEffectID`（extensions/search/camera），扩展按钮加 `glassEffectTransition(.materialize)`，让容器用系统转场溶解/形变，而不是移除视图触发重排；动画 `.snappy(0.26)`。
+- 文件：`Views/HomeBottomBar.swift`。
+- 验证：构建号 142 编译、签名、安装成功；流畅度需真机确认。
+- 关联：C0102–C0104。

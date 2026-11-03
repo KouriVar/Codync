@@ -11,6 +11,8 @@ struct HomeBottomBar: View {
     /// The search field is active: hide the extensions button and turn the camera into Close.
     @State private var searching = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// Identities so the glass container can morph elements instead of re-laying them out.
+    @Namespace private var glass
     let openCamera: () -> Void
     let openPlugins: () -> Void
     /// One 48pt row for the search capsule and both circles.
@@ -22,11 +24,15 @@ struct HomeBottomBar: View {
             HStack(spacing: 12) {
                 if !searching {
                     Button(action: openPlugins) {
-                    RemixIcon("apps-2-line", size: iconSize)
-                        .foregroundStyle(Palette.text)
-                        .frame(width: 48, height: 48)
-                        .glassEffect(.regular.interactive(), in: Circle())
-                }
+                        RemixIcon("apps-2-line", size: iconSize)
+                            .foregroundStyle(Palette.text)
+                            .frame(width: 48, height: 48)
+                            .glassEffect(.regular.interactive(), in: Circle())
+                            // iOS 26's own transition: the circle's glass dissolves with the
+                            // container morph instead of a plain removal that stutters.
+                            .glassEffectID("extensions", in: glass)
+                            .glassEffectTransition(.materialize)
+                    }
                     .buttonStyle(.plain)
                     .accessibilityLabel("插件")
                     .help("插件")
@@ -35,8 +41,8 @@ struct HomeBottomBar: View {
 
                 SearchField("搜索", text: $searchText, opaqueBackground: false, active: $searching)
                     .frame(height: 48)
-                    .geometryGroup()
                     .glassEffect(.regular.interactive(), in: Capsule())
+                    .glassEffectID("search", in: glass)
                     .submitLabel(.search)
                     .accessibilityLabel("搜索聊天")
 
@@ -45,13 +51,13 @@ struct HomeBottomBar: View {
                         .foregroundStyle(Palette.text)
                         .frame(width: 48, height: 48)
                         .glassEffect(.regular.interactive(), in: Circle())
+                        .glassEffectID("camera", in: glass)
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(searching ? "关闭搜索" : "拍照")
                 .help(searching ? "关闭搜索" : "拍照")
             }
-            .geometryGroup()
-            .animation(Motion.reduced(.snappy(duration: 0.24), reduceMotion), value: searching)
+            .animation(Motion.reduced(.snappy(duration: 0.26), reduceMotion), value: searching)
         }
         // One 16pt margin with the toolbar and the list rows.
         .padding(.horizontal, 16)

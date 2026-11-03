@@ -179,6 +179,12 @@ static JWKS: LazyLock<Mutex<Option<CacheEntry>>> = LazyLock::new(|| Mutex::new(N
 /// Google's keys, cached for the `Cache-Control: max-age` it sends (default an hour).
 #[cfg(not(test))]
 async fn fetch_jwks(force: bool) -> Option<KeySet> {
+    // Tests point the host at a local JWKS so verification never reaches the network.
+    if let Ok(raw) = std::env::var("CODYNC_GOOGLE_JWKS_JSON") {
+        if let Ok(set) = serde_json::from_str::<KeySet>(&raw) {
+            return Some(set);
+        }
+    }
     if !force {
         let cached = {
             let guard = JWKS.lock().ok()?;

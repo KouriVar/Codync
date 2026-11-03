@@ -9,6 +9,17 @@ use std::time::{Duration, Instant};
 /// The seed of the cloud key a test host trusts for device certificates.
 pub const TEST_CLOUD_SEED: [u8; 32] = [9; 32];
 
+/// Google pairing in tests: the public half of `src/remote/google_auth_test_*.pem` as a JWKS, and
+/// the client/email the test host is told to trust (never the real constants).
+pub const TEST_GOOGLE_KID: &str = "test";
+pub const TEST_GOOGLE_CLIENT_ID: &str = "test-client";
+pub const TEST_GOOGLE_EMAIL: &str = "test@example.com";
+const TEST_GOOGLE_N: &str = "zod1k1ohfxQFgpDmgG1bacrqqQzmWvRumpG7ZCWF0gQ-9XL4UdJ4-d_sFFmEJONCLM2kJjt8ImGrnxXAj4z30CHuvUuUOZXB0bB04l7q1Rf62p6_8t4EnxbY49rIrNeIkVjcUvTAaioaoVMfcDgXKkS8TAPUTyhQp4wHVouc2BTmx_Q83KGOyYC_w9Gm6xg8cDxhsrITpZA0FDP39BZ8OtS9uhQIrFTmGz9rN7kORfGoi8G4MplnJf9wfDWZYJQizAFPM4Ti_eOZ38rDPiGxcDtexh4ObirC5IpchpXt6iefUpaoA445ZcBqqzXhssrYZx1A2IuP6_z_L9ayT-kgzw";
+
+pub fn test_google_jwks() -> String {
+    serde_json::json!({"keys": [{"kty": "RSA", "kid": TEST_GOOGLE_KID, "n": TEST_GOOGLE_N, "e": "AQAB"}]}).to_string()
+}
+
 fn test_cloud_key() -> String {
     use base64::Engine as _;
     let key = ed25519_dalek::SigningKey::from_bytes(&TEST_CLOUD_SEED).verifying_key();
@@ -32,6 +43,10 @@ pub async fn serve(home: &Path) -> (Child, String) {
             .env("CODYNC_CLOUD", "off")
             // Pairing checks the phone's account: tests sign certificates with `TEST_CLOUD_SEED`.
             .env("CODYNC_DEVICE_CERT_KEY", test_cloud_key())
+            // Google pairing in tests: a local JWKS and a test client/email.
+            .env("CODYNC_GOOGLE_JWKS_JSON", test_google_jwks())
+            .env("CODYNC_GOOGLE_CLIENT_IDS", TEST_GOOGLE_CLIENT_ID)
+            .env("CODYNC_ALLOWED_EMAILS", TEST_GOOGLE_EMAIL)
             .stdout(Stdio::null())
             .stderr(std::fs::File::create(&log).map_or_else(|_| Stdio::null(), Stdio::from))
             .spawn()
