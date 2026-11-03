@@ -3,19 +3,33 @@ import CodyncUI
 import SwiftUI
 import UIKit
 
-struct AppearanceSettings: View {
+/// The settings row that opens the theme page.
+struct AppearanceRow: View {
+    let open: () -> Void
     @AppStorage(Appearance.storageKey) private var appearance = Appearance.system
 
     var body: some View {
-        Picker(selection: $appearance) {
-            ForEach(Appearance.allCases, id: \.self) { Text(L10n.tr($0.label)).tag($0) }
-        } label: {
-            HStack(spacing: 12) {
-                RemixIcon("palette-line", size: 18).frame(width: 22).foregroundStyle(.primary)
-                Text(L10n.tr("Theme"))
+        Button(action: open) {
+            SettingsRow("palette-line", title: L10n.tr("Theme"), value: L10n.tr(appearance.label))
+        }
+    }
+}
+
+/// The pushed page: an inline picker, no system chevron anywhere.
+struct AppearancePage: View {
+    @AppStorage(Appearance.storageKey) private var appearance = Appearance.system
+
+    var body: some View {
+        Form {
+            Section {
+                Picker(selection: $appearance) {
+                    ForEach(Appearance.allCases, id: \.self) { Text(L10n.tr($0.label)).tag($0) }
+                } label: { EmptyView() }
+                .pickerStyle(.inline)
+                .labelsHidden()
             }
         }
-        .pickerStyle(.navigationLink)
+        .listRowSeparator(.hidden)
     }
 }
 

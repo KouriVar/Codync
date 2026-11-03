@@ -6,6 +6,7 @@ import SwiftUI
 /// notification permission, analytics, Start over). Each computer's own settings (voice chat, push, connection, hidden bots) are in
 /// Computer management (`ComputersView`).
 struct SettingsView: View {
+    @Binding var path: [AccountRoute]
     @Environment(AppStore.self) private var app
     @Environment(\.openURL) private var openURL
     @Environment(\.scenePhase) private var scenePhase
@@ -23,39 +24,35 @@ struct SettingsView: View {
             // Notifications, appearance and language share one grouped card.
             Section {
                 notificationsRow
-                AppearanceSettings()
-                LanguageSettings()
+                AppearanceRow { path.append(.appearance) }
+                LanguageRow { path.append(.language) }
             }
+            .listRowSeparator(.hidden)
 
             // Chat (thinking details) and usage analytics share one grouped card.
             Section {
                 ThinkingDetailsSettings()
                 analyticsRow
             }
+            .listRowSeparator(.hidden)
 
             ShortcutLeadSettings()
 
             // The version row is the hidden trigger for Start over.
             Section {
-                LabeledContent {
-                    Text(appVersion)
-                } label: {
-                    HStack(spacing: 12) {
-                        RemixIcon("information-line", size: 18).frame(width: 22).foregroundStyle(.primary)
-                        Text(L10n.tr("App version"))
-                    }
-                }
+                SettingsRow("information-line", title: L10n.tr("App version"), value: appVersion, chevron: false)
                     .contentShape(Rectangle())
                     .onTapGesture(perform: tappedVersion)
             }
+            .listRowSeparator(.hidden)
 
             if showStartOver {
                 Section {
                     Button(role: .destructive) { confirmStartOver = true } label: {
-                        Label { Text(L10n.tr("Start over")) } icon: { RemixIcon("restart-line") }
-                            .foregroundStyle(.red)
+                        SettingsRow("restart-line", title: L10n.tr("Start over"), destructive: true, chevron: false)
                     }
                 }
+            .listRowSeparator(.hidden)
             }
         }
         .tint(.primary)
@@ -98,7 +95,9 @@ struct SettingsView: View {
                 }
             }
         }
+        .listRowSeparator(.hidden)
         .toggleStyle(.switch)
+        .tint(.black)
         .accessibilityLabel(L10n.tr("Share usage analytics"))
     }
 
@@ -110,14 +109,8 @@ struct SettingsView: View {
                 Task { notificationsAllowed = await PushRegistrar.shared.requestAuthorization(from: .settings) }
             }
         } label: {
-            HStack(spacing: 12) {
-                RemixIcon("notification-3-line", size: 18).frame(width: 22).foregroundStyle(.primary)
-                Text(L10n.tr("Notifications"))
-                Spacer()
-                Text(L10n.tr(notificationsAllowed == true ? "On" : notificationsAllowed == false ? "Off in Settings" : "Turn on"))
-                    .foregroundStyle(.secondary)
-                Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
-            }
+            SettingsRow("notification-3-line", title: L10n.tr("Notifications"),
+                        value: L10n.tr(notificationsAllowed == true ? "On" : notificationsAllowed == false ? "Off in Settings" : "Turn on"))
         }
         .buttonStyle(.plain)
     }

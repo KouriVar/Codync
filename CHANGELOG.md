@@ -822,3 +822,12 @@
 - 验证：构建号 116–119 编译、签名、安装成功；截图确认箭头大小一致。
 - 限制/待办：`.alignmentGuide(.listRowSeparatorTrailing)` 在当前 iOS 27 SDK 的 Form 上不生效（行级与 Form 级都试过），分隔线右侧仍留 16pt；若要顶死右侧需改为自绘分隔线（隐藏系统线 + overlay 1px hairline）。
 - 关联：C0086。
+
+### C0091 · 2026-11-03 · Switch 开关统一黑色高亮
+
+- 原因：开关的 ON 态跟随 tint，深色下被 `.tint(.primary)` 变成白色；用户要求统一黑色。
+- 变化：全部 7 处 `.toggleStyle(.switch)` 追加 `.tint(.black)`（设置页思考细节、共享分析、电脑管理推送通知、记忆、定时任务、自定义图标等）。
+- 文件：SettingsView、ThinkingDetailsSettings、ComputersView、MemoryView、RoutinesView、CustomIconEditor。
+- 验证：构建号 124 编译、签名、安装成功；截图确认（截图为 OFF 态，灰色轨道）。
+- 限制/待办：ON 态为黑色轨道，深色卡片对比度偏低，若观感不佳可改 `Palette.text`/`Color(white:0.2)`。
+- 关联：C0084。

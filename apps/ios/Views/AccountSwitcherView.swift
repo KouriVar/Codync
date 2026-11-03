@@ -62,11 +62,11 @@ struct AccountSwitcherView: View {
     var body: some View {
         NavigationStack(path: $path) {
             Form {
-                AccountProfileView(showPairing: $showPairing, showVault: $showVault, showExtensions: $showExtensions, showComputersSheet: $showComputersSheet)
-                SettingsView()
+                AccountProfileView(path: $path, showPairing: $showPairing, showVault: $showVault, showExtensions: $showExtensions, showComputersSheet: $showComputersSheet)
+                SettingsView(path: $path)
             }
-            // A hairline separator, softened, that runs to the card's right edge.
-            .listRowSeparatorTint(Color.white.opacity(0.08))
+            // No separators between rows: each row hides its own.
+            .listRowSeparator(.hidden)
             .codyncSheet(isPresented: $showPairing) { PairingView(inModal: true) }
             .codyncSheet(isPresented: $showVault) {
                 if let store = app.currentStore {
@@ -94,6 +94,14 @@ struct AccountSwitcherView: View {
                 case .ordering:
                     OrderingView()
                         .navigationTitle("列表排序")
+                        .navigationBarTitleDisplayMode(.inline)
+                case .appearance:
+                    AppearancePage()
+                        .navigationTitle(L10n.tr("Theme"))
+                        .navigationBarTitleDisplayMode(.inline)
+                case .language:
+                    LanguagePage()
+                        .navigationTitle(L10n.tr("App language"))
                         .navigationBarTitleDisplayMode(.inline)
                 }
             }
@@ -123,7 +131,7 @@ struct AccountSwitcherView: View {
 }
 
 /// A pushed secondary page from the avatar sheet.
-enum AccountRoute: Hashable { case state, profile, ordering }
+enum AccountRoute: Hashable { case state, profile, ordering, appearance, language }
 
 private struct AccountProfileView: View {
     @Environment(AppStore.self) private var app
@@ -133,6 +141,7 @@ private struct AccountProfileView: View {
     @AppStorage(LocalProfile.bioKey) private var profileBio = ""
     @State private var confirmSignOut = false
     @State private var confirmDelete = false
+    @Binding var path: [AccountRoute]
     @Binding var showPairing: Bool
     @Binding var showVault: Bool
     @Binding var showExtensions: Bool
@@ -144,7 +153,7 @@ private struct AccountProfileView: View {
         Group {
             // One grouped card (Grok style): editable profile on top, then connections and the vault.
             Section {
-                NavigationLink(value: AccountRoute.profile) {
+                Button { path.append(.profile) } label: {
                     HStack(spacing: 12) {
                         profileAvatar
                         VStack(alignment: .leading, spacing: 2) {
@@ -152,80 +161,50 @@ private struct AccountProfileView: View {
                             Text(displayBio).font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
                         }
                         Spacer(minLength: 8)
+                        RemixIcon("arrow-right-s-line", size: 20).foregroundStyle(.tertiary)
                     }
                 }
+                .listRowSeparator(.hidden)
 
                 Button { showPairing = true } label: {
-                    HStack(spacing: 12) {
-                        RemixIcon("qr-scan-line", size: 18).frame(width: 22).foregroundStyle(.primary)
-                        Text("配对")
-                        Spacer(minLength: 8)
-                        Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
-                    }
+                    SettingsRow("qr-scan-line", title: "配对")
                 }
 
                 Button { showComputersSheet = true } label: {
-                    HStack(spacing: 12) {
-                        RemixIcon("computer-line", size: 18).frame(width: 22).foregroundStyle(.primary)
-                        Text("电脑")
-                        Spacer(minLength: 8)
-                        if !accounts.computers.isEmpty {
-                            Text("\(accounts.computers.count) 台已连接").foregroundStyle(.secondary)
-                        }
-                        Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
-                    }
+                    SettingsRow("computer-line", title: "电脑",
+                                value: accounts.computers.isEmpty ? nil : "\(accounts.computers.count) 台已连接")
                 }
 
-                NavigationLink(value: AccountRoute.state) {
-                    HStack(spacing: 12) {
-                        RemixIcon("pulse-line", size: 18).frame(width: 22).foregroundStyle(.primary)
-                        Text("状态")
-                    }
+                Button { path.append(.state) } label: {
+                    SettingsRow("pulse-line", title: "状态")
                 }
 
                 Button { showVault = true } label: {
-                    HStack(spacing: 12) {
-                        RemixIcon("shield-keyhole-line", size: 18).frame(width: 22).foregroundStyle(.primary)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("凭证")
-                            Text("可以使用的登录信息、卡片和联系信息")
-                                .font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
-                        }
-                        Spacer(minLength: 8)
-                        Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
-                    }
+                    SettingsRow("shield-keyhole-line", title: "凭证")
                 }
                 .disabled(app.currentStore == nil)
             }
+            .listRowSeparator(.hidden)
 
             // A separate list that opens the Extensions (marketplace) page.
             Section {
                 Button { showExtensions = true } label: {
-                    HStack(spacing: 12) {
-                        RemixIcon("plug-line", size: 18).frame(width: 22).foregroundStyle(.primary)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("连接应用")
-                            Text("搜索插件")
-                                .font(.subheadline).foregroundStyle(.secondary)
-                        }
-                        Spacer(minLength: 8)
-                        Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
-                    }
+                    SettingsRow("plug-line", title: "连接应用")
                 }
                 .disabled(app.currentStore == nil)
             }
+            .listRowSeparator(.hidden)
 
             Section {
-                NavigationLink(value: AccountRoute.ordering) {
-                    HStack(spacing: 12) {
-                        RemixIcon("arrow-up-down-line", size: 18).frame(width: 22).foregroundStyle(.primary)
-                        Text("列表排序")
-                    }
+                Button { path.append(.ordering) } label: {
+                    SettingsRow("arrow-up-down-line", title: "列表排序")
                 }
             }
+            .listRowSeparator(.hidden)
 
             if !account.isSignedIn && account.isConfigured {
                 Section { SignInButtons() }
+            .listRowSeparator(.hidden)
             }
 
             if account.isSignedIn, account.supportsMultipleAccounts || account.accounts.count > 1 {
@@ -250,6 +229,7 @@ private struct AccountProfileView: View {
                     }
                     if addingAccount { SignInButtons() }
                 }
+            .listRowSeparator(.hidden)
             }
             if account.isSignedIn {
                 Section {
@@ -258,12 +238,14 @@ private struct AccountProfileView: View {
                     Button(L10n.tr("Delete account"), role: .destructive) { confirmDelete = true }
                         .disabled(account.isBusy)
                 }
+            .listRowSeparator(.hidden)
             }
             if let message = account.errorMessage {
                 Section {
                     Label { Text(L10n.tr(message)) } icon: { RemixIcon("alert-fill") }
                         .font(.footnote).foregroundStyle(.red)
                 }
+            .listRowSeparator(.hidden)
             }
         }
         .onAppear { avatarImage = LocalProfile.loadAvatar() }
@@ -390,6 +372,7 @@ struct ProfileEditView: View {
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 8)
             }
+            .listRowSeparator(.hidden)
             Section("显示") {
                 TextField("名称", text: $name)
                 TextField("说明", text: $bio, axis: .vertical)

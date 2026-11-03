@@ -47,7 +47,7 @@ struct CustomIconEditor: View {
             if let icon {
                 Toggle(L10n.tr("Tint icon"), isOn: Binding(get: { icon.tinted }, set: { save(.init(target: target, tinted: $0)) }))
                     .toggleStyle(.switch)
-                    .tint(.gray)
+                    .tint(.black)
             }
             VStack(spacing: 2) {
                 Text(L10n.tr("PNG, JPEG, WebP up to 5 MiB; SVG up to 256 KiB."))

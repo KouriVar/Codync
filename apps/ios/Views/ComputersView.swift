@@ -457,6 +457,7 @@ private struct ComputerNotificationsRow: View {
                     Text(L10n.tr("Push notifications"))
                 }
                 .toggleStyle(.switch)
+                .tint(.black)
             } else {
                 Button {
                     if allowed == false {

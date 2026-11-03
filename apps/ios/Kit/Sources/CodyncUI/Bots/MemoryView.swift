@@ -119,6 +119,7 @@ struct MemoryCard: View {
                 Text(L10n.tr("Use what your bots share"))
             }
                 .toggleStyle(.switch)
+                .tint(.black)
         }
         // The harness's own memory: a switch where Codync can turn it off, "Shared" where every bot on it shares it.
         if !shared, let bot, bot.harnessMemory != nil || bot.harnessMemoryShared == true {
@@ -132,6 +133,7 @@ struct MemoryCard: View {
                 if let on = bot.harnessMemory {
                     Toggle(isOn: Binding(get: { on }, set: { host.setHarnessMemory(bot, $0) })) { EmptyView() }
                         .toggleStyle(.switch)
+                        .tint(.black)
                         .accessibilityLabel(own)
                 } else {
                     Spacer(minLength: 8)

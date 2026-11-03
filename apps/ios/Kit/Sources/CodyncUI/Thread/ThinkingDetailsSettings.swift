@@ -21,5 +21,7 @@ public struct ThinkingDetailsSettings: View {
             }
         }
             .toggleStyle(.switch)
+            .tint(.black)
+            .listRowSeparator(.hidden)
     }
 }

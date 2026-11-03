@@ -545,3 +545,40 @@ public extension View {
         scrollEdgeEffectStyle(.soft, for: [.top, .bottom])
     }
 }
+
+
+/// A settings row: a leading Remix glyph, a title, an optional value and a trailing chevron.
+/// The system separator is hidden; Settings draws no dividers between rows.
+public struct SettingsRow: View {
+    let icon: String
+    let title: String
+    var value: String?
+    var destructive: Bool
+    var showsChevron: Bool
+
+    public init(_ icon: String, title: String, value: String? = nil,
+                destructive: Bool = false, chevron: Bool = true) {
+        self.icon = icon
+        self.title = title
+        self.value = value
+        self.destructive = destructive
+        self.showsChevron = chevron
+    }
+
+    public var body: some View {
+        HStack(spacing: 12) {
+            RemixIcon(icon, size: 18)
+                .frame(width: 22)
+                .foregroundStyle(destructive ? Color.red : Color.primary)
+            Text(title).foregroundStyle(destructive ? Color.red : Color.primary)
+            Spacer(minLength: 8)
+            if let value {
+                Text(value).foregroundStyle(.secondary)
+            }
+            if showsChevron {
+                RemixIcon("arrow-right-s-line", size: 20).foregroundStyle(.tertiary)
+            }
+        }
+        .listRowSeparator(.hidden)
+    }
+}

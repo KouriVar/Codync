@@ -124,6 +124,7 @@ struct RoutinesView: View {
             .buttonStyle(.plain)
             Toggle(isOn: Binding(get: { routine.enabled }, set: { action("setRoutineEnabled", routine, enabled: $0) })) { EmptyView() }
                 .toggleStyle(.switch)
+                .tint(.black)
                 .fixedSize()
                 .accessibilityLabel(routine.name)
                 .disabled(busy || model.isOffline)
