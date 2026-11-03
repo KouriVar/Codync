@@ -404,15 +404,15 @@ struct JumpToLatest: View {
 
     @ViewBuilder private var jumpButton: some View {
         if #available(iOS 26, *) {
-            Button(action: action) { Label { Text(L10n.tr("Jump to latest")) } icon: { RemixIcon("arrow-down-line") } }
-                .labelStyle(.iconOnly)
+            Button(action: action) { RemixIcon("arrow-down-line", size: 18) }
+                .accessibilityLabel(Text(L10n.tr("Jump to latest")))
                 .font(.system(size: 18, weight: .medium))
                 .controlSize(.large)
                 .buttonStyle(.glass)
                 .buttonBorderShape(.circle)
         } else {
-            Button(action: action) { Label { Text(L10n.tr("Jump to latest")) } icon: { RemixIcon("arrow-down-line") } }
-                .labelStyle(.iconOnly)
+            Button(action: action) { RemixIcon("arrow-down-line") }
+                .accessibilityLabel(Text(L10n.tr("Jump to latest")))
                 .buttonStyle(IconButtonStyle())
                 .glass(in: Circle())
         }

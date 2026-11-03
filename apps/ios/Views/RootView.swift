@@ -199,8 +199,7 @@ struct StateTab: View {
         .toolbar {
             if active {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button {  app.showUsage = true  } label: { Label { Text(L10n.tr("Usage limits")) } icon: { RemixIcon("bar-chart-line") } }
-                        .labelStyle(.iconOnly)
+                    Button(action: {  app.showUsage = true  }) { RemixIcon("bar-chart-line") }.accessibilityLabel(Text(L10n.tr("Usage limits")))
                         .buttonBorderShape(.circle)
                 }
             }
@@ -231,8 +230,7 @@ private struct UsageSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button {  dismiss()  } label: { Label { Text(L10n.tr("Close")) } icon: { RemixIcon("close-line") } }
-                        .labelStyle(.iconOnly).buttonBorderShape(.circle)
+                    Button(action: {  dismiss()  }) { RemixIcon("close-line") }.accessibilityLabel(Text(L10n.tr("Close"))).buttonBorderShape(.circle)
                 }
                 if store != nil, accounts.computers.count > 1 {
                     ToolbarItem(placement: .topBarLeading) {

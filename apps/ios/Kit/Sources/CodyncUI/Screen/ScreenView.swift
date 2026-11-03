@@ -230,8 +230,8 @@ private struct Overlay: View {
             }
             Text(L10n.tr(text)).font(.callout).multilineTextAlignment(.center).foregroundStyle(.secondary)
             if let retry {
-                Button(action: retry) { Label { Text(L10n.tr("Try again")) } icon: { RemixIcon("refresh-line") } }
-                    .labelStyle(.iconOnly)
+                Button(action: retry) { RemixIcon("refresh-line") }
+                    .accessibilityLabel(Text(L10n.tr("Try again")))
                     .buttonStyle(.secondary)
             }
         }

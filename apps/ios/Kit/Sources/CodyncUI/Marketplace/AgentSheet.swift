@@ -158,8 +158,7 @@ struct AgentSheet: View {
                 if checking {
                     ProgressView()
                 } else {
-                    Button {  Task { await check() }  } label: { Label { Text(L10n.tr("Check again")) } icon: { RemixIcon("refresh-line") } }
-                        .labelStyle(.iconOnly)
+                    Button(action: {  Task { await check() }  }) { RemixIcon("refresh-line") }.accessibilityLabel(Text(L10n.tr("Check again")))
                         .buttonStyle(.plain)
                         .foregroundStyle(Palette.secondary)
                         .help("Check again")

@@ -165,8 +165,8 @@ struct UserBubble: View {
         case "failed":
             HStack(spacing: 10) {
                 Text(L10n.tr("Failed to send")).foregroundStyle(Palette.danger)
-                Button {  model.retry(entry)  } label: { Label { Text(L10n.tr("Resend")) } icon: { RemixIcon("refresh-line") } }.labelStyle(.iconOnly).help("Resend")
-                Button {  model.discard(entry)  } label: { Label { Text(L10n.tr("Delete")) } icon: { RemixIcon("delete-bin-line") } }.labelStyle(.iconOnly).help("Delete")
+                Button(action: {  model.retry(entry)  }) { RemixIcon("refresh-line") }.accessibilityLabel(Text(L10n.tr("Resend"))).help("Resend")
+                Button(action: {  model.discard(entry)  }) { RemixIcon("delete-bin-line") }.accessibilityLabel(Text(L10n.tr("Delete"))).help("Delete")
             }
             .buttonStyle(.plain)
             .font(.caption2.bold())
@@ -175,8 +175,7 @@ struct UserBubble: View {
         case "waiting":
             HStack(spacing: 10) {
                 Text(L10n.tr("Waiting for the computer to come online")).foregroundStyle(Palette.tertiary)
-                Button {  model.cancelQueued(entry)  } label: { Label { Text(L10n.tr("Cancel")) } icon: { RemixIcon("close-circle-line") } }
-                    .labelStyle(.iconOnly)
+                Button(action: {  model.cancelQueued(entry)  }) { RemixIcon("close-circle-line") }.accessibilityLabel(Text(L10n.tr("Cancel")))
                     .help("Don't send")
                     .accessibilityLabel("Don't send")
             }

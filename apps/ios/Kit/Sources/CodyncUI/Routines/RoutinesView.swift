@@ -82,7 +82,8 @@ struct RoutinesView: View {
         }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Button {  open(nil)  } label: { Label { Text("添加定时任务") } icon: { RemixIcon("add-line") } }
+                Button {  open(nil)  } label: { RemixIcon("add-line") }
+                    .accessibilityLabel(Text("添加定时任务"))
                     .disabled(model.isOffline)
             }
         }

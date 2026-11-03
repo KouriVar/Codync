@@ -85,8 +85,7 @@ struct SettingsView: View {
         Toggle(isOn: Binding(get: { analyticsEnabled }, set: { Analytics.shared.setEnabled($0) })) {
             HStack(spacing: 4) {
                 Text(L10n.tr("Share usage analytics"))
-                Button {  aboutAnalytics = true  } label: { Label { Text(L10n.tr("About usage analytics")) } icon: { RemixIcon("information-line") } }
-                    .labelStyle(.iconOnly).buttonStyle(.borderless)
+                Button(action: {  aboutAnalytics = true  }) { RemixIcon("information-line") }.accessibilityLabel(Text(L10n.tr("About usage analytics"))).buttonStyle(.borderless)
             }
         }
         .toggleStyle(.switch)

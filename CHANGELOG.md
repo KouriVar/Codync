@@ -769,3 +769,12 @@
 - 验证：构建号 96 编译、签名、安装、启动成功；首页/设置截图确认字体渲染正常（无豆腐块）。
 - 限制/待办：图标尺寸与基线尚未逐个微调（RemixIcon 默认 17pt，不随调用点 `.font` 缩放）；少数动态 `systemImage`、ContentUnavailableView 仍为 SF；待用户逐点反馈后定点替换。
 - 关联：C0074。
+
+### C0076 · 2026-11-03 · 修复图标按钮退化成文字（labelStyle(.iconOnly) 对自定义 Label 无效）
+
+- 原因：首轮替换把 `Button(_, systemImage:)` 变成 `Label { Text } icon: {}`，而 `.labelStyle(.iconOnly)` 对自定义 Label 不生效，导致「关闭」「凭证」「分享模板」「添加定时任务」「更多」等图标按钮显示成文字。
+- 变化：此类按钮统一改成 `Button { RemixIcon(...) } + .accessibilityLabel(...)`；共修 18 处（工具栏、设置关闭、重试、删除、跳到最新、重发、Added 状态等）。
+- 文件：MarketplaceView、BotDetailsView、RoutinesView、RootView、AccountSwitcherView、NewBotView、InstalledView、ScreenView、ConversationList、MarketRows、ChatRows 等。
+- 验证：构建号 97/98 编译、签名、安装成功；截图确认设置「关闭」为 ✕ 图标、首页「新建」为 ＋ 图标。
+- 限制/待办：工具栏「新建」仍用系统 SF 加号；「电脑管理」的「关闭」是设计上的文字按钮。
+- 关联：C0075。

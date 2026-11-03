@@ -102,8 +102,7 @@ struct AccountSwitcherView: View {
                     }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button {  dismiss()  } label: { Label { Text(L10n.tr("Close")) } icon: { RemixIcon("close-line") } }
-                        .labelStyle(.iconOnly)
+                    Button(action: {  dismiss()  }) { RemixIcon("close-line") }.accessibilityLabel(Text(L10n.tr("Close")))
                         .buttonBorderShape(.circle)
                         .keyboardShortcut(.cancelAction)
                 }
