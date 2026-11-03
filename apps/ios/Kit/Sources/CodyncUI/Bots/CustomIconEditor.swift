@@ -38,7 +38,7 @@ struct CustomIconEditor: View {
                         TextField("https://…", text: $url).textInputAutocapitalization(.never).autocorrectionDisabled().textFieldStyle(.roundedBorder)
                             .keyboardType(.URL).focused($urlFocused).submitLabel(.go)
                             .accessibilityLabel(L10n.tr("Image URL")).onSubmit { saveURL() }
-                        Button { saveURL() } label: { Image(systemName: "arrow.up") }
+                        Button { saveURL() } label: { RemixIcon("arrow-up-line") }
                             .buttonStyle(.bordered).accessibilityLabel(L10n.tr("Use URL"))
                             .disabled(url.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     }

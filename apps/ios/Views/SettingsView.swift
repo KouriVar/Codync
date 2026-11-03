@@ -45,7 +45,7 @@ struct SettingsView: View {
             if showStartOver {
                 Section {
                     Button(role: .destructive) { confirmStartOver = true } label: {
-                        Label(L10n.tr("Start over"), systemImage: "arrow.counterclockwise")
+                        Label { Text(L10n.tr("Start over")) } icon: { RemixIcon("restart-line") }
                             .foregroundStyle(.red)
                     }
                 }
@@ -85,7 +85,7 @@ struct SettingsView: View {
         Toggle(isOn: Binding(get: { analyticsEnabled }, set: { Analytics.shared.setEnabled($0) })) {
             HStack(spacing: 4) {
                 Text(L10n.tr("Share usage analytics"))
-                Button(L10n.tr("About usage analytics"), systemImage: "info.circle") { aboutAnalytics = true }
+                Button {  aboutAnalytics = true  } label: { Label { Text(L10n.tr("About usage analytics")) } icon: { RemixIcon("information-line") } }
                     .labelStyle(.iconOnly).buttonStyle(.borderless)
             }
         }
@@ -106,7 +106,7 @@ struct SettingsView: View {
                 Spacer()
                 Text(L10n.tr(notificationsAllowed == true ? "On" : notificationsAllowed == false ? "Off in Settings" : "Turn on"))
                     .foregroundStyle(.secondary)
-                Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
+                RemixIcon("arrow-right-s-line").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
             }
         }
         .buttonStyle(.plain)

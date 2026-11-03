@@ -59,7 +59,7 @@ struct ComputerSection: View {
             if store.connection == .online {
                 RouteIcon(route: store.hostRoute, cloud: store.computer.cloud).font(.footnote).foregroundStyle(Palette.tertiary)
             }
-            Image(systemName: "chevron.down")
+            RemixIcon("arrow-down-s-line")
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(Palette.tertiary)
                 .rotationEffect(.degrees(collapsed ? -90 : 0))
@@ -70,7 +70,7 @@ struct ComputerSection: View {
             if let extensions {
                 // After the chevron, as on the desktop; the glyph is light like it, the target finger-sized.
                 Button(action: extensions) {
-                    Image(systemName: "square.grid.2x2")
+                    RemixIcon("grid-line")
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(Palette.secondary)
                         .frame(width: 44, height: 40)

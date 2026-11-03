@@ -152,7 +152,7 @@ struct MemoryCard: View {
         ForEach(layer.entries) { entry in
             VStack(alignment: .leading, spacing: 4) {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
-                    if entry.pinned { Image(systemName: "pin.fill").font(.caption2).foregroundStyle(Palette.secondary) }
+                    if entry.pinned { RemixIcon("pushpin-fill").font(.caption2).foregroundStyle(Palette.secondary) }
                     Text(entry.text).foregroundStyle(entry.archived ? Palette.tertiary : Palette.text).lineLimit(lines(.entry(entry.id)))
                 }
                 Text("\(author(entry)) · \(Date(milliseconds: entry.updatedAt).formatted(.relative(presentation: .named)))\(entry.archived ? " · archived" : "")")
@@ -184,7 +184,7 @@ struct MemoryCard: View {
                 let limit = lines(.dream(run.id))
                 ForEach(run.added, id: \.id) { Text(L10n.tr("+ \($0.text)")).foregroundStyle(Palette.added).lineLimit(limit) }
                 ForEach(run.archived, id: \.id) { Text(L10n.tr("− \($0.text)")).foregroundStyle(Palette.removed).lineLimit(limit) }
-                ForEach(run.files ?? [], id: \.version) { Label("Added to \($0.name)", systemImage: "doc.text").foregroundStyle(Palette.secondary) }
+                ForEach(run.files ?? [], id: \.version) { file in Label { Text("Added to \(file.name)") } icon: { RemixIcon("file-text-line") }.foregroundStyle(Palette.secondary) }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(Rectangle())

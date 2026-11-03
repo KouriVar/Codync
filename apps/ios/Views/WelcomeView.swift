@@ -175,7 +175,7 @@ private struct ChatGlimpse: View {
 struct DemoButton: View {
     var body: some View {
         Link(destination: URL(string: "https://youtube.com/shorts/xtZ5WeyOewU")!) {
-            Label(L10n.tr("Watch the demo"), systemImage: "play.circle.fill")
+            Label { Text(L10n.tr("Watch the demo")) } icon: { RemixIcon("play-circle-fill") }
                 .font(.subheadline.weight(.medium))
                 .foregroundStyle(Palette.text)
         }

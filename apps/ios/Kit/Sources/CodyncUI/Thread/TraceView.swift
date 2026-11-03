@@ -55,7 +55,7 @@ struct TraceRow: View {
         let d = entry.data
         switch entry.kind {
         case "user":
-            Label { Text(d.text ?? "").foregroundStyle(Palette.text) } icon: { Image(systemName: "person.fill").foregroundStyle(Palette.secondary) }
+            Label { Text(d.text ?? "").foregroundStyle(Palette.text) } icon: { RemixIcon("user-fill").foregroundStyle(Palette.secondary) }
                 .font(.subheadline)
         case "agent":
             VStack(alignment: .leading, spacing: 4) {
@@ -74,7 +74,7 @@ struct TraceRow: View {
             ToolRow(data: d)
         case "plan":
             VStack(alignment: .leading, spacing: 6) {
-                Label(L10n.tr("Plan"), systemImage: "checklist").font(.subheadline.bold())
+                Label { Text(L10n.tr("Plan")) } icon: { RemixIcon("list-check") }.font(.subheadline.bold())
                 ForEach(Array((d.entries ?? []).enumerated()), id: \.offset) { _, item in
                     Label {
                         Text(item.content).strikethrough(item.status == "completed").foregroundStyle(Palette.text)
@@ -86,7 +86,7 @@ struct TraceRow: View {
                 }
             }
         case "permission":
-            Label(d.title ?? "Approval", systemImage: "hand.raised")
+            Label { Text(d.title ?? "Approval") } icon: { RemixIcon("hand") }
                 .font(.subheadline)
                 .foregroundStyle(Palette.secondary)
         default:
@@ -145,8 +145,8 @@ struct ToolRow: View {
             Text(data.title ?? "Tool").font(.subheadline).foregroundStyle(Palette.text).lineLimit(2)
             Spacer(minLength: 4)
             switch data.status {
-            case "completed": Image(systemName: "checkmark").foregroundStyle(Palette.accent)
-            case "failed": Image(systemName: "xmark").foregroundStyle(Palette.danger)
+            case "completed": RemixIcon("check-line").foregroundStyle(Palette.accent)
+            case "failed": RemixIcon("close-line").foregroundStyle(Palette.danger)
             default: ThinkingOrb(state: orb, size: 16, color: Palette.secondary)
             }
         }

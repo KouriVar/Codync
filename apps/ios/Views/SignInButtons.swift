@@ -7,7 +7,7 @@ struct SignInButtons: View {
     var body: some View {
         VStack(spacing: 10) {
             ProviderButton(provider: .apple, title: "Continue with Apple") {
-                Image(systemName: "apple.logo").font(.system(size: 20))
+                RemixIcon("apple-fill").font(.system(size: 20))
             }
             .buttonStyle(.primary)
             ProviderButton(provider: .google, title: "Continue with Google") {

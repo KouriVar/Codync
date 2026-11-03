@@ -89,7 +89,7 @@ private struct InstallPage: View {
                 VStack(alignment: .leading, spacing: 24) {
                     // A bot on the computer's screen: that's where it lives.
                     ZStack {
-                        Image(systemName: "laptopcomputer")
+                        RemixIcon("macbook-line")
                             .font(.system(size: 150, weight: .ultraLight))
                             .foregroundStyle(Palette.tertiary)
                         CharacterAvatar(shape: "blob", color: "blue", size: 52, mood: .working)
@@ -264,8 +264,7 @@ private struct ScanPage: View {
                     VStack(alignment: .leading, spacing: 6) {
                         Text(L10n.tr(error)).font(.footnote).foregroundStyle(Palette.danger)
                         // The usual cause: the phone has no road to the computer yet.
-                        if unreachable { Label(L10n.tr("Check that this iPhone and the computer are on the same Wi-Fi or both on Tailscale, or that “Reach from anywhere” is on in Codync on the computer."),
-                              systemImage: "wifi.exclamationmark")
+                        if unreachable { Label { Text(L10n.tr("Check that this iPhone and the computer are on the same Wi-Fi or both on Tailscale, or that “Reach from anywhere” is on in Codync on the computer.")) } icon: { RemixIcon("signal-wifi-error-line") }
                             .font(.footnote)
                             .foregroundStyle(Palette.secondary) }
                     }
@@ -277,15 +276,15 @@ private struct ScanPage: View {
 
                 // How it connects is never a choice here: every paired computer gets every route.
                 VStack(alignment: .leading, spacing: 8) {
-                    Label(L10n.tr(RelayCopy.pairing(pasted: pasted)), systemImage: "lock.fill")
+                    Label { Text(L10n.tr(RelayCopy.pairing(pasted: pasted))) } icon: { RemixIcon("lock-fill") }
                     if tailscaleOn {
-                        Label(L10n.tr("Tailscale is on: Codync connects over it directly."), systemImage: "checkmark.circle.fill")
+                        Label { Text(L10n.tr("Tailscale is on: Codync connects over it directly.")) } icon: { RemixIcon("checkbox-circle-fill") }
                     } else {
                         Button {
                             Analytics.shared.capture(.linkOpened(.tailscale))
                             openURL(Tailscale.downloadURL)
                         } label: {
-                            Label(L10n.tr("Use Tailscale? Direct and faster away from home."), systemImage: "arrow.up.right")
+                            Label { Text(L10n.tr("Use Tailscale? Direct and faster away from home.")) } icon: { RemixIcon("arrow-right-up-line") }
                         }
                         .buttonStyle(PressScale())
                     }
@@ -327,7 +326,7 @@ private struct ScanPage: View {
                 }
             } else {
                 VStack(spacing: 10) {
-                    Image(systemName: "qrcode.viewfinder").font(.system(size: 44, weight: .light))
+                    RemixIcon("qr-scan-line").font(.system(size: 44, weight: .light))
                     Text(L10n.tr("Camera not available. Paste the link below.")).font(.footnote)
                 }
                 .foregroundStyle(Palette.tertiary)

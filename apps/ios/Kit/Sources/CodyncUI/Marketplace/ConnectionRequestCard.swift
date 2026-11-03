@@ -98,7 +98,7 @@ struct ConnectionRequestCard: View {
             }
         } else {
             HStack(spacing: 6) {
-                if request.status == "ready" { Image(systemName: "checkmark").fontWeight(.semibold) }
+                if request.status == "ready" { RemixIcon("check-line").fontWeight(.semibold) }
                 Text(request.status == "ready" ? doneTitle : "Cancelled")
             }
             .font(.subheadline)
@@ -180,7 +180,7 @@ public struct CredentialsView: View {
                 NativeFormSection("Saved connections") {
                     ForEach(model.installedConnectors.filter { !$0.keys.isEmpty }) { connector in
                         Button { withAnimation(Motion.layout) { selected = connector } } label: {
-                            HStack { Text(connector.name); Spacer(); Image(systemName: "chevron.right") }
+                            HStack { Text(connector.name); Spacer(); RemixIcon("arrow-right-s-line") }
                         }
                         .buttonStyle(.plain)
                     }

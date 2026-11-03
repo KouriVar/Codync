@@ -19,7 +19,7 @@ struct RecordingPill: View {
                     .foregroundStyle(Palette.secondary)
             } else {
                 Button { dictation.finish() } label: {
-                    Image(systemName: "stop.fill")
+                    RemixIcon("stop-fill")
                         .font(.system(size: 11, weight: .bold))
                         .foregroundStyle(Palette.text)
                         .frame(width: height - 8, height: height - 8)

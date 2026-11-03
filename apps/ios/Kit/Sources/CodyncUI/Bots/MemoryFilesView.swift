@@ -31,7 +31,7 @@ struct MemoryFilesList: View {
             withAnimation(Motion.layout) { open = MemoryFileTarget(name: file.name, shared: shared) }
         } label: {
             VStack(alignment: .leading, spacing: 4) {
-                Label(file.name, systemImage: "doc.text")
+                Label { Text(file.name) } icon: { RemixIcon("file-text-line") }
                 if let description = file.description {
                     Text(description).font(.footnote).foregroundStyle(Palette.secondary).lineLimit(noteLines)
                 }

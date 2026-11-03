@@ -201,7 +201,7 @@ struct CallView: View {
                 session?.muted.toggle()
             }
             Button(action: close) {
-                Image(systemName: "xmark")
+                RemixIcon("close-line")
                     .font(.system(size: Self.iconSize, weight: .semibold))
                     .foregroundStyle(.white)
                     .frame(width: Self.buttonSize, height: Self.buttonSize)

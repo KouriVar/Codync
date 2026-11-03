@@ -25,14 +25,14 @@ public struct BotRow: View {
             VStack(alignment: .leading, spacing: lineSpacing) {
                 HStack(alignment: .firstTextBaseline) {
                     if bot.pinned {
-                        Image(systemName: "pin.fill").font(.caption2).foregroundStyle(Palette.tertiary)
+                        RemixIcon("pushpin-fill").font(.caption2).foregroundStyle(Palette.tertiary)
                     }
                     Text(bot.name)
                         .font(.system(size: titleSize, weight: .semibold))
                         .foregroundStyle(Color(uiColor: .label))
                         .lineLimit(1)
                     if model.screen?.agentBot == bot.id {
-                        Image(systemName: "cursorarrow.motionlines")
+                        RemixIcon("cursor-line")
                             .font(.caption)
                             .foregroundStyle(Palette.accent)
                             .accessibilityLabel("Using the computer")

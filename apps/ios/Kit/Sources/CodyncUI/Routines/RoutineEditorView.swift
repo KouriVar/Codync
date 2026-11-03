@@ -112,7 +112,7 @@ struct RoutineEditorView: View {
                         ChoicePicker(selection: $schedule.kind, options: options.map { (id: $0.0, label: $0.1) }, fitsAvailableWidth: true)
                     }
                     if loaded { triggerFields }
-                    else { Label(L10n.tr("Loading schedule…"), systemImage: "clock").foregroundStyle(Palette.secondary) }
+                    else { Label { Text(L10n.tr("Loading schedule…")) } icon: { RemixIcon("time-line") }.foregroundStyle(Palette.secondary) }
                 }
                 VStack(alignment: .leading, spacing: 12) {
                     Button {
@@ -120,7 +120,7 @@ struct RoutineEditorView: View {
                     } label: {
                         HStack(spacing: 6) {
                             Text(L10n.tr("Run settings"))
-                            Image(systemName: "chevron.down").font(.caption2.weight(.semibold))
+                            RemixIcon("arrow-down-s-line").font(.caption2.weight(.semibold))
                                 .rotationEffect(.degrees(advanced ? 180 : 0))
                             Spacer()
                             if !advanced { Text(L10n.tr("Timeout \(Routine.timeoutText(timeout))")).foregroundStyle(Palette.tertiary) }
@@ -263,7 +263,7 @@ struct RoutineEditorView: View {
                 HStack(spacing: 6) {
                     Text(schedule.zone).lineLimit(1)
                     Text(TimeZones.offset(schedule.zone)).foregroundStyle(Palette.secondary)
-                    Image(systemName: "chevron.down").font(.caption2.weight(.semibold)).foregroundStyle(Palette.secondary)
+                    RemixIcon("arrow-down-s-line").font(.caption2.weight(.semibold)).foregroundStyle(Palette.secondary)
                 }
                 .foregroundStyle(Palette.text)
                 .outlinedPill()
@@ -307,11 +307,11 @@ struct RoutineEditorView: View {
                 Text(previewError).font(.caption).foregroundStyle(Palette.danger)
             }
             if let error {
-                Label(error, systemImage: "exclamationmark.circle")
+                Label { Text(error) } icon: { RemixIcon("error-warning-line") }
                     .font(.callout).foregroundStyle(Palette.danger).textSelection(.enabled)
             }
             if model.isOffline {
-                Label(L10n.tr("Connect to this computer to save your routine."), systemImage: "wifi.slash")
+                Label { Text(L10n.tr("Connect to this computer to save your routine.")) } icon: { RemixIcon("wifi-off-line") }
                     .font(.caption).foregroundStyle(Palette.danger)
             }
             if loaded, !model.isOffline,

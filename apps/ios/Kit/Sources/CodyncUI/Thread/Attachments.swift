@@ -198,7 +198,7 @@ struct AttachmentImage: View {
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
                     .fill(Palette.bubbleUser)
                     .frame(width: 160, height: 120)
-                    .overlay { Image(systemName: "photo").foregroundStyle(Palette.tertiary) }
+                    .overlay { RemixIcon("image-line").foregroundStyle(Palette.tertiary) }
             }
         }
         // Asked again when the computer comes online: a chat shown from the cache before it connects

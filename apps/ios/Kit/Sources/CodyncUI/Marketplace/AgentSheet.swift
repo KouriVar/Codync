@@ -9,7 +9,7 @@ struct NodeNotice: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
-            Image(systemName: "shippingbox")
+            RemixIcon("inbox-archive-line")
                 .font(.body)
                 .foregroundStyle(Palette.secondary)
                 .padding(.top, 1)
@@ -158,7 +158,7 @@ struct AgentSheet: View {
                 if checking {
                     ProgressView()
                 } else {
-                    Button(L10n.tr("Check again"), systemImage: "arrow.clockwise") { Task { await check() } }
+                    Button {  Task { await check() }  } label: { Label { Text(L10n.tr("Check again")) } icon: { RemixIcon("refresh-line") } }
                         .labelStyle(.iconOnly)
                         .buttonStyle(.plain)
                         .foregroundStyle(Palette.secondary)
@@ -236,7 +236,7 @@ struct AgentSheet: View {
                 if busy {
                     ProgressView()
                 } else {
-                    Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(Palette.tertiary)
+                    RemixIcon("arrow-right-s-line").font(.caption.weight(.semibold)).foregroundStyle(Palette.tertiary)
                 }
             }
             .contentShape(Rectangle())
@@ -381,7 +381,7 @@ private struct SetupStepRow: View {
             ZStack {
                 Circle().fill(done ? Palette.accentFill : Palette.bubbleAgent)
                 if done {
-                    Image(systemName: "checkmark").font(.caption.weight(.bold)).foregroundStyle(Palette.onAccent)
+                    RemixIcon("check-line").font(.caption.weight(.bold)).foregroundStyle(Palette.onAccent)
                 } else {
                     Text(L10n.tr("\(number)")).font(.caption.weight(.semibold)).foregroundStyle(Palette.secondary)
                 }

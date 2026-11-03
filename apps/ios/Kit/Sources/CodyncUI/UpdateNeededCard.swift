@@ -30,7 +30,7 @@ public struct UpdateNeededCard: View {
 
     public var body: some View {
         HStack(alignment: .top, spacing: 12) {
-            Image(systemName: "arrow.down.circle")
+            RemixIcon("arrow-down-circle-line")
                 .font(.title3)
                 .foregroundStyle(Palette.warning)
                 .accessibilityHidden(true)
@@ -185,7 +185,7 @@ public struct UpdateReminderCard: View {
 
     public var body: some View {
         HStack(alignment: .top, spacing: 12) {
-            Image(systemName: "arrow.down.circle.fill")
+            RemixIcon("arrow-down-circle-fill")
                 .font(.title3.weight(.medium))
                 .symbolRenderingMode(.hierarchical)
                 .foregroundStyle(Palette.text)

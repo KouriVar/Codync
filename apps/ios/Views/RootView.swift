@@ -199,7 +199,7 @@ struct StateTab: View {
         .toolbar {
             if active {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button(L10n.tr("Usage limits"), systemImage: "chart.bar") { app.showUsage = true }
+                    Button {  app.showUsage = true  } label: { Label { Text(L10n.tr("Usage limits")) } icon: { RemixIcon("bar-chart-line") } }
                         .labelStyle(.iconOnly)
                         .buttonBorderShape(.circle)
                 }
@@ -231,12 +231,12 @@ private struct UsageSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button(L10n.tr("Close"), systemImage: "xmark") { dismiss() }
+                    Button {  dismiss()  } label: { Label { Text(L10n.tr("Close")) } icon: { RemixIcon("close-line") } }
                         .labelStyle(.iconOnly).buttonBorderShape(.circle)
                 }
                 if store != nil, accounts.computers.count > 1 {
                     ToolbarItem(placement: .topBarLeading) {
-                        Menu(L10n.tr("Computers"), systemImage: "desktopcomputer") {
+                        Menu { 
                             ForEach(accounts.computers) { computer in
                                 Button(computer.name) {
                                     picked = computer.id
@@ -244,7 +244,7 @@ private struct UsageSheet: View {
                                     WidgetCenter.shared.reloadTimelines(ofKind: "CodyncUsage")
                                 }
                             }
-                        }
+                         } label: { Label { Text(L10n.tr("Computers")) } icon: { RemixIcon("computer-line") } }
                     }
                 }
             }

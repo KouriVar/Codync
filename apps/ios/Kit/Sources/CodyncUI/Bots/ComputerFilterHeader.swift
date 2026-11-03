@@ -26,7 +26,7 @@ public struct ComputerFilterHeader: View {
     public var body: some View {
         Menu {
             Toggle(isOn: Binding(get: { selection.shown.count == accounts.computers.count }, set: { _ in update("") })) {
-                Label(L10n.tr("All computers"), systemImage: "desktopcomputer")
+                Label { Text(L10n.tr("All computers")) } icon: { RemixIcon("computer-line") }
             }
             .menuActionDismissBehavior(.disabled)
             ForEach(accounts.computers) { computer in
@@ -36,9 +36,9 @@ public struct ComputerFilterHeader: View {
                 .menuActionDismissBehavior(.disabled)
             }
             Divider()
-            Button(L10n.tr("Reconnect"), systemImage: "arrow.clockwise", action: reconnect)
+            Button(action: reconnect) { Label { Text(L10n.tr("Reconnect")) } icon: { RemixIcon("refresh-line") } }
                 .disabled(stores.isEmpty)
-            Button(L10n.tr("Manage computers"), systemImage: "desktopcomputer", action: manage)
+            Button(action: manage) { Label { Text(L10n.tr("Manage computers")) } icon: { RemixIcon("computer-line") } }
         } label: { label }
         .accessibilityLabel("Computers, \(summary). Filter conversations")
     }
@@ -46,11 +46,11 @@ public struct ComputerFilterHeader: View {
     private var label: some View {
         HStack(spacing: 4) {
             if compact {
-                Image(systemName: "desktopcomputer")
+                RemixIcon("computer-line")
             } else {
                 Text(Self.phrase(summary)).lineLimit(1).contentTransition(.opacity)
             }
-            Image(systemName: "chevron.down").font(.system(size: 8, weight: .semibold))
+            RemixIcon("arrow-down-s-line").font(.system(size: 8, weight: .semibold))
         }
         .font(.system(size: 12, weight: .medium))
         .foregroundStyle(Palette.secondary)

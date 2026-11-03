@@ -21,7 +21,7 @@ struct BotProfileEditView: View {
                     CharacterAvatar(shape: session.draft.avatarShape, color: session.draft.avatarColor, size: 88,
                                     customIcon: model.icons["bot:\(botId)"])
                         .overlay(alignment: .bottomTrailing) {
-                            Image(systemName: "pencil")
+                            RemixIcon("pencil-line")
                                 .font(.system(size: 18, weight: .medium))
                                 .frame(width: 38, height: 38)
                                 .background(.regularMaterial, in: Circle())

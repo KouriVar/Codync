@@ -1,4 +1,5 @@
 import CodyncKit
+import CodyncUI
 import SwiftUI
 
 /// An icon and a short name, with a chevron when it leads somewhere.
@@ -34,7 +35,7 @@ struct RowLabel: View {
             Text(L10n.tr(title))
             Spacer(minLength: 8)
             if chevron {
-                Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(Palette.tertiary)
+                RemixIcon("arrow-right-s-line").font(.caption.weight(.semibold)).foregroundStyle(Palette.tertiary)
             }
         }
         .foregroundStyle(tint)

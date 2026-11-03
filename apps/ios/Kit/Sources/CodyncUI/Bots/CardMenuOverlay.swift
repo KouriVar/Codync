@@ -97,7 +97,7 @@ public struct CardMenuOverlay: View {
                 Text(item.shownTitle())
                 Spacer(minLength: 0)
                 if !item.submenu.isEmpty {
-                    Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
+                    RemixIcon("arrow-right-s-line").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
                 }
             }
             .foregroundStyle(item.destructive ? Color.red : Color.primary)
@@ -115,7 +115,7 @@ public struct CardMenuOverlay: View {
             withAnimation(.spring(response: 0.28, dampingFraction: 0.9)) { _ = stack.popLast() }
         } label: {
             HStack(spacing: 14) {
-                Image(systemName: "chevron.left").frame(width: 22)
+                RemixIcon("arrow-left-s-line").frame(width: 22)
                 Text(L10n.tr("Back"))
                 Spacer(minLength: 0)
             }

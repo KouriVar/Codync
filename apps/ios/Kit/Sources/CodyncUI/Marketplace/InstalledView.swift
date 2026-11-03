@@ -130,7 +130,7 @@ private struct InstalledRow<Icon: View, Accessory: View>: View {
             }
             Spacer(minLength: 12)
             accessory
-            Button("Remove \(title)", systemImage: "trash", role: .destructive, action: remove)
+            Button(role: .destructive, action: remove) { Label { Text("Remove \(title)") } icon: { RemixIcon("delete-bin-line") } }
                 .labelStyle(.iconOnly)
                 .buttonStyle(.plain)
                 .foregroundStyle(Palette.secondary)

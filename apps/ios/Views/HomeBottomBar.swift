@@ -32,7 +32,7 @@ struct HomeBottomBar: View {
                     .accessibilityLabel("搜索聊天")
 
                 Button(action: openCamera) {
-                    Image(systemName: "camera.fill")
+                    RemixIcon("camera-fill")
                         .font(.system(size: iconSize, weight: .semibold))
                         .foregroundStyle(Palette.text)
                         .frame(width: 48, height: 48)

@@ -73,7 +73,7 @@ struct MarketRow<Icon: View>: View {
             if busy {
                 ThinkingOrb(size: 18, color: Palette.secondary).frame(width: 60)
             } else if added {
-                Label(L10n.tr("Added"), systemImage: "checkmark")
+                Label { Text(L10n.tr("Added")) } icon: { RemixIcon("check-line") }
                     .labelStyle(.iconOnly)
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(Palette.secondary)
@@ -197,7 +197,7 @@ struct SkillGlyph: View {
     var body: some View {
         RoundedRectangle(cornerRadius: 12, style: .continuous)
             .fill(Palette.bubbleAgent)
-            .overlay(Image(systemName: "book.pages").foregroundStyle(Palette.text))
+            .overlay(RemixIcon("book-open-line").foregroundStyle(Palette.text))
     }
 }
 

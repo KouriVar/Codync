@@ -261,7 +261,7 @@ struct Composer: View {
     }
 
     private var addLabel: some View {
-        Image(systemName: "plus")
+        RemixIcon("add-line")
             .font(.system(size: 18, weight: .medium))
             .foregroundStyle(Palette.text)
             .frame(width: buttonHitSize, height: buttonHitSize)

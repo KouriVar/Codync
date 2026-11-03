@@ -29,7 +29,7 @@ struct NativeExtensionSheet<Content: View>: View {
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) {
-                        Button(L10n.tr("Close"), systemImage: "xmark") { dismiss() }
+                        Button {  dismiss()  } label: { Label { Text(L10n.tr("Close")) } icon: { RemixIcon("close-line") } }
                             .labelStyle(.iconOnly).buttonBorderShape(.circle)
                             .disabled(busy)
                     }

@@ -161,7 +161,7 @@ struct BotListView: View {
                 // A computer waiting for an update has its card instead; its bots aren't known yet.
                 if isSearching && roster.isEmpty {
                     VStack(spacing: 12) {
-                        Image(systemName: "magnifyingglass").font(.title)
+                        RemixIcon("search-line").font(.title)
                         Text("没有找到匹配的聊天").font(.body)
                     }
                     .foregroundStyle(Palette.secondary)
@@ -235,11 +235,11 @@ struct BotListView: View {
             ToolbarItem(placement: .topBarTrailing) {
                 // A native menu: the bar hosts toolbar buttons outside SwiftUI's layout,
                 // so an anchored Codync menu can't find where the button is.
-                Menu(L10n.tr("New"), systemImage: "plus") {
-                    Button(L10n.tr("New bot"), systemImage: "plus", action: newBot)
-                    Button(L10n.tr("New group chat"), systemImage: "person.2", action: newGroup)
+                Menu { 
+                    Button(action: newBot) { Label { Text(L10n.tr("New bot")) } icon: { RemixIcon("add-line") } }
+                    Button(action: newGroup) { Label { Text(L10n.tr("New group chat")) } icon: { RemixIcon("team-line") } }
                         .disabled(onlineStores.isEmpty)
-                }
+                 } label: { Label(L10n.tr("New"), systemImage: "plus") }
                 // A computer that needs an update can't take a new bot.
                 .disabled(availableStores.isEmpty)
             }

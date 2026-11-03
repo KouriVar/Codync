@@ -207,7 +207,7 @@ struct BotNativeSettingsView: View {
                     HStack {
                         Text(name)
                         if title == "技能", let item = model.installedSkills.first(where: { $0.id == id }) {
-                            Button { skill = SkillRef(item) } label: { Image(systemName: "info.circle") }
+                            Button { skill = SkillRef(item) } label: { RemixIcon("information-line") }
                                 .buttonStyle(.borderless)
                                 .accessibilityLabel("关于 \(name)")
                         }

@@ -62,7 +62,7 @@ struct ComposioConnectSheet: View {
             }
             if connected {
                 NativeFormSection(footer: "Turn \(app.name) on for a bot in the bot's settings, under Connectors.") {
-                    Label(L10n.tr("Connected"), systemImage: "checkmark.circle.fill").foregroundStyle(Palette.added)
+                    Label { Text(L10n.tr("Connected")) } icon: { RemixIcon("checkbox-circle-fill") }.foregroundStyle(Palette.added)
                 }
             } else if let plan, plan.status == "needsFields" {
                 NativeFormSection(footer: "Sent to Composio, which keeps it for \(app.name).") {
@@ -85,7 +85,7 @@ struct ComposioConnectSheet: View {
             } else if let plan, plan.status == "redirect" {
                 NativeFormSection(footer: "Sign in on the page that opened. This updates by itself when you're done.") {
                     if let url = plan.url.flatMap(URL.init(string:)) {
-                        Button(L10n.tr("Open the sign-in page"), systemImage: "safari") { openURL(url) }
+                        Button {  openURL(url)  } label: { Label { Text(L10n.tr("Open the sign-in page")) } icon: { RemixIcon("global-line") } }
                             .buttonStyle(.bordered)
                     }
                     HStack(spacing: 8) {

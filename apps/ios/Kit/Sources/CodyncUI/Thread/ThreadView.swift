@@ -383,14 +383,14 @@ extension ThreadView {
         let operating = model.screen?.agentBot == botId
         return Menu {
             if model.screen != nil {
-                Button(operating ? "查看正在操作的电脑屏幕" : "查看电脑屏幕", systemImage: "desktopcomputer") {
+                Button { 
                     model.screenRequest = operating ? ScreenRequest(watching: botId) : ScreenRequest()
-                }
+                 } label: { Label { Text(operating ? "查看正在操作的电脑屏幕" : "查看电脑屏幕") } icon: { RemixIcon("computer-line") } }
             }
             Label(L10n.tr(model.connectionLabel), systemImage: connectionSymbol)
             Text(model.hostName)
         } label: {
-            Image(systemName: "ellipsis")
+            RemixIcon("more-line")
                 .font(.system(size: 18, weight: .semibold))
         }
         .menuIndicator(.hidden)

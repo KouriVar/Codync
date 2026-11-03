@@ -759,3 +759,13 @@
 - 文件：`Bots/BotMenuPreview.swift`。
 - 验证：构建号 93 编译、签名、装机成功；深色观感待确认。
 - 关联：C0072。
+
+### C0075 · 2026-11-03 · 接入 Remix Icon 并全量首轮替换 SF Symbols
+
+- 原因：用户计划用 Remix Icon 替换 Apple 原生图标。
+- 变化：引入 Remix Icon 4.9.1（Apache-2.0）：`apps/ios/Resources/Fonts/`（remixicon.ttf / codepoints.json / LICENSE），Info.plist 加 `UIAppFonts`；新增 `RemixIcon` 视图与 `RemixSymbolMap`（SF 名 → Remix 名，88 条）。自动替换 167 处：`Image(systemName:)` 108、`Label(_, systemImage:)` 31、`Button/Menu(_, systemImage:)` 23、`IconButton` 与 `MenuItem` 改为经 `RemixSymbolMap` 渲染（动态名回退 SF）。
+- 修复：`NavigationLink` 行重复箭头；ForEach `$0` 作用域；`AgentIcon`/WidgetSetupDemo 需要真 `Image` 处保留 SF；工具栏 `Menu` 自定义 label 会丢图标 → 保留系统加号。
+- 文件：`Resources/Fonts/*`、`Resources/Info.plist`、`CodyncUI/RemixIcon.swift`、`CodyncUI/Chrome.swift`、`CodyncUI/MenuItem.swift` 及 60+ 视图文件。
+- 验证：构建号 96 编译、签名、安装、启动成功；首页/设置截图确认字体渲染正常（无豆腐块）。
+- 限制/待办：图标尺寸与基线尚未逐个微调（RemixIcon 默认 17pt，不随调用点 `.font` 缩放）；少数动态 `systemImage`、ContentUnavailableView 仍为 SF；待用户逐点反馈后定点替换。
+- 关联：C0074。

@@ -22,7 +22,7 @@ struct FolderPicker: View {
                 VStack(alignment: .leading, spacing: 16) {
                     Text("Your bot will work in this folder.").font(.subheadline).foregroundStyle(Palette.secondary)
                     HStack(spacing: 10) {
-                        Image(systemName: "desktopcomputer")
+                        RemixIcon("computer-line")
                         Text(model.hello?.name ?? "Computer").lineLimit(1)
                         Spacer()
                         Text(model.connection == .online ? "Connected" : "Disconnected")
@@ -34,7 +34,7 @@ struct FolderPicker: View {
                         HStack {
                             TextField("Paste an absolute path", text: $pathInput)
                                 .textFieldStyle(.plain).plainTextInput().onSubmit { openPath() }
-                            Button(action: openPath) { Image(systemName: "arrow.right") }
+                            Button(action: openPath) { RemixIcon("arrow-right-line") }
                                 .disabled(pathInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                                 .accessibilityLabel("Go to folder")
                         }.padding(12).background(Palette.surface, in: RoundedRectangle(cornerRadius: 10))
@@ -71,10 +71,10 @@ struct FolderPicker: View {
     private var browseButton: some View {
         Button { open(start) } label: {
             HStack {
-                Image(systemName: "folder")
+                RemixIcon("folder-line")
                 Text("Browse other folders")
                 Spacer()
-                Image(systemName: "chevron.right").font(.caption)
+                RemixIcon("arrow-right-s-line").font(.caption)
             }.padding(.vertical, 12)
         }.buttonStyle(PressScale())
     }
@@ -83,7 +83,7 @@ struct FolderPicker: View {
         HStack(spacing: 8) {
             Button {
                 animate { state.mode = .recent; state.selected = ""; state.filter = ""; path = nil; pathOpen = false; request += 1 }
-            } label: { Image(systemName: "chevron.left").frame(width: 32, height: 36) }
+            } label: { RemixIcon("arrow-left-s-line").frame(width: 32, height: 36) }
                 .accessibilityLabel("Recent workspaces")
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
@@ -96,10 +96,10 @@ struct FolderPicker: View {
                 }
             }
             Button { if let parent = state.listing?.parent { open(parent) } } label: {
-                Image(systemName: "arrow.up").frame(width: 32, height: 36)
+                RemixIcon("arrow-up-line").frame(width: 32, height: 36)
             }.disabled(state.listing?.parent == nil || state.busy).accessibilityLabel("Parent folder")
             Button { animate { pathInput = state.listing?.path ?? ""; pathOpen.toggle() } } label: {
-                Image(systemName: "pencil").frame(width: 32, height: 36)
+                RemixIcon("pencil-line").frame(width: 32, height: 36)
             }.accessibilityLabel("Enter folder path")
         }.buttonStyle(PressScale())
     }
@@ -110,14 +110,14 @@ struct FolderPicker: View {
             ForEach(recent) { item in
                 Button { animate { state.selected = item.path } } label: {
                     HStack(spacing: 12) {
-                        Image(systemName: "folder").foregroundStyle(Palette.secondary)
+                        RemixIcon("folder-line").foregroundStyle(Palette.secondary)
                         VStack(alignment: .leading, spacing: 4) {
                             Text(item.path.split(whereSeparator: { $0 == "/" || $0 == "\\" }).last.map(String.init) ?? item.path)
                                 .lineLimit(1)
                             Text(item.path).font(.caption).foregroundStyle(Palette.secondary).lineLimit(1).truncationMode(.middle)
                         }
                         Spacer(minLength: 4)
-                        if state.selected == item.path { Image(systemName: "checkmark").font(.caption) }
+                        if state.selected == item.path { RemixIcon("check-line").font(.caption) }
                     }.padding(12).frame(maxWidth: .infinity, alignment: .leading)
                         .background(state.selected == item.path ? Palette.surface : .clear, in: RoundedRectangle(cornerRadius: 12))
                 }.buttonStyle(PressScale()).accessibilityAddTraits(state.selected == item.path ? .isSelected : [])
@@ -135,7 +135,7 @@ struct FolderPicker: View {
                         Image(systemName: dir.isGit ? "arrow.triangle.branch" : "folder").foregroundStyle(Palette.secondary)
                         Text(dir.name).lineLimit(1)
                         Spacer()
-                        Image(systemName: "chevron.right").font(.caption2).foregroundStyle(Palette.tertiary)
+                        RemixIcon("arrow-right-s-line").font(.caption2).foregroundStyle(Palette.tertiary)
                     }.padding(.vertical, 13).contentShape(Rectangle())
                 }.buttonStyle(PressScale())
             }

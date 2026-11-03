@@ -198,7 +198,7 @@ private struct DemoPhone: View {
             HStack {
                 Text(L10n.tr("9:41")).font(.system(size: 9, weight: .semibold))
                 Spacer()
-                Image(systemName: "battery.75percent").font(.system(size: 9))
+                RemixIcon("battery-low-fill").font(.system(size: 9))
             }
             .foregroundStyle(.white)
             .padding(.horizontal, 20)
@@ -326,7 +326,7 @@ private struct DemoPhone: View {
         VStack(spacing: 0) {
             Capsule().fill(.white.opacity(0.3)).frame(width: 28, height: 3).padding(.vertical, 6)
             HStack(spacing: 5) {
-                Image(systemName: "magnifyingglass")
+                RemixIcon("search-line")
                 Text(L10n.tr("Search Widgets"))
                 Spacer()
             }
@@ -358,7 +358,7 @@ private struct DemoPhone: View {
             }
             Text(L10n.tr(title)).font(.system(size: 10, weight: .medium)).foregroundStyle(.white)
             Spacer()
-            Image(systemName: "chevron.right").font(.system(size: 7, weight: .semibold)).foregroundStyle(.white.opacity(0.35))
+            RemixIcon("arrow-right-s-line").font(.system(size: 7, weight: .semibold)).foregroundStyle(.white.opacity(0.35))
         }
         .padding(.horizontal, 12)
         .frame(height: 28)
@@ -387,7 +387,7 @@ private struct DemoPhone: View {
                 ForEach(0..<3) { i in Circle().fill(.white.opacity(i == 1 ? 0.9 : 0.3)).frame(width: 4, height: 4) }
             }
             Spacer()
-            Label(L10n.tr("Add Widget"), systemImage: "plus")
+            Label { Text(L10n.tr("Add Widget")) } icon: { RemixIcon("add-line") }
                 .font(.system(size: 10, weight: .semibold))
                 .foregroundStyle(.black)
                 .frame(width: 140, height: 28)

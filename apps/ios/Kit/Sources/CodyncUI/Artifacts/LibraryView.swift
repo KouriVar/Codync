@@ -112,7 +112,7 @@ struct LibraryView: View {
 
     private var empty: some View {
         VStack(spacing: 8) {
-            Image(systemName: "books.vertical").font(.system(size: 34)).foregroundStyle(Palette.tertiary)
+            RemixIcon("book-2-line").font(.system(size: 34)).foregroundStyle(Palette.tertiary)
             Text(L10n.tr("Library is empty")).font(.headline).foregroundStyle(Palette.text)
             Text(L10n.tr("Artifacts {name} makes and files shared in this chat show here.")
                 .replacingOccurrences(of: "{name}", with: model.bots[botId]?.name ?? ""))

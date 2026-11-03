@@ -10,7 +10,7 @@ struct RoutineNoticeRow: View {
     var body: some View {
         HStack(spacing: 8) {
             Button(action: open) {
-                Label(entry.data.text ?? "Routine", systemImage: "clock.arrow.circlepath")
+                Label { Text(entry.data.text ?? "Routine") } icon: { RemixIcon("history-line") }
                     .font(.footnote).foregroundStyle(Palette.secondary).padding(.vertical, 10)
             }
             .buttonStyle(.plain)

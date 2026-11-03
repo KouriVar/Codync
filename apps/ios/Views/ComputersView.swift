@@ -55,7 +55,7 @@ struct ComputersView: View {
                             Spacer()
                             Button {
                                 withAnimation(Motion.layout) { store.setHidden(bot, false) }
-                            } label: { Image(systemName: "eye") }
+                            } label: { RemixIcon("eye-line") }
                             .buttonStyle(.borderless)
                         }
                     }
@@ -68,7 +68,7 @@ struct ComputersView: View {
                     HStack {
                         Text(L10n.tr("Pair a computer"))
                         Spacer(minLength: 8)
-                        Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
+                        RemixIcon("arrow-right-s-line").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
                     }
                 }
                 .buttonStyle(.plain)
@@ -184,7 +184,7 @@ private struct ComputerRows: View {
             HStack {
                 Text(title)
                 Spacer(minLength: 8)
-                Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
+                RemixIcon("arrow-right-s-line").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
             }
         }
         .buttonStyle(.plain)
@@ -222,7 +222,7 @@ private struct ComputerRows: View {
                 Text(store.hostName).font(.body.weight(.semibold)).foregroundStyle(Palette.text)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 if inAccount != nil {
-                    Image(systemName: "person.crop.circle.badge.checkmark")
+                    RemixIcon("user-follow-line")
                         .foregroundStyle(Palette.tertiary)
                         .accessibilityLabel(L10n.tr("In your account"))
                 }
@@ -280,7 +280,7 @@ private struct ComputerRows: View {
                 Spacer(minLength: 8)
                 Text(L10n.tr(RelayCopy.routeShortTitle(preference, cloud: store.computer.cloud)))
                     .foregroundStyle(Palette.secondary).lineLimit(1)
-                Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
+                RemixIcon("arrow-right-s-line").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
             }
         }
         .buttonStyle(.plain)
@@ -418,7 +418,7 @@ private struct SwatchPanel: View {
                         .frame(width: 32, height: 32)
                         .overlay {
                             if selected == swatch.id {
-                                Image(systemName: "checkmark").font(.caption.weight(.bold)).foregroundStyle(.white)
+                                RemixIcon("check-line").font(.caption.weight(.bold)).foregroundStyle(.white)
                             }
                         }
                 }
@@ -516,7 +516,7 @@ private struct ConnectionRouteSheet: View {
                                 Text(L10n.tr(RelayCopy.routeTitle(route, cloud: store.computer.cloud)))
                                 Spacer()
                                 if route == preference {
-                                    Image(systemName: "checkmark").foregroundStyle(Palette.accent)
+                                    RemixIcon("check-line").foregroundStyle(Palette.accent)
                                 }
                             }
                         }

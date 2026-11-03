@@ -12,7 +12,7 @@ struct HandoffCardRow: View {
     var body: some View {
         if card.isDraft {
             VStack(alignment: .leading, spacing: 10) {
-                Label(entry.data.text ?? "", systemImage: "arrow.triangle.branch")
+                Label { Text(entry.data.text ?? "") } icon: { RemixIcon("git-branch-line") }
                     .font(.footnote)
                     .foregroundStyle(Palette.secondary)
                 Disclosure(isExpanded: $expanded) {
@@ -40,7 +40,7 @@ struct HandoffCardRow: View {
             Disclosure(isExpanded: $expanded) {
                 carried
             } label: {
-                Label(entry.data.text ?? "", systemImage: "arrow.triangle.branch")
+                Label { Text(entry.data.text ?? "") } icon: { RemixIcon("git-branch-line") }
                     .font(.footnote)
                     .foregroundStyle(Palette.secondary)
             }
@@ -83,7 +83,7 @@ struct AgentSwitchRow: View {
     }
 
     private var line: some View {
-        Label(entry.data.text ?? "", systemImage: "arrow.turn.down.right")
+        Label { Text(entry.data.text ?? "") } icon: { RemixIcon("corner-down-right-line") }
             .font(.footnote)
             .foregroundStyle(Palette.secondary)
     }

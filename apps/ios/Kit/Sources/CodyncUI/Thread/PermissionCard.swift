@@ -36,7 +36,7 @@ struct PermissionCard: View {
                 .font(.subheadline.monospaced())
                 .foregroundStyle(Palette.secondary)
                 .lineLimit(expanded ? nil : 3)
-            Label("Runs on \(hostName)\(d.cwd.map { " · \(($0 as NSString).lastPathComponent)" } ?? "")", systemImage: "desktopcomputer")
+            Label { Text("Runs on \(hostName)\(d.cwd.map { " · \(($0 as NSString).lastPathComponent)" } ?? "")") } icon: { RemixIcon("computer-line") }
                 .font(.caption)
                 .foregroundStyle(Palette.tertiary)
 

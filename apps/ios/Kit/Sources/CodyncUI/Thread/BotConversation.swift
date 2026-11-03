@@ -19,12 +19,12 @@ struct BotMessageRow: View {
         Button(action: open) {
             HStack(spacing: 6) {
                 if failed {
-                    Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(Palette.danger)
+                    RemixIcon("alert-fill").foregroundStyle(Palette.danger)
                 }
                 Text(group.title).foregroundStyle(failed ? Palette.danger : Palette.secondary)
                 if let peer { CharacterAvatar(bot: peer, size: 18, animated: false) }
                 Text(name).fontWeight(.semibold).foregroundStyle(failed ? Palette.danger : Palette.text)
-                Image(systemName: "chevron.right").font(.caption2).foregroundStyle(Palette.tertiary)
+                RemixIcon("arrow-right-s-line").font(.caption2).foregroundStyle(Palette.tertiary)
             }
             .font(.footnote)
             .padding(.vertical, 10)
@@ -50,7 +50,7 @@ struct BotPairTitle: View {
     var body: some View {
         HStack(spacing: 8) {
             side(botId)
-            Image(systemName: "arrow.left.arrow.right").font(.footnote).foregroundStyle(Palette.tertiary)
+            RemixIcon("arrow-left-right-line").font(.footnote).foregroundStyle(Palette.tertiary)
             side(peerId)
         }
         .accessibilityElement(children: .ignore)

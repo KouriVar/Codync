@@ -111,7 +111,7 @@ public struct ScreenView: View {
         HStack(spacing: 8) {
             OverlayButton("Close", "xmark") { if let close { close() } else { dismiss() } }
             if let agent, !interactive {
-                Label("\(agent.name) is using the computer", systemImage: "cursorarrow.motionlines")
+                Label { Text("\(agent.name) is using the computer") } icon: { RemixIcon("cursor-line") }
                     .font(.caption.weight(.medium))
                     .lineLimit(1)
                     .padding(.horizontal, 10)
@@ -230,7 +230,7 @@ private struct Overlay: View {
             }
             Text(L10n.tr(text)).font(.callout).multilineTextAlignment(.center).foregroundStyle(.secondary)
             if let retry {
-                Button(L10n.tr("Try again"), systemImage: "arrow.clockwise", action: retry)
+                Button(action: retry) { Label { Text(L10n.tr("Try again")) } icon: { RemixIcon("refresh-line") } }
                     .labelStyle(.iconOnly)
                     .buttonStyle(.secondary)
             }

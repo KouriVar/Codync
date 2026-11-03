@@ -89,10 +89,10 @@ struct AgentModelPicker: View {
             if stage != .closed {
                 HStack {
                     if onAgentChange != nil {
-                        Button { open(stage == .agents ? .settings : .agents) } label: { Text(agentName).lineLimit(1); Image(systemName: "chevron.down") }
+                        Button { open(stage == .agents ? .settings : .agents) } label: { Text(agentName).lineLimit(1); RemixIcon("arrow-down-s-line") }
                     }
                     Spacer(minLength: 0)
-                    Button { open(stage == .models ? .settings : .models) } label: { Text(modelName).lineLimit(1); Image(systemName: "chevron.down") }
+                    Button { open(stage == .models ? .settings : .models) } label: { Text(modelName).lineLimit(1); RemixIcon("arrow-down-s-line") }
                 }
                 .font(.subheadline)
                 .buttonStyle(.plain)
@@ -168,7 +168,7 @@ struct AgentModelPicker: View {
                                 Text(L10n.tr(choice.1)).lineLimit(2)
                                 Spacer(minLength: 0)
                                 if choice.0 == (stage == .agents ? backend : value.wrappedValue) {
-                                    Image(systemName: "checkmark").font(.caption)
+                                    RemixIcon("check-line").font(.caption)
                                 }
                             }
                             .foregroundStyle(Palette.text)

@@ -186,7 +186,7 @@ private struct ProviderVoiceSettings: View {
     /// The key is on the computer: say so, and offer test / replace / remove.
     private var savedKeyRow: some View {
         HStack(spacing: 10) {
-            Image(systemName: "key.fill")
+            RemixIcon("key-fill")
                 .foregroundStyle(Palette.secondary)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 1) {
@@ -212,7 +212,7 @@ private struct ProviderVoiceSettings: View {
     /// On the phone: where to add the key.
     private var missingKeyRow: some View {
         HStack(alignment: .top, spacing: 10) {
-            Image(systemName: "key")
+            RemixIcon("key-line")
                 .foregroundStyle(Palette.tertiary)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {

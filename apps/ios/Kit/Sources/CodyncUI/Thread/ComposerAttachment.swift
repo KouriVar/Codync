@@ -25,7 +25,7 @@ struct ComposerAttachment: View {
                             .resizable()
                             .scaledToFit()
                     } else {
-                        Image(systemName: "photo").foregroundStyle(Palette.secondary)
+                        RemixIcon("image-line").foregroundStyle(Palette.secondary)
                     }
                 }
                 .frame(width: size, height: size)
@@ -69,7 +69,7 @@ struct ComposerAttachment: View {
 
     private var removeButton: some View {
         Button(action: remove) {
-            Image(systemName: "xmark")
+            RemixIcon("close-line")
                 .font(.system(size: 11, weight: .bold))
                 .frame(width: 28, height: 28)
                 .contentShape(Circle())

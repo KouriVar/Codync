@@ -18,7 +18,7 @@ struct UsageView: View {
                 }
                 if model.usage.providers.isEmpty {
                     VStack(spacing: 8) {
-                        Image(systemName: "chart.bar").font(.system(size: 40)).foregroundStyle(Palette.tertiary)
+                        RemixIcon("bar-chart-line").font(.system(size: 40)).foregroundStyle(Palette.tertiary)
                         Text(L10n.tr("No usage yet")).font(.title3.weight(.semibold)).foregroundStyle(Palette.text)
                         Text(L10n.tr("Your computer reads plan limits from the agents installed on it."))
                             .font(.subheadline).foregroundStyle(Palette.secondary)

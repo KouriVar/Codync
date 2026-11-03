@@ -51,7 +51,7 @@ struct AccessRequestView: View {
                     }
                 }.buttonStyle(.secondary)
             } else if approved {
-                Label("\(computer.name) approved this iPhone", systemImage: "checkmark.circle.fill")
+                Label { Text("\(computer.name) approved this iPhone") } icon: { RemixIcon("checkbox-circle-fill") }
                     .font(.headline)
                     .foregroundStyle(Palette.added)
             } else if let ticket {

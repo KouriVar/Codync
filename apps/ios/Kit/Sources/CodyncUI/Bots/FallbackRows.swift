@@ -108,7 +108,7 @@ struct FallbackList: View {
                     .background(Palette.bubbleUser, in: Capsule())
             }
             DropdownMenu { menu(at: i) } label: {
-                Image(systemName: "ellipsis")
+                RemixIcon("more-line")
                     .font(.system(size: 15, weight: .medium))
                     .foregroundStyle(Palette.secondary)
                     .frame(width: 36, height: 36)

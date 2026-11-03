@@ -82,7 +82,7 @@ struct RoutinesView: View {
         }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Button("添加定时任务", systemImage: "plus") { open(nil) }
+                Button {  open(nil)  } label: { Label { Text("添加定时任务") } icon: { RemixIcon("add-line") } }
                     .disabled(model.isOffline)
             }
         }

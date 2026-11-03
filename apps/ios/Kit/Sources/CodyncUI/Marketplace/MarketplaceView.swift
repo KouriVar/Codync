@@ -53,12 +53,12 @@ public struct MarketplaceView: View {
                 .toolbar {
                     ToolbarItem(placement: .topBarLeading) {
                         Button { showCredentials = true } label: {
-                            Label(L10n.tr("Credentials"), systemImage: "lock.shield")
+                            Label { Text(L10n.tr("Credentials")) } icon: { RemixIcon("shield-check-line") }
                         }
                         .buttonBorderShape(.capsule)
                     }
                     ToolbarItem(placement: .topBarTrailing) {
-                        Button(L10n.tr("Close"), systemImage: "xmark") { dismiss() }
+                        Button {  dismiss()  } label: { Label { Text(L10n.tr("Close")) } icon: { RemixIcon("close-line") } }
                             .labelStyle(.iconOnly)
                             .buttonBorderShape(.circle)
                             .keyboardShortcut(.cancelAction)

@@ -11,10 +11,10 @@ struct CallLineRow: View {
         let length = entry.data.callSeconds.map { String(format: " · %02d:%02d", $0 / 60, $0 % 60) } ?? ""
         Button(action: open) {
             HStack(spacing: 6) {
-                Image(systemName: "waveform").foregroundStyle(Palette.secondary)
+                RemixIcon("voiceprint-line").foregroundStyle(Palette.secondary)
                 Text(title).foregroundStyle(Palette.text)
                 Text(length).monospacedDigit().foregroundStyle(Palette.secondary)
-                Image(systemName: "chevron.right").font(.caption2).foregroundStyle(Palette.tertiary)
+                RemixIcon("arrow-right-s-line").font(.caption2).foregroundStyle(Palette.tertiary)
             }
             .font(.footnote)
             .lineLimit(1)
@@ -92,7 +92,7 @@ struct CallConversationView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.trailing, 40)
         case .voiceToBot:
-            Label(message.text, systemImage: "arrow.turn.down.right")
+            Label { Text(message.text) } icon: { RemixIcon("corner-down-right-line") }
                 .font(.footnote)
                 .foregroundStyle(Palette.secondary)
                 .frame(maxWidth: .infinity, alignment: .leading)

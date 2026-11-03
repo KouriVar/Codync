@@ -102,7 +102,7 @@ struct AccountSwitcherView: View {
                     }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button(L10n.tr("Close"), systemImage: "xmark") { dismiss() }
+                    Button {  dismiss()  } label: { Label { Text(L10n.tr("Close")) } icon: { RemixIcon("close-line") } }
                         .labelStyle(.iconOnly)
                         .buttonBorderShape(.circle)
                         .keyboardShortcut(.cancelAction)
@@ -157,7 +157,7 @@ private struct AccountProfileView: View {
                     HStack {
                         Text("配对")
                         Spacer(minLength: 8)
-                        Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
+                        RemixIcon("arrow-right-s-line").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
                     }
                 }
 
@@ -168,7 +168,7 @@ private struct AccountProfileView: View {
                         if !accounts.computers.isEmpty {
                             Text("\(accounts.computers.count) 台已连接").foregroundStyle(.secondary)
                         }
-                        Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
+                        RemixIcon("arrow-right-s-line").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
                     }
                 }
 
@@ -184,7 +184,7 @@ private struct AccountProfileView: View {
                                 .font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
                         }
                         Spacer(minLength: 8)
-                        Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
+                        RemixIcon("arrow-right-s-line").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
                     }
                 }
                 .disabled(app.currentStore == nil)
@@ -200,7 +200,7 @@ private struct AccountProfileView: View {
                                 .font(.subheadline).foregroundStyle(.secondary)
                         }
                         Spacer(minLength: 8)
-                        Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
+                        RemixIcon("arrow-right-s-line").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
                     }
                 }
                 .disabled(app.currentStore == nil)
@@ -208,11 +208,7 @@ private struct AccountProfileView: View {
 
             Section {
                 NavigationLink(value: AccountRoute.ordering) {
-                    HStack {
-                        Text("列表排序")
-                        Spacer(minLength: 8)
-                        Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
-                    }
+                    Text("列表排序")
                 }
             }
 
@@ -228,7 +224,7 @@ private struct AccountProfileView: View {
                                 AccountAvatar(url: item.avatarURL, email: item.email, size: 36)
                                 Text(item.email).lineLimit(1).truncationMode(.middle)
                                 Spacer()
-                                if item.id == account.userID { Image(systemName: "checkmark") }
+                                if item.id == account.userID { RemixIcon("check-line") }
                             }
                         }
                         .disabled(account.isBusy || item.id == account.userID)
@@ -236,7 +232,7 @@ private struct AccountProfileView: View {
                     }
                     if account.supportsMultipleAccounts {
                         Button { withAnimation(Motion.layout) { addingAccount.toggle() } } label: {
-                            Label(L10n.tr("Add account"), systemImage: "plus")
+                            Label { Text(L10n.tr("Add account")) } icon: { RemixIcon("add-line") }
                         }
                         .disabled(account.isBusy)
                     }
@@ -253,7 +249,7 @@ private struct AccountProfileView: View {
             }
             if let message = account.errorMessage {
                 Section {
-                    Label(L10n.tr(message), systemImage: "exclamationmark.triangle.fill")
+                    Label { Text(L10n.tr(message)) } icon: { RemixIcon("alert-fill") }
                         .font(.footnote).foregroundStyle(.red)
                 }
             }

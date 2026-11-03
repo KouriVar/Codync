@@ -33,7 +33,7 @@ struct RosterSectionHeader: View {
             }
             .animation(Motion.reduced(Motion.fade, reduceMotion), value: showsUnread)
             .layoutPriority(1)
-            Image(systemName: "chevron.down")
+            RemixIcon("arrow-down-s-line")
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(Palette.tertiary)
                 .rotationEffect(.degrees((section.folded || moving) ? -90 : 0))

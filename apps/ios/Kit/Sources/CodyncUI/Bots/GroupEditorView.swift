@@ -71,7 +71,7 @@ public struct GroupEditorView: View {
                             ForEach(candidates) { bot in
                                 Button { toggle(bot.id) } label: {
                                     memberRow(bot, dimmed: true) {
-                                        Image(systemName: "plus.circle").font(.system(size: 18)).foregroundStyle(Palette.secondary)
+                                        RemixIcon("add-circle-line").font(.system(size: 18)).foregroundStyle(Palette.secondary)
                                     }
                                 }
                                 .buttonStyle(PressScale())
@@ -80,7 +80,7 @@ public struct GroupEditorView: View {
                         } else if !candidates.isEmpty {
                             Button { withAnimation(Motion.layout) { adding = true } } label: {
                                 HStack(spacing: 14) {
-                                    Image(systemName: "plus").font(.system(size: 16)).foregroundStyle(Palette.secondary).frame(width: 32)
+                                    RemixIcon("add-line").font(.system(size: 16)).foregroundStyle(Palette.secondary).frame(width: 32)
                                     Text(L10n.tr("Add Member")).foregroundStyle(Palette.secondary)
                                     Spacer(minLength: 0)
                                 }

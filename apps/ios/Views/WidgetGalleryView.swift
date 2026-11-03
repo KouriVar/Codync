@@ -127,7 +127,7 @@ struct WidgetGalleryView: View {
                 VStack(alignment: .leading, spacing: 12) {
                     sectionLabel("Keep tasks in view")
                     Button { page = .lockScreen } label: {
-                        Label(L10n.tr("Lock Screen widgets"), systemImage: "lock.rectangle").foregroundStyle(Palette.accent)
+                        Label { Text(L10n.tr("Lock Screen widgets")) } icon: { RemixIcon("lock-line") }.foregroundStyle(Palette.accent)
                     }
                     .buttonStyle(PressScale())
                 }

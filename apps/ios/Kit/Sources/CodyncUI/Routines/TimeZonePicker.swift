@@ -22,7 +22,7 @@ struct TimeZonePicker: View {
                             Text(zone).foregroundStyle(Palette.text).lineLimit(1)
                             Spacer(minLength: 8)
                             Text(TimeZones.offset(zone)).foregroundStyle(.secondary)
-                            Image(systemName: "checkmark").font(.callout.weight(.semibold)).foregroundStyle(Palette.accent)
+                            RemixIcon("check-line").font(.callout.weight(.semibold)).foregroundStyle(Palette.accent)
                                 .opacity(zone == selection ? 1 : 0)
                         }
                     }
@@ -47,7 +47,7 @@ struct TimeZonePicker: View {
                 Text(zone).foregroundStyle(Palette.text).lineLimit(1)
                 Spacer(minLength: 8)
                 Text(TimeZones.offset(zone)).foregroundStyle(Palette.secondary)
-                Image(systemName: "checkmark").font(.callout.weight(.semibold)).foregroundStyle(Palette.accent)
+                RemixIcon("check-line").font(.callout.weight(.semibold)).foregroundStyle(Palette.accent)
                     .opacity(zone == selection ? 1 : 0)
             }
             .padding(.horizontal, 16)

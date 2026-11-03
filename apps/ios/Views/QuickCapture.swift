@@ -173,7 +173,7 @@ struct QuickCaptureOverlay: View {
             content
                 .clipShape(RoundedRectangle(cornerRadius: 30, style: .continuous))
             Button { withAnimation(.easeOut(duration: 0.2)) { model.close() } } label: {
-                Image(systemName: "xmark")
+                RemixIcon("close-line")
                     .font(.system(size: 11, weight: .bold))
                     .foregroundStyle(.white)
                     .padding(7)
@@ -195,7 +195,7 @@ struct QuickCaptureOverlay: View {
             }
         } else {
             VStack(spacing: 10) {
-                Image(systemName: "camera.fill").font(.title).foregroundStyle(.white)
+                RemixIcon("camera-fill").font(.title).foregroundStyle(.white)
                 Text("需要相机权限").font(.footnote).foregroundStyle(.white.opacity(0.85))
                 Button("打开设置") {
                     if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
@@ -214,7 +214,7 @@ struct QuickCaptureOverlay: View {
                 if let image = await model.capture() { onAttach(image); model.close() }
             }
         } label: {
-            Label("贴图", systemImage: "paperclip")
+            Label { Text("贴图") } icon: { RemixIcon("attachment-line") }
                 .font(.subheadline.weight(.semibold))
                 .padding(.horizontal, 16)
                 .padding(.vertical, 8)
@@ -241,7 +241,7 @@ struct QuickCaptureSheet: View {
                 QuickCameraPreview(session: camera.session).ignoresSafeArea()
             } else {
                 VStack(spacing: 12) {
-                    Image(systemName: "camera.fill").font(.largeTitle).foregroundStyle(.white)
+                    RemixIcon("camera-fill").font(.largeTitle).foregroundStyle(.white)
                     Text("需要相机权限").foregroundStyle(.white)
                     Button("打开设置") {
                         if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
@@ -254,7 +254,7 @@ struct QuickCaptureSheet: View {
                 Spacer()
                 HStack {
                     Button { dismiss() } label: {
-                        Image(systemName: "chevron.left")
+                        RemixIcon("arrow-left-s-line")
                             .font(.system(size: 17, weight: .semibold))
                             .foregroundStyle(.white)
                             .frame(width: 44, height: 44)
@@ -270,7 +270,7 @@ struct QuickCaptureSheet: View {
                     Menu {
                         // Placeholder for now; nothing in it yet.
                     } label: {
-                        Image(systemName: "ellipsis")
+                        RemixIcon("more-line")
                             .font(.system(size: 17, weight: .semibold))
                             .foregroundStyle(.white)
                             .frame(width: 44, height: 44)

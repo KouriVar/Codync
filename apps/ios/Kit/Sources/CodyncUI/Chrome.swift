@@ -22,10 +22,16 @@ public struct IconButton: View {
     }
 
     public var body: some View {
-        Button(L10n.tr(title), systemImage: systemImage, action: action)
-            .labelStyle(.iconOnly)
-            .buttonStyle(IconButtonStyle())
-            .help(L10n.tr(title))
+        Button(action: action) {
+            if let remix = RemixSymbolMap.remix(for: systemImage) {
+                RemixIcon(remix, size: 17)
+            } else {
+                Image(systemName: systemImage)
+            }
+        }
+        .buttonStyle(IconButtonStyle())
+        .help(L10n.tr(title))
+        .accessibilityLabel(L10n.tr(title))
     }
 }
 

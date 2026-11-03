@@ -198,7 +198,7 @@ private struct CreateForm<Preview: View, Content: View>: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button(L10n.tr("Cancel"), systemImage: "xmark") { dismiss() }
+                    Button {  dismiss()  } label: { Label { Text(L10n.tr("Cancel")) } icon: { RemixIcon("close-line") } }
                         .labelStyle(.iconOnly).buttonBorderShape(.circle)
                         .disabled(saving)
                 }

@@ -22,7 +22,7 @@ struct PullIndicator: View {
 
     var body: some View {
         // The system's arrow, swept in from its tail as the pull grows.
-        Image(systemName: "arrow.clockwise")
+        RemixIcon("refresh-line")
             .font(.system(size: 17, weight: .medium))
             .foregroundStyle(Palette.secondary)
             .mask { Sweep(progress: pull.refreshing ? 1 : pull.progress) }

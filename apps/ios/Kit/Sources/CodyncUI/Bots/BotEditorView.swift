@@ -202,7 +202,7 @@ struct BotSettingsForm: View {
                     } label: {
                         HStack(spacing: 6) {
                             Text(draft.cwd.isEmpty ? L10n.tr("Personal") : (draft.cwd as NSString).lastPathComponent).lineLimit(1)
-                            Image(systemName: "chevron.down").font(.caption2.weight(.semibold)).foregroundStyle(Palette.secondary)
+                            RemixIcon("arrow-down-s-line").font(.caption2.weight(.semibold)).foregroundStyle(Palette.secondary)
                         }
                         .foregroundStyle(Palette.text)
                         .outlinedPill()

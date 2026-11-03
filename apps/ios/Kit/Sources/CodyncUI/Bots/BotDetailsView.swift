@@ -79,20 +79,20 @@ struct BotDetailsView: View {
         .botNativePage("")
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Button("分享 Bot 模板", systemImage: "square.and.arrow.up") {
+                Button { 
                     if let bot { template = EditorRequest(BotDraft(bot)) }
-                }
+                 } label: { Label { Text("分享 Bot 模板") } icon: { RemixIcon("share-forward-line") } }
                 .buttonBorderShape(.circle)
                 .disabled(bot == nil)
             }
             ToolbarSpacer(.fixed, placement: .topBarTrailing)
             ToolbarItem(placement: .topBarTrailing) {
-                Menu("更多", systemImage: "ellipsis") {
-                    Button("指令与智能体", systemImage: "slider.horizontal.3") { page = .agent }
-                    Button("工作区与权限", systemImage: "folder.badge.gearshape") { page = .workspace }
-                    Button("能力与插件", systemImage: "puzzlepiece.extension") { page = .capabilities }
-                    Button("记忆", systemImage: "brain") { page = .memory }
-                }
+                Menu { 
+                    Button {  page = .agent  } label: { Label { Text("指令与智能体") } icon: { RemixIcon("equalizer-line") } }
+                    Button {  page = .workspace  } label: { Label { Text("工作区与权限") } icon: { RemixIcon("folder-settings-line") } }
+                    Button {  page = .capabilities  } label: { Label { Text("能力与插件") } icon: { RemixIcon("puzzle-line") } }
+                    Button {  page = .memory  } label: { Label { Text("记忆") } icon: { RemixIcon("brain-line") } }
+                 } label: { Label { Text("更多") } icon: { RemixIcon("more-line") } }
                 .menuIndicator(.hidden)
                 .buttonBorderShape(.circle)
             }
@@ -198,9 +198,9 @@ private struct BotComputerPage: View {
                     Toggle("允许 Bot 使用电脑", isOn: Binding(get: { model.bots[botId]?.computer ?? false }, set: { model.setComputer(bot, $0) }))
                         .tint(.gray)
                         .disabled(model.isOffline)
-                    Button("查看电脑屏幕", systemImage: "desktopcomputer") {
+                    Button { 
                         model.screenRequest = model.screen?.agentBot == botId ? ScreenRequest(watching: botId) : ScreenRequest()
-                    }
+                     } label: { Label { Text("查看电脑屏幕") } icon: { RemixIcon("computer-line") } }
                     .disabled(model.isOffline)
                 } footer: { Text("屏幕录制与控制权限在 Mac 的 Codync 设置中管理。") }
                 .botNativeGroup()

@@ -133,11 +133,7 @@ private struct SystemMenuRow: View {
     if let image = item.image {
         SwiftUI.Label { Text(title) } icon: { image }
     } else if let icon = item.icon {
-        if item.destructive {
-            SwiftUI.Label { Text(title) } icon: { SwiftUI.Image(systemName: icon).foregroundStyle(.red) }
-        } else {
-            SwiftUI.Label(title, systemImage: icon)
-        }
+        SwiftUI.Label { Text(title) } icon: { MenuGlyph(symbol: icon, destructive: item.destructive) }
     } else {
         Text(title)
     }
@@ -163,5 +159,21 @@ public struct DropdownMenu<Label: View>: View {
         } label: { label }
             .buttonStyle(.plain)
             .menuIndicator(.hidden)
+    }
+}
+
+/// A menu row's icon: Remix when we have a mapping, otherwise the SF Symbol.
+private struct MenuGlyph: View {
+    let symbol: String
+    let destructive: Bool
+
+    var body: some View {
+        if let remix = RemixSymbolMap.remix(for: symbol) {
+            RemixIcon(remix, size: 17)
+                .foregroundStyle(destructive ? Color.red : Color.primary)
+        } else {
+            Image(systemName: symbol)
+                .foregroundStyle(destructive ? Color.red : Color.primary)
+        }
     }
 }

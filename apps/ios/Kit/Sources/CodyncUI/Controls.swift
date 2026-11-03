@@ -154,7 +154,7 @@ public struct ChoicePicker<ID: Hashable>: View {
                     picture.resizable().scaledToFit().frame(width: 16, height: 16)
                 }
                 Text(L10n.tr(options.first { $0.id == selection }?.label ?? "Choose")).lineLimit(1)
-                Image(systemName: "chevron.down").font(.caption2.weight(.semibold)).foregroundStyle(Palette.secondary)
+                RemixIcon("arrow-down-s-line").font(.caption2.weight(.semibold)).foregroundStyle(Palette.secondary)
             }
             .font(.body)
             .foregroundStyle(Palette.text)
@@ -282,7 +282,7 @@ public struct ChoiceList<ID: Hashable>: View {
                             }
                         }
                         Spacer(minLength: 8)
-                        Image(systemName: "checkmark")
+                        RemixIcon("check-line")
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(Palette.text)
                             .opacity(option.id == selection ? 1 : 0)
@@ -459,11 +459,11 @@ public struct SearchField: View {
 
     public var body: some View {
         HStack(spacing: 8) {
-            Image(systemName: "magnifyingglass").foregroundStyle(Palette.secondary)
+            RemixIcon("search-line").foregroundStyle(Palette.secondary)
             TextField(prompt, text: $text).textFieldStyle(.plain).plainTextInput()
             if !text.isEmpty {
                 Button { text = "" } label: {
-                    Image(systemName: "xmark.circle.fill").foregroundStyle(Palette.tertiary)
+                    RemixIcon("close-circle-fill").foregroundStyle(Palette.tertiary)
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Clear search")
@@ -497,7 +497,7 @@ public struct Disclosure<Label: View, Content: View>: View {
                 HStack(spacing: 6) {
                     label
                     Spacer(minLength: 8)
-                    Image(systemName: "chevron.right")
+                    RemixIcon("arrow-right-s-line")
                         .font(.caption2.weight(.semibold))
                         .foregroundStyle(Palette.secondary)
                         .rotationEffect(.degrees(isExpanded ? 90 : 0))

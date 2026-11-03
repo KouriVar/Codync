@@ -106,7 +106,7 @@ struct QuoteLine: View {
         Label {
             Text(L10n.tr("“\(MessagePreview.text(text))”")).lineLimit(1)
         } icon: {
-            Image(systemName: "text.bubble")
+            RemixIcon("chat-1-line")
         }
         .font(.subheadline)
         .foregroundStyle(ink)
@@ -165,8 +165,8 @@ struct UserBubble: View {
         case "failed":
             HStack(spacing: 10) {
                 Text(L10n.tr("Failed to send")).foregroundStyle(Palette.danger)
-                Button(L10n.tr("Resend"), systemImage: "arrow.clockwise") { model.retry(entry) }.labelStyle(.iconOnly).help("Resend")
-                Button(L10n.tr("Delete"), systemImage: "trash") { model.discard(entry) }.labelStyle(.iconOnly).help("Delete")
+                Button {  model.retry(entry)  } label: { Label { Text(L10n.tr("Resend")) } icon: { RemixIcon("refresh-line") } }.labelStyle(.iconOnly).help("Resend")
+                Button {  model.discard(entry)  } label: { Label { Text(L10n.tr("Delete")) } icon: { RemixIcon("delete-bin-line") } }.labelStyle(.iconOnly).help("Delete")
             }
             .buttonStyle(.plain)
             .font(.caption2.bold())
@@ -175,7 +175,7 @@ struct UserBubble: View {
         case "waiting":
             HStack(spacing: 10) {
                 Text(L10n.tr("Waiting for the computer to come online")).foregroundStyle(Palette.tertiary)
-                Button(L10n.tr("Cancel"), systemImage: "xmark.circle") { model.cancelQueued(entry) }
+                Button {  model.cancelQueued(entry)  } label: { Label { Text(L10n.tr("Cancel")) } icon: { RemixIcon("close-circle-line") } }
                     .labelStyle(.iconOnly)
                     .help("Don't send")
                     .accessibilityLabel("Don't send")
@@ -234,7 +234,7 @@ struct NoticeRow: View {
         let text = entry.data.text ?? ""
         // A call an older app logged, with no conversation to open.
         if let seconds = entry.data.callSeconds {
-            Label("\(L10n.tr(text)) · \(String(format: "%02d:%02d", seconds / 60, seconds % 60))", systemImage: "waveform")
+            Label { Text("\(L10n.tr(text)) · \(String(format: "%02d:%02d", seconds / 60, seconds % 60))") } icon: { RemixIcon("voiceprint-line") }
                 .font(.footnote.monospacedDigit())
                 .foregroundStyle(Palette.secondary)
                 .frame(maxWidth: .infinity)
@@ -250,7 +250,7 @@ struct NoticeRow: View {
                 Label {
                     Text(L10n.tr(text)).font(.footnote).foregroundStyle(Palette.text).textSelection(.enabled)
                 } icon: {
-                    Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(Palette.danger)
+                    RemixIcon("alert-fill").foregroundStyle(Palette.danger)
                 }
                 if entry.data.addFallback == true, let addFallback {
                     Button(L10n.tr("Add a fallback"), action: addFallback).buttonStyle(.secondary)
@@ -324,7 +324,7 @@ struct WorkingIndicator: View {
                     .foregroundStyle(Palette.tertiary)
             }
             if details {
-                Image(systemName: "chevron.right")
+                RemixIcon("arrow-right-s-line")
                     .font(.caption2.weight(.semibold))
                     .foregroundStyle(Palette.tertiary)
                     .rotationEffect(.degrees(open ? 90 : 0))

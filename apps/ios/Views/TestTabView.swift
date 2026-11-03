@@ -14,7 +14,7 @@ struct TestTabView: View {
             }
 
             VStack(spacing: 16) {
-                Image(systemName: "flask.fill")
+                RemixIcon("flask-fill")
                     .font(.system(size: 48))
                     .foregroundStyle(Palette.secondary)
                 Text("第四个导航已就位")

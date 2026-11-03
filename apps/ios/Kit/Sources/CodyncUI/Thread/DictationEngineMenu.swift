@@ -13,7 +13,7 @@ struct DictationEngineMenu: View {
                     MenuItem(provider.name, selected: engine == provider.rawValue) { engine = provider.rawValue }
                 }
         } label: {
-            Image(systemName: "chevron.up")
+            RemixIcon("arrow-up-s-line")
                 .font(.caption2.weight(.semibold))
                 .foregroundStyle(Palette.secondary)
                 .frame(width: 14, height: height)
