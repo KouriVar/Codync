@@ -911,3 +911,12 @@
 - 文件：`CodyncUI/Controls.swift`、`Views/HomeBottomBar.swift`。
 - 验证：构建号 138 编译、签名、安装成功；交互需真机点按确认。
 - 关联：C0096。
+
+### C0102 · 2026-11-03 · 首页搜索态动画去"玻璃融合"
+
+- 原因：`GlassEffectContainer(spacing: 12)` 会让相邻玻璃元素在出现/消失时形变融合，左键消失时像"钻进"搜索胶囊，观感卡顿。
+- 变化：移除容器包裹，三个元素各自 `.glassEffect`；左键过渡由 `scale+opacity` 改为纯 `.opacity` 淡出；保留 `.snappy(0.26)` 与 Reduce Motion。
+- 文件：`Views/HomeBottomBar.swift`。
+- 验证：构建号 139 编译、签名、安装成功；观感需真机确认。
+- 限制/待办：若希望保留玻璃融合但只在"贴住"时发生，可换回容器并把 spacing 调小（如 0），待用户反馈。
+- 关联：C0101。
