@@ -32,6 +32,7 @@ struct Composer: View {
     @State private var photoItems: [PhotosPickerItem] = []
     /// Keyboard up: sit just above it; down: keep the same 28pt gap as the home bar.
     @State private var keyboardUp = false
+    @Environment(\.capturePhoto) private var capturePhoto
     @FocusState private var focused: Bool
 
     private var bot: Bot? { model.bots[botId] }
@@ -147,7 +148,7 @@ struct Composer: View {
         .fileImporter(isPresented: $pickingFiles, allowedContentTypes: [.item], allowsMultipleSelection: true) { result in
             if case .success(let urls) = result { add(urls) }
         }
-            .photosPicker(isPresented: $pickingPhotos, selection: $photoItems, maxSelectionCount: 10, matching: .images)
+            .photosPicker(isPresented: $pickingPhotos, selection: $photoItems, maxSelectionCount: 10, matching: .any(of: [.images, .videos]))
             .onChange(of: photoItems) { _, items in
                 guard !items.isEmpty else { return }
                 photoItems = []
@@ -260,12 +261,9 @@ struct Composer: View {
     /// Photos, files or the clipboard, from a system menu; dropping files on the box works too.
     @ViewBuilder private var addButton: some View {
             DropdownMenu {
-                var items = [MenuItem("Photos", icon: "photo.on.rectangle") { pickingPhotos = true },
-                             MenuItem("Files", icon: "folder") { pickingFiles = true }]
-                if UIPasteboard.general.hasImages || UIPasteboard.general.hasURLs {
-                    items.append(MenuItem("Paste", icon: "doc.on.clipboard") { pasteFiles() })
-                }
-                return items
+                [MenuItem("照片或视频", icon: "image-line") { pickingPhotos = true },
+                 MenuItem("拍照", icon: "camera-line") { capturePhoto { image in add(captured: image) } },
+                 MenuItem("选择文件", icon: "folder-line") { pickingFiles = true }]
             } label: { addLabel }
                 .accessibilityLabel("Add files")
     }
@@ -302,6 +300,13 @@ struct Composer: View {
         })
     }
 
+    /// The camera sheet's still, pushed straight into the composer.
+    private func add(captured image: UIImage) {
+        guard let jpeg = image.jpegData(compressionQuality: 0.85) else { return }
+        let file = OutgoingFile(name: "photo-\(Int(Date.now.timeIntervalSince1970)).jpg", data: jpeg)
+        withAnimation(Motion.reduced(Motion.layout, reduceMotion)) { append([file]) }
+    }
+
     private func append(_ new: [OutgoingFile]) {
         guard canAttach else { return }
         for file in new {
@@ -324,9 +329,12 @@ struct Composer: View {
             let stamp = Int(Date.now.timeIntervalSince1970)
             var picked: [OutgoingFile] = []
             for (i, item) in items.enumerated() {
-                guard let data = try? await item.loadTransferable(type: Data.self),
-                      let jpeg = ImageData.jpeg(data) else { continue }
-                picked.append(OutgoingFile(name: "photo-\(stamp)-\(i + 1).jpg", data: jpeg))
+                guard let data = try? await item.loadTransferable(type: Data.self) else { continue }
+                if let movie = item.supportedContentTypes.first(where: { $0.conforms(to: .movie) }) {
+                    picked.append(OutgoingFile(name: "video-\(stamp)-\(i + 1).\(movie.preferredFilenameExtension ?? "mov")", data: data))
+                } else if let jpeg = ImageData.jpeg(data) {
+                    picked.append(OutgoingFile(name: "photo-\(stamp)-\(i + 1).jpg", data: jpeg))
+                }
             }
             append(picked)
         }

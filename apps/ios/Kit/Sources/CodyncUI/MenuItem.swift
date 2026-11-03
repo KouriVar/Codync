@@ -168,7 +168,10 @@ private struct MenuGlyph: View {
     let destructive: Bool
 
     var body: some View {
-        if let remix = RemixSymbolMap.remix(for: symbol) {
+        if RemixFont.has(symbol) {
+            RemixIcon(symbol, size: 17)
+                .foregroundStyle(destructive ? Color.red : Color.primary)
+        } else if let remix = RemixSymbolMap.remix(for: symbol) {
             RemixIcon(remix, size: 17)
                 .foregroundStyle(destructive ? Color.red : Color.primary)
         } else {

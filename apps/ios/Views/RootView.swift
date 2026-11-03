@@ -1,6 +1,7 @@
 import CodyncKit
 import CodyncUI
 import SwiftUI
+import UIKit
 import WidgetKit
 
 struct RootView: View {
@@ -11,6 +12,9 @@ struct RootView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// First launch only: past the welcome, on to setup.
     @State private var welcomed = false
+    /// The composer's camera: the same sheet the home bar opens, handing the photo back.
+    @State private var showCapture = false
+    @State private var captureCompletion: (@MainActor @Sendable (UIImage) -> Void)?
 
     /// The open bot, as a NavigationStack path.
     private var path: Binding<[BotReference]> {
@@ -42,6 +46,17 @@ struct RootView: View {
             }
         }
         .background(Palette.background)
+        .environment(\.capturePhoto, CameraCaptureAction { completion in
+            captureCompletion = completion
+            showCapture = true
+        })
+        .sheet(isPresented: $showCapture) {
+            QuickCaptureSheet(onCapture: { image in
+                captureCompletion?(image)
+                captureCompletion = nil
+                showCapture = false
+            })
+        }
         .onChange(of: accounts.computers.isEmpty && accounts.cloudComputers.isEmpty, initial: true) { _, empty in
             // Pairing, signing in to an account that has computers, or explicitly skipping completes
             // setup. Keep this device-level milestone across account changes and unpairing.

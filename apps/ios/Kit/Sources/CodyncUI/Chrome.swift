@@ -290,3 +290,21 @@ public extension View {
             .background(SwipeBackEnabler().frame(width: 0, height: 0))
     }
 }
+
+
+/// Presents the app's camera sheet and hands the photo back (the composer's "Take photo").
+public struct CameraCaptureAction: Sendable {
+    let present: @MainActor @Sendable (@escaping @MainActor @Sendable (UIImage) -> Void) -> Void
+
+    public init(_ present: @escaping @MainActor @Sendable (@escaping @MainActor @Sendable (UIImage) -> Void) -> Void) {
+        self.present = present
+    }
+
+    @MainActor public func callAsFunction(_ completion: @escaping @MainActor @Sendable (UIImage) -> Void) {
+        present(completion)
+    }
+}
+
+public extension EnvironmentValues {
+    @Entry var capturePhoto = CameraCaptureAction { _ in }
+}

@@ -872,3 +872,11 @@
 - 文件：`CodyncUI/Thread/Composer.swift`、`CodyncUI/Thread/ThreadView.swift`。
 - 验证：构建号 133–135 编译、签名、安装成功；截图确认输入区与首页同规格。
 - 关联：C0094、C0095。
+
+### C0097 · 2026-11-03 · 输入框加号菜单重做 + 复用相机 sheet
+
+- 原因：原菜单只有 Photos / Files / Paste，语义粗糙；用户要「照片或视频 / 拍照 / 选择文件」，拍照复用首页相机并把照片推进输入框。
+- 变化：菜单三项（Remix `image-line` / `camera-line` / `folder-line`）；新增 `CameraCaptureAction` 环境值 + RootView 挂 `QuickCaptureSheet`，拍照回传后 `withAnimation` 追加到附件；PhotosPicker 支持视频（`matching: .any(of: [.images, .videos])`，视频按 `video-*.mov` 入列）；`MenuGlyph` 支持直接传 Remix 名。
+- 文件：`CodyncUI/Thread/Composer.swift`、`CodyncUI/Chrome.swift`、`CodyncUI/MenuItem.swift`、`Views/RootView.swift`。
+- 验证：构建号 136 编译、签名、安装成功（菜单交互需真机点按确认）。
+- 关联：C0096。
