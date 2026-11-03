@@ -239,7 +239,7 @@ struct BotListView: View {
                     Button(action: newBot) { Label { Text(L10n.tr("New bot")) } icon: { RemixIcon("add-line") } }
                     Button(action: newGroup) { Label { Text(L10n.tr("New group chat")) } icon: { RemixIcon("team-line") } }
                         .disabled(onlineStores.isEmpty)
-                 } label: { RemixIcon("add-line", size: 24) }
+                 } label: { RemixImage("add-line", size: 24) }
                     .accessibilityLabel(Text(L10n.tr("New")))
                 // A computer that needs an update can't take a new bot.
                 .disabled(availableStores.isEmpty)

@@ -198,7 +198,7 @@ private struct CreateForm<Preview: View, Content: View>: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button(action: {  dismiss()  }) { RemixIcon("close-line") }.accessibilityLabel(Text(L10n.tr("Cancel"))).buttonBorderShape(.circle)
+                    Button(action: {  dismiss()  }) { RemixImage("close-line", size: 24) }.accessibilityLabel(Text(L10n.tr("Cancel"))).buttonBorderShape(.circle)
                         .disabled(saving)
                 }
                 ToolbarItem(placement: .confirmationAction) {

@@ -93,6 +93,7 @@ struct ComputersView: View {
             }
         }
         .tint(.primary)
+        .softScrollEdges()
         .tracked(.screenViewed(.computers))
         .task { await accounts.refreshCloud() }
         .codyncSheet(isPresented: $addingComputer) {

@@ -24,7 +24,7 @@ public struct IconButton: View {
     public var body: some View {
         Button(action: action) {
             if let remix = RemixSymbolMap.remix(for: systemImage) {
-                RemixIcon(remix, size: 17)
+                RemixIcon(remix, size: 24)
             } else {
                 Image(systemName: systemImage)
             }
@@ -36,7 +36,7 @@ public struct IconButton: View {
 }
 
 public struct IconButtonStyle: ButtonStyle {
-    private let size: CGFloat = 36
+    private let size: CGFloat = 44
 
     public init() {}
 
@@ -211,6 +211,8 @@ private struct CodyncSheet<Sheet: View>: ViewModifier {
     func body(content: Content) -> some View {
         content.sheet(isPresented: $isPresented) {
             sheet()
+                // iOS 26's progressive blur at the edges; iOS 27 otherwise hard-clips.
+                .softScrollEdges()
                 .environment(\.dismissModal, DismissModalAction { isPresented = false })
                 .presentationDragIndicator(.visible)
         }

@@ -1,13 +1,16 @@
 import CodyncKit
+import UIKit
 import CodyncUI
 import SwiftUI
 
 /// Floating home controls, scoped to the roster so a pushed conversation has no bottom bar.
 struct HomeBottomBar: View {
     @Binding var searchText: String
+    /// Keyboard up: sit just above it; down: keep the 28pt gap to the screen edge.
+    @State private var keyboardUp = false
     let openCamera: () -> Void
     let openPlugins: () -> Void
-    /// One 44pt row (HIG touch target) for the search capsule and both circles.
+    /// One 48pt row for the search capsule and both circles.
     private let iconSize: CGFloat = 24
     private let iconLineWidth: CGFloat = 1.8
 
@@ -17,7 +20,7 @@ struct HomeBottomBar: View {
                 Button(action: openPlugins) {
                     RemixIcon("apps-2-line", size: iconSize)
                         .foregroundStyle(Palette.text)
-                        .frame(width: 44, height: 44)
+                        .frame(width: 48, height: 48)
                         .glassEffect(.regular.interactive(), in: Circle())
                 }
                 .buttonStyle(.plain)
@@ -25,7 +28,7 @@ struct HomeBottomBar: View {
                 .help("插件")
 
                 SearchField("搜索", text: $searchText, opaqueBackground: false)
-                    .frame(height: 44)
+                    .frame(height: 48)
                     .glassEffect(.regular.interactive(), in: Capsule())
                     .submitLabel(.search)
                     .accessibilityLabel("搜索聊天")
@@ -33,7 +36,7 @@ struct HomeBottomBar: View {
                 Button(action: openCamera) {
                     RemixIcon("camera-fill", size: iconSize)
                         .foregroundStyle(Palette.text)
-                        .frame(width: 44, height: 44)
+                        .frame(width: 48, height: 48)
                         .glassEffect(.regular.interactive(), in: Circle())
                 }
                 .buttonStyle(.plain)
@@ -43,7 +46,15 @@ struct HomeBottomBar: View {
         }
         .padding(.horizontal, 24)
         .padding(.top, 10)
-        .padding(.bottom, 8)
+        // Match the 12pt spacing between the search field and the two circles.
+        .padding(.bottom, keyboardUp ? 12 : 28)
+        .ignoresSafeArea(.container, edges: keyboardUp ? [] : .bottom)
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
+            keyboardUp = true
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
+            keyboardUp = false
+        }
     }
 }
 

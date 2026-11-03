@@ -536,3 +536,12 @@ extension View {
     }
 }
 
+
+
+public extension View {
+    /// iOS 26's progressive blur at the scroll edges. iOS 27 otherwise draws a hard clip
+    /// (or its own automatic treatment) instead of the soft falloff.
+    func softScrollEdges() -> some View {
+        scrollEdgeEffectStyle(.soft, for: [.top, .bottom])
+    }
+}

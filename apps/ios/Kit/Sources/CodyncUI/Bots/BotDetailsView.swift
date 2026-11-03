@@ -81,7 +81,7 @@ struct BotDetailsView: View {
             ToolbarItem(placement: .topBarTrailing) {
                 Button { 
                     if let bot { template = EditorRequest(BotDraft(bot)) }
-                 } label: { RemixIcon("share-forward-line") }
+                 } label: { RemixImage("share-forward-line", size: 24) }
                 .accessibilityLabel(Text("分享 Bot 模板"))
                 .buttonBorderShape(.circle)
                 .disabled(bot == nil)
@@ -93,7 +93,7 @@ struct BotDetailsView: View {
                     Button {  page = .workspace  } label: { Label { Text("工作区与权限") } icon: { RemixIcon("folder-settings-line") } }
                     Button {  page = .capabilities  } label: { Label { Text("能力与插件") } icon: { RemixIcon("puzzle-line") } }
                     Button {  page = .memory  } label: { Label { Text("记忆") } icon: { RemixIcon("brain-line") } }
-                 } label: { RemixIcon("more-line") }
+                 } label: { RemixImage("more-line", size: 24) }
                     .accessibilityLabel(Text("更多"))
                 .menuIndicator(.hidden)
                 .buttonBorderShape(.circle)

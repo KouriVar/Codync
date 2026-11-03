@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// Remix Icon 4.9.1 (Apache-2.0), shipped as one font file plus its codepoint table.
 /// Use `RemixIcon("chat-3-line", size: 17)` anywhere an SF Symbol used to be.
@@ -145,4 +146,42 @@ public enum RemixSymbolMap {
     ]
 
     public static func remix(for systemImage: String) -> String? { remixes[systemImage] }
+}
+
+
+public extension RemixFont {
+    /// The glyph rendered into a template image, so toolbars lay it out like an SF Symbol
+    /// (a plain Text-based icon keeps its font advance width and widens the glass button).
+    static func image(_ name: String, size: CGFloat = 20) -> UIImage? {
+        let glyph = glyph(name)
+        guard !glyph.isEmpty else { return nil }
+        let font = UIFont(name: "remixicon", size: size) ?? UIFont.systemFont(ofSize: size)
+        let text = NSAttributedString(string: glyph, attributes: [.font: font, .foregroundColor: UIColor.black])
+        let bounds = text.boundingRect(with: CGSize(width: size * 2, height: size * 2),
+                                       options: [.usesLineFragmentOrigin, .usesFontLeading], context: nil)
+        let canvas = CGSize(width: max(1, ceil(bounds.width)), height: max(1, ceil(bounds.height)))
+        let renderer = UIGraphicsImageRenderer(size: canvas)
+        let image = renderer.image { _ in text.draw(at: CGPoint(x: -bounds.minX, y: -bounds.minY)) }
+        return image.withRenderingMode(.alwaysTemplate)
+    }
+}
+
+/// A Remix glyph as a `View` that sizes like an image (for toolbars and menus).
+public struct RemixImage: View {
+    let name: String
+    var size: CGFloat
+
+    public init(_ name: String, size: CGFloat = 20) {
+        self.name = name
+        self.size = size
+    }
+
+    public var body: some View {
+        if let image = RemixFont.image(name, size: size) {
+            Image(uiImage: image).renderingMode(.template).resizable().scaledToFit()
+                .frame(width: size, height: size)
+        } else {
+            RemixIcon(name, size: size)
+        }
+    }
 }

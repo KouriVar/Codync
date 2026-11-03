@@ -230,7 +230,7 @@ private struct UsageSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button(action: {  dismiss()  }) { RemixIcon("close-line") }.accessibilityLabel(Text(L10n.tr("Close"))).buttonBorderShape(.circle)
+                    Button(action: {  dismiss()  }) { RemixImage("close-line", size: 24) }.accessibilityLabel(Text(L10n.tr("Close"))).buttonBorderShape(.circle)
                 }
                 if store != nil, accounts.computers.count > 1 {
                     ToolbarItem(placement: .topBarLeading) {

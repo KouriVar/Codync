@@ -102,13 +102,14 @@ struct AccountSwitcherView: View {
                     }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button(action: {  dismiss()  }) { RemixIcon("close-line") }.accessibilityLabel(Text(L10n.tr("Close")))
+                    Button(action: {  dismiss()  }) { RemixImage("close-line", size: 24) }.accessibilityLabel(Text(L10n.tr("Close")))
                         .buttonBorderShape(.circle)
                         .keyboardShortcut(.cancelAction)
                 }
             }
         }
         .tint(.primary)
+        .softScrollEdges()
         .tracked(.screenViewed(app.accountPane.screen))
         .onChange(of: app.accountPane, initial: true) { _, pane in
             // Debug/deep-link opens (CODYNC_ACCOUNT_PANE=state, codync://usage): push the state page once.

@@ -29,7 +29,7 @@ struct NativeExtensionSheet<Content: View>: View {
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) {
-                        Button(action: {  dismiss()  }) { RemixIcon("close-line") }.accessibilityLabel(Text(L10n.tr("Close"))).buttonBorderShape(.circle)
+                        Button(action: {  dismiss()  }) { RemixImage("close-line", size: 24) }.accessibilityLabel(Text(L10n.tr("Close"))).buttonBorderShape(.circle)
                             .disabled(busy)
                     }
                     if let actionTitle, let action {
