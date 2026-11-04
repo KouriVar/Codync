@@ -19,6 +19,14 @@ struct HomeSourcesView: View {
 
     @AppStorage(HomeSourcePrefs.sourcesKey) private var sourcesRaw = HomeSourcePrefs.defaultRaw
     @AppStorage(HomeSourcePrefs.pinnedKey) private var pinnedRaw = ""
+    /// Which face the home shows: the pinned list, or one source's own.
+    @AppStorage(HomeSourcePrefs.faceKey) private var faceRaw = HomeFace.pinned.stored
+    /// The source switcher is up: the page is one card among them.
+    @State private var switcherShown = false
+    /// The card in the middle while the switcher is up.
+    @State private var switcherFace = HomeFace.pinned
+    /// The page's own scale while two fingers close on it: 1 is the page, `miniScale` is a card.
+    @State private var pinchScale: CGFloat = 1
 
     @State private var searchText = ""
     /// The field in the bottom bar has the keyboard.
@@ -64,6 +72,17 @@ struct HomeSourcesView: View {
 
     private var enabledOrdered: [HomeSource] { HomeSource.allCases.filter { enabledSources.contains($0) } }
 
+    /// The face the home is showing: what the switcher last picked, unless that source was turned
+    /// off in Settings since — then the pinned list.
+    private var face: HomeFace {
+        guard let stored = HomeFace(stored: faceRaw) else { return .pinned }
+        guard case .source(let source) = stored else { return stored }
+        return enabledSources.contains(source) ? stored : .pinned
+    }
+
+    /// One card per face: the pinned list first, then every source Settings leaves on.
+    private var faces: [HomeFace] { [.pinned] + enabledOrdered.map { HomeFace.source($0) } }
+
     private var searchQuery: String { searchText.trimmingCharacters(in: .whitespacesAndNewlines) }
     private var isSearching: Bool { !searchQuery.isEmpty }
 
@@ -71,6 +90,18 @@ struct HomeSourcesView: View {
 
     var body: some View {
         navigationStack
+            // The pages, over everything the home draws: the toolbar's buttons step out of the way
+            // (they fade below), and the cards take the screen.
+            .overlay {
+                if switcherShown {
+                    SourceSwitcher(faces: faces, centered: $switcherFace,
+                                   card: { AnyView(faceList($0)) },
+                                   commit: { pick($0) })
+                        .ignoresSafeArea()
+                        .transition(.opacity)
+                        .zIndex(2)
+                }
+            }
             .task {
                 syncDSHConnection()
                 #if DEBUG
@@ -161,14 +192,18 @@ struct HomeSourcesView: View {
     private var navigationStack: some View {
         NavigationStack(path: path) {
             Group {
-                // Typing anything shows the whole home filtered, as the search tab used to; with the
-                // field empty it is the pinned list again.
+                // Typing anything shows the whole home filtered; with the field empty it is whichever
+                // face the switcher last picked.
                 if isSearching {
                     searchResults
                 } else {
-                    rosterList(pinnedEntries, pinnedEmpty: true)
+                    faceList(face)
                 }
             }
+            // The page becomes a card under two fingers: only the list scales, the bars stay put
+            // (they fade with it) and the card settles into the switcher on release.
+            .scaleEffect(pinchScale, anchor: .center)
+            .simultaneousGesture(pinchToSwitch)
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { toolbarContent }
@@ -267,6 +302,87 @@ struct HomeSourcesView: View {
             .rosterRow()
     }
 
+    // MARK: - The pages
+
+    /// The home's list for one face: the pinned list, a source's bots, or the DSH conversations.
+    @ViewBuilder private func faceList(_ face: HomeFace) -> some View {
+        switch face {
+        case .pinned:
+            rosterList(pinnedEntries, pinnedEmpty: true)
+        case .source(.dsh):
+            rosterList(dshEntries, hint: dshHint)
+        case .source(let source):
+            rosterList(botEntries(for: source))
+        }
+    }
+
+    /// How far the page has shrunk toward a card, 0…1: what the chrome fades on.
+    private var shrink: Double {
+        let span = 1 - SourceSwitcher.miniScale
+        return Double(min(1, max(0, (1 - pinchScale) / span)))
+    }
+
+    /// The navigation buttons and the bottom bar fade as the page shrinks, and are gone entirely while
+    /// the pages are up.
+    private var chromeOpacity: Double { switcherShown ? 0 : 1 - shrink }
+
+    /// The switcher's front door: two fingers closed on the list shrink the page toward a card and
+    /// letting go makes the card. One finger still scrolls — this wakes only once the pinch has
+    /// closed — and only the home's own root answers it.
+    private var pinchToSwitch: some Gesture {
+        MagnifyGesture(minimumScaleDelta: 0.04)
+            .onChanged { value in
+                guard canPinch else { return }
+                // The keyboard goes first: the page is about to become a card.
+                if searchFocused { searchFocused = false }
+                pinchScale = min(1, max(SourceSwitcher.miniScale, value.magnification))
+            }
+            .onEnded { value in
+                guard canPinch else {
+                    withAnimation(switchAnimation) { pinchScale = 1 }
+                    return
+                }
+                if value.magnification < 0.93 {
+                    openSwitcher()
+                } else {
+                    withAnimation(switchAnimation) { pinchScale = 1 }
+                }
+            }
+    }
+
+    /// The home's own root, with nothing else over it.
+    private var canPinch: Bool {
+        accounts.selection == nil && openDSHSession == nil
+            && !switcherShown && !voiceOpen && !showVoice && !showVoiceSettings
+    }
+
+    private var switchAnimation: Animation {
+        Motion.reduced(Self.switchSpring, reduceMotion) ?? Motion.fade
+    }
+
+    private static let switchSpring = Animation.spring(response: 0.34, dampingFraction: 0.86)
+
+    /// The page is a card now: the switcher takes over, opening on the face the home is showing.
+    private func openSwitcher() {
+        switcherFace = face
+        Haptics.selection()
+        withAnimation(switchAnimation) {
+            pinchScale = 1
+            switcherShown = true
+        }
+    }
+
+    /// A card was picked: the home shows it, and the card grows back into the page.
+    private func pick(_ face: HomeFace) {
+        faceRaw = face.stored
+        switcherFace = face
+        pinchScale = SourceSwitcher.miniScale
+        withAnimation(switchAnimation) {
+            switcherShown = false
+            pinchScale = 1
+        }
+    }
+
     // MARK: - The bottom bar
 
     /// The bot the round button speaks to: the one the long-press menu made lead, and the store it
@@ -314,6 +430,9 @@ struct HomeSourcesView: View {
         // The voice's phase changes live in a view of their own: on the home's root they would
         // rebuild the roster list on every one of them — including the first, while the bar is moving.
         .background { VoicePhaseWatcher(voice: voice, onPhase: handleVoicePhase) }
+        // Out of the way while the pages are up, fading with the page as it shrinks.
+        .opacity(chromeOpacity)
+        .allowsHitTesting(!switcherShown)
     }
 
     /// The field's width is whatever the button is not using, so the two always add up to the row:
@@ -499,12 +618,21 @@ struct HomeSourcesView: View {
         // iOS 27 gives a toolbar item an icon-sized inset; a photo inside it is stretched wide in the
         // bar's capsule unless the item asks for its content margins to go.
         if #available(iOS 27.0, *) {
-            ToolbarItem(placement: .topBarLeading) { AccountSwitcherButton(avatarSize: 36) }
+            ToolbarItem(placement: .topBarLeading) { accountButton.opacity(chromeOpacity) }
                 .contentMarginsRemoved()
         } else {
-            ToolbarItem(placement: .topBarLeading) { AccountSwitcherButton(avatarSize: 36) }
+            ToolbarItem(placement: .topBarLeading) { accountButton.opacity(chromeOpacity) }
         }
-        ToolbarItem(placement: .topBarTrailing) { newBotMenu }
+        ToolbarItem(placement: .topBarTrailing) {
+            newBotMenu
+                .opacity(chromeOpacity)
+                .disabled(switcherShown)
+        }
+    }
+
+    private var accountButton: some View {
+        AccountSwitcherButton(avatarSize: 36)
+            .disabled(switcherShown)
     }
 
     /// The system's own menu: one entry per source Settings leaves on.

@@ -2433,3 +2433,48 @@
   就是这个形态；若以后首页改成大标题或自定义导航栏，这个基准需要跟着调整。极窄机型上
   `maxPillWidth` 会很小，长文字会更早截断（这是设计要求，未实测具体宽度）。
 - 关联：C0197（语音发送链路）、C0201（底部 48pt token）。
+
+### C0202 · 2026-11-05 · 首页双指捏合进入来源切换（仿锁屏壁纸页）
+
+- 原因：首页有三个会话来源（Coe / DS Bot / DSH 对话，由设置里的「首页来源」决定开哪几个），C0194 起首页主体
+  固定显示「置顶」，来源列表一直有代码但没有入口。穗要仿 iOS 锁屏长按的壁纸切换，入口换成**双指捏合**。
+  按确认的两个决定实现：① 切换态里顶部头像/「＋」与底部搜索栏/语音钮**淡出**并禁止交互；② **置顶也算一张卡片**
+  （卡片 = 置顶 + 开着的来源），选定后首页主体换成那一张。
+- 新增（`apps/ios/Views/HomeSourceSwitcher.swift`，XcodeGen 已重新生成工程）：
+  - `HomeFace`：`.pinned` 或 `.source(HomeSource)`，带 `stored`/`init(stored:)` 与显示名（置顶 / Coe / DS Bot / DSH 对话）。
+  - `SourceSwitcher`：切换态。上方来源名（`.title3.semibold`）+ 中间横向分页卡片 + 下方分页点（当前项 18×7 胶囊，
+    其余 7×7 圆点）。卡片宽 = 屏宽 × `miniScale`(0.86)，高 = min(屏高 × 0.62, 卡宽 × 1.5)，间距 12，
+    `contentMargins` 让首尾卡片也能居中。
+  - 分页：`ScrollView(.horizontal)` + `.scrollTargetBehavior(.viewAligned)` + `.scrollPosition(id:)`，
+    `onChange` 时更新居中卡片并 `Haptics.selection()`（沿用现有档位，关掉不震）。
+  - `SourceCard`（`mini(_:)`）：**真实列表**（由首页传入的 `faceList`）按整屏尺寸布局后 `.scaleEffect(0.86, anchor: .topLeading)`
+    缩到卡片大小，圆角 28 裁剪 + 1pt 描边 + 阴影；内容 `allowsHitTesting(false)`，只有卡片本身的点按生效。
+- 变化（`Views/HomeSourcesView.swift`）：
+  - 新增 `@AppStorage(HomeSourcePrefs.faceKey)`（`homeFace`）、`switcherShown` / `switcherFace` / `pinchScale` 三个状态；
+    `face`（当前面，来源被关掉时回落置顶）、`faces`（= 置顶 + `enabledOrdered`）、`faceList(_:)`。
+  - 首页主体从「固定置顶」改为 `faceList(face)`；搜索过滤逻辑不变。
+  - 手势：列表上 `.simultaneousGesture(MagnifyGesture(minimumScaleDelta: 0.04))`（不抢单指滚动）——`onChanged`
+    把 `magnification` 夹到 `[0.86, 1]` 实时缩放页面（顺带收起搜索键盘）；`onEnded` 时 `magnification < 0.93`
+    吸附进入切换态，否则弹回。只有首页根页（`accounts.selection == nil && openDSHSession == nil`）且没有语音/设置
+    sheet 打开时才响应。切换态里再挂一个 `MagnifyGesture`，`magnification > 1.08`（向外张开）按当前卡片退出。
+  - chrome：`chromeOpacity = 切换态 ? 0 : 1 − shrink`（`shrink` 由 `pinchScale` 换算），套在底部栏与两个
+    toolbar 按钮上；切换态时底部栏 `allowsHitTesting(false)`、两个菜单 `.disabled(true)`。
+  - 退出：点卡片 → `pick(face)`：写入 `faceRaw`、把 `pinchScale` 置为 0.86 再动画回 1（卡片放大回整页），
+    同时收起切换态。
+- 手势冲突核查：单指纵向滚动不冲突（捏合两指、且用 simultaneousGesture）；行长按菜单是单指长按，不冲突；
+  返回手势只存在于二级页，切换态只在根页；底部语音胶囊的上/下推在另一区域，且切换态时整条栏禁用交互；
+  搜索框聚焦时捏合会先收键盘。
+- 未做（按需求排除）：底部「自定义」与 + 按钮、卡片上的编辑/删除/长按菜单。
+- 文件：`apps/ios/Views/HomeSourceSwitcher.swift`（新）、`apps/ios/Views/HomeSourcesView.swift`、
+  `apps/ios/Views/HomeSource.swift`（`HomeSourcePrefs.faceKey`）、`apps/Codync.xcodeproj/project.pbxproj`（XcodeGen 生成）。
+- 验证：`xcodebuild build -project apps/Codync.xcodeproj -scheme 'iOS Dev' -configuration DevDebug`
+  （真机 destination、ui-preview 覆盖、构建号 190）**编译通过，0 error**，改动文件 0 warning；
+  `xcrun devicectl device install app` 装到 iPhone 16 Pro（`com.suiyikou.codync.uipreview` 2.36.0 / 190）成功。
+  按要求**不自测**：不跑测试、不截图、不用 CDP，捏合手感、翻页吸附、卡片缩放观感均未实测。
+- 限制/待办：
+  - 捏合过程中只缩放列表本身（导航栏与底部栏按比例淡出），列表在缩放时没有同步变圆角；进入切换态是一次
+    交叉淡入，不是 matchedGeometry 的连续变形，手感需要真机确认。
+  - 卡片里同时挂着 N 个真实 `List`（每个都 `.scrollDisabled`），数量等于开着的来源 + 置顶；来源很多时开销会上去。
+  - 双指按住不动时，首根手指仍可能唤起行的长按预览（未在真机确认），若碍事可再加 `minimumScaleDelta` 门槛。
+  - 切换态背景用 `Palette.background` 纯色，不是当前页的模糊快照。
+- 关联：C0194（首页只显示置顶、来源列表保留）、C0199、C0201。备份 tag：`backup/before-source-pinch`（`dde7eb62`）。

@@ -58,6 +58,8 @@ enum HomeBadge {
 enum HomeSourcePrefs {
     static let sourcesKey = "homeEnabledSources"
     static let pinnedKey = "homePinned"
+    /// Which face the home last showed: `pinned`, or a source's raw value (see `HomeFace`).
+    static let faceKey = "homeFace"
     static let defaultRaw = HomeSource.coe.rawValue
 
     static func enabled(from raw: String) -> Set<HomeSource> {

@@ -35,6 +35,7 @@
 		518BD325D0FE6D7AAE973588 /* BotRosterLine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70093609851E57B883D23DB9 /* BotRosterLine.swift */; };
 		52CF04B855C6AAEC47B75B8F /* CodyncKit in Frameworks */ = {isa = PBXBuildFile; productRef = 1285DDFA0390A76ECDAAD6C0 /* CodyncKit */; };
 		54CEEA0734C2940E2D9FAC7D /* AXTree.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4D13418ABB5FD7CFC087677 /* AXTree.swift */; };
+		558384CB2FF51979DD5AFEB9 /* HomeSourceSwitcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF29FFF3EB9793DD1AF51471 /* HomeSourceSwitcher.swift */; };
 		5849B65F697A599EF4E71453 /* HomeSourcesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B293175C9E85107FF1223923 /* HomeSourcesView.swift */; };
 		5A56EF5D36D12ACCEA100642 /* LanguageSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73D324231A9BCE79C84C0403 /* LanguageSettings.swift */; };
 		5C9AE497DA83EB32AEC9057C /* OpenBotIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C4EB0DBA2F08CD7C0E25E30 /* OpenBotIntent.swift */; };
@@ -186,6 +187,7 @@
 		A65FE0504B741D0B44DB2516 /* CodyncApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodyncApp.swift; sourceTree = "<group>"; };
 		AAD970B8394F4EDFB85A8936 /* CodyncBot-cloud-Tint.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "CodyncBot-cloud-Tint.ttf"; sourceTree = "<group>"; };
 		AD18A04CD014230F1B7B0535 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		AF29FFF3EB9793DD1AF51471 /* HomeSourceSwitcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeSourceSwitcher.swift; sourceTree = "<group>"; };
 		B274A0195CB3B2409EA4C194 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
 		B293175C9E85107FF1223923 /* HomeSourcesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeSourcesView.swift; sourceTree = "<group>"; };
 		B6E13F8EA6C7B0DA4D899FEE /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
@@ -359,6 +361,7 @@
 				B7250AAB773DD3B935922021 /* DSHConversationView.swift */,
 				3EFE467F7DCE50480B80E50A /* HomeSource.swift */,
 				B293175C9E85107FF1223923 /* HomeSourcesView.swift */,
+				AF29FFF3EB9793DD1AF51471 /* HomeSourceSwitcher.swift */,
 				73D324231A9BCE79C84C0403 /* LanguageSettings.swift */,
 				6FC76D28AB02DF1427D530ED /* LaunchSplash.swift */,
 				1CC287193FD50B9E97D3138A /* OrderingView.swift */,
@@ -772,6 +775,7 @@
 				AC044B31C0B4A68463B9024E /* ComputersView.swift in Sources */,
 				BB2A14D476D01DE8BF9110D5 /* DSHConversationView.swift in Sources */,
 				41BBBC5811EC8406D7BC866C /* HomeSource.swift in Sources */,
+				558384CB2FF51979DD5AFEB9 /* HomeSourceSwitcher.swift in Sources */,
 				5849B65F697A599EF4E71453 /* HomeSourcesView.swift in Sources */,
 				5A56EF5D36D12ACCEA100642 /* LanguageSettings.swift in Sources */,
 				35CFB641A4F10C0EBD21CB14 /* LaunchSplash.swift in Sources */,
