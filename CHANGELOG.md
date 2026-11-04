@@ -1615,3 +1615,11 @@
 - 验证：`xcodebuild build -scheme 'iOS Dev' -configuration DevDebug` 通过；已装到 iPhone 16 Pro（2.36.0 / 159）并启动。按要求未自测、未截图。
 - 限制/待办：顶部效果完全由系统决定，若系统行为不如预期只能调整内容内边距，不再自绘。
 - 关联：C0156、C0159、C0160。
+### C0162 · 2026-11-04 · 修 C0161 把导航栏头像改宽的问题
+
+- 原因：C0161 按「工具栏只用标准项、去掉多余修饰」把 `ToolbarItem` 上的 iOS 27 分支连同 `.contentMarginsRemoved()` 一起删了。而这台手机是 iOS 27.3，正走那个分支：iOS 27 会给工具栏项一个图标尺寸的内边距，照片放进导航栏胶囊里就会被横向拉开——原注释写的就是这件事，删掉即回归。
+- 变化：恢复 `toolbarContent` 里的 `#available(iOS 27.0, *)` 分支，仅对头像项应用 `.contentMarginsRemoved()`；iOS 26 及以下仍用标准 `ToolbarItem`。C0161 的其它改动（首页/聊天页改系统 `.scrollEdgeEffectStyle(.soft, for: .top)`、删自绘模糊与 `ProgressiveTopBlur`、不再强制 `toolbarBackground`）保持不变。
+- 文件：`apps/ios/Views/HomeSourcesView.swift`。
+- 验证：`xcodebuild build -scheme 'iOS Dev' -configuration DevDebug` 通过；已装到 iPhone 16 Pro（2.36.0 / 160，iOS 27.3）并启动。按要求未自测、未截图。
+- 限制/待办：这是 iOS 27 工具栏布局的适配，属于系统 API 用法，不是顶部模糊的新补丁。
+- 关联：C0161。

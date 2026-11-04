@@ -272,7 +272,14 @@ struct HomeSourcesView: View {
     }
 
     @ToolbarContentBuilder private var toolbarContent: some ToolbarContent {
-        ToolbarItem(placement: .topBarLeading) { AccountSwitcherButton(avatarSize: 36) }
+        // iOS 27 gives a toolbar item an icon-sized inset; a photo inside it is stretched wide in the
+        // bar's capsule unless the item asks for its content margins to go.
+        if #available(iOS 27.0, *) {
+            ToolbarItem(placement: .topBarLeading) { AccountSwitcherButton(avatarSize: 36) }
+                .contentMarginsRemoved()
+        } else {
+            ToolbarItem(placement: .topBarLeading) { AccountSwitcherButton(avatarSize: 36) }
+        }
         ToolbarItem(placement: .topBarTrailing) { newBotMenu }
     }
 
