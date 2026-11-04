@@ -1702,3 +1702,20 @@
 - 验证：`xcodebuild build -scheme 'iOS Dev' -configuration DevDebug` 通过；已装到 iPhone 16 Pro（2.36.0 / 165）并启动。按要求未自测、未截图。
 - 限制/待办：`tabViewBottomAccessory(isEnabled:)` 需 iOS 26.1，这里用 ViewModifier 条件挂载；DSH 新建依赖网关已连接。
 - 关联：C0163、C0164、C0165、C0166。
+### C0168 · 2026-11-04 · 附属栏与语音 sheet 返工：会话页隐藏底栏、头像对齐、原地展开、相机翻转
+
+- 原因：C0167 之后有四处不合用——push 进会话页底栏还在；附属栏左边是图标而不是主 bot 头像、间距不对；点附属栏直接弹 sheet 太重；相机跳去 App 另一个独立拍照页。
+- 变化：
+  - **二级页隐藏底栏（最高优先级）**：每个 tab 的 `navigationDestination` 里，`ChatScreen` 与 `DSHConversationView` 都加 `.toolbar(.hidden, for: .tabBar)`；附属栏改成「只在当前 tab 的根页面挂载」——`isTabRoot`（`accounts.selection == nil && openDSHSession == nil`）与 tab 条件一起判断。返回一级页由系统动画恢复。会话页自己的输入框未动。
+  - **+ 菜单汉化**：`New Coe chat / New DS Bot chat / New DSH chat` 三条补进 zh-Hans / zh-Hant（新建 Coe 会话 / 新建 DS Bot 会话 / 新建 DSH 会话），不再显示英文。
+  - **附属栏样式**：左边换成主 bot 头像 24pt（`CharacterAvatar`，Circle 裁切），文字「跟 <主 Bot 名> 说点什么…」17pt `.secondary`；左右各 12pt、头像与文字间距 8，与 tab bar 边缘对齐；`inline` 只留头像，`expanded` 显示完整一行。整条可点。
+  - **原地展开成 76pt 胶囊**：点附属栏不再弹 sheet，而是附属栏自己展开成 76pt 玻璃胶囊（`VoiceMiniBar`：头像 36 / 一条线波形 / 设置 44 / 暂停 44），spring 动画，并立刻开始录音；下方五个 tab 位置不动、始终可点。
+    - 往上拖超过 40pt：弹出现有语音 sheet 并直接到 `.medium`，录音状态与已识别文字无缝带过去。
+    - 收起：往下拖，或点页面空白处（展开期间 TabView 内容上盖一层透明点击层）；有文字时弹「丢弃这段语音？」沿用既有确认。
+    - 实现方式：**先用原生 `.tabViewBottomAccessory`**（内容在展开态给到 76pt），没有退到 overlay 玻璃胶囊——若真机上系统把附属栏压矮，再改用 overlay 方案。
+    - 展开期间再打开 sheet 时，sheet 关闭会一并把胶囊收起。
+  - **半屏相机的翻转页**：语音 sheet 内置相机页 `VoiceCameraPage`（AVCaptureSession 实时取景、左上返回 `arrow-left-line` 44 玻璃钮、下方中间快门、右下切换前后摄 `camera-switch-line`、左下相册 `PhotosPicker`）；按下相机按钮用 `rotation3DEffect` 绕 Y 轴翻转 0.45s、中途（225ms）切换内容，返回时反向翻回，录音与文字保留；拍照或选图后自动翻回语音页并在标题下显示 64pt 缩略图。不再跳 App 原有的 `\.capturePhoto` 独立页面；相机权限沿用 AVCaptureDevice 授权流程。
+- 文件：`apps/ios/Views/HomeSourcesView.swift`、`apps/ios/Kit/Sources/CodyncUI/Voice/VoiceSheetView.swift`、`VoiceCamera.swift`（新）、`VoiceMiniBar.swift`（新）、`Resources/Languages/zh-Hans.json`、`zh-Hant.json`。
+- 验证：`xcodebuild build -scheme 'iOS Dev' -configuration DevDebug` 通过；已装到 iPhone 16 Pro（2.36.0 / 166）并启动。按要求未自测、未截图。
+- 限制/待办：附属栏展开高度依赖系统是否允许 76pt（真机确认，不行改 overlay）；相机页取景方向未做旋转适配；`.large` 仍复用半屏布局。
+- 关联：C0166、C0167。

@@ -28,6 +28,12 @@ struct HomeSourcesView: View {
     @State private var showVoice = false
     /// Which tab is showing. The system keeps the accessory and the tab bar in step with it.
     @State private var selection = HomeTab.pinned
+    /// The accessory is open in place as the 76pt pill, recording.
+    @State private var voiceBarOpen = false
+    /// Closing the open bar with words in it asks first.
+    @State private var confirmBarDiscard = false
+    /// The voice settings sheet, opened from the open bar's gear.
+    @State private var showVoiceSettings = false
     /// Which height it rests at: the 76pt pill, half, or full.
     @State private var voiceDetent: PresentationDetent = VoiceSheetView.small
     /// The glass pill that says what was just sent.
@@ -90,6 +96,7 @@ struct HomeSourcesView: View {
                 // Pulled down or sent: either way the recording is over and the bar comes back.
                 voice.discard()
                 voiceDetent = VoiceSheetView.small
+                voiceBarOpen = false
             }) {
                 VoiceSheetView(lead: leadBot?.bot, session: voice, detent: $voiceDetent,
                                openSystemSettings: { openSystemVoiceSettings() })
@@ -104,6 +111,21 @@ struct HomeSourcesView: View {
                     .interactiveDismissDisabled(voice.hasWords)
             }
             .glassToast($toast, topPadding: 6)
+            .sheet(isPresented: $showVoiceSettings) {
+                VoiceLanguageSheet()
+                    .presentationDetents([.medium])
+                    .presentationDragIndicator(.visible)
+            }
+            .confirmationDialog(L10n.tr("Discard this voice message?"), isPresented: $confirmBarDiscard,
+                                titleVisibility: .visible) {
+                Button(L10n.tr("Discard"), role: .destructive) {
+                    voice.discard()
+                    withAnimation(Motion.reduced(.spring(response: 0.35, dampingFraction: 0.85), reduceMotion)) {
+                        voiceBarOpen = false
+                    }
+                }
+                Button(L10n.tr("Keep editing"), role: .cancel) {}
+            }
             .onChange(of: voice.phase) { _, phase in
                 switch phase {
                 // The words are read at half height: come up if the pill is where it still sits.
@@ -174,8 +196,18 @@ struct HomeSourcesView: View {
         // Scrolling down shrinks the bar to the tab you are on and folds the accessory into it.
         .tabBarMinimizeBehavior(.onScrollDown)
         // Only the two tabs that talk to Coe carry the bar; the others leave the screen to their list.
-        .modifier(VoiceBar(shown: selection == .pinned || selection == .coe,
-                           botName: leadBot?.bot.name ?? "Coe", onTap: beginVoice))
+        .modifier(VoiceBar(shown: (selection == .pinned || selection == .coe) && isTabRoot,
+                           lead: leadBot?.bot, session: voice, open: voiceBarOpen,
+                           onTap: expandVoiceBar, onCollapse: collapseVoiceBar,
+                           onRaise: raiseVoiceBar, onSettings: { showVoiceSettings = true }))
+        // Tapping the page while the bar is open puts it away; the bar itself is outside this overlay.
+        .overlay {
+            if voiceBarOpen {
+                Color.clear
+                    .contentShape(Rectangle())
+                    .onTapGesture { collapseVoiceBar() }
+            }
+        }
         .tint(Palette.text)
         .onChange(of: enabledSources) { _, sources in
             // The tab you were on has just been switched off in Settings: back to 置顶.
@@ -190,13 +222,21 @@ struct HomeSourcesView: View {
                 .navigationTitle("")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar { toolbarContent }
-                .navigationDestination(for: BotReference.self) { ref in ChatScreen(ref: ref) }
-                .navigationDestination(item: $openDSHSession) { _ in DSHConversationView(gateway: dsh) }
+                // A pushed page is not the tab's root: the tab bar and the accessory go with it.
+                .navigationDestination(for: BotReference.self) { ref in
+                    ChatScreen(ref: ref).toolbar(.hidden, for: .tabBar)
+                }
+                .navigationDestination(item: $openDSHSession) { _ in
+                    DSHConversationView(gateway: dsh).toolbar(.hidden, for: .tabBar)
+                }
         }
     }
 
     /// The open conversation, shared by every tab: opening one from a notification or a link lands in
     /// whichever tab is on screen.
+    /// Nothing is pushed on the tab in front, so its root is what the user is looking at.
+    private var isTabRoot: Bool { accounts.selection == nil && openDSHSession == nil }
+
     private var path: Binding<[BotReference]> {
         Binding(get: { accounts.selection.map { [$0] } ?? [] }, set: { accounts.selection = $0.last })
     }
@@ -306,6 +346,41 @@ struct HomeSourcesView: View {
             accounts.selection = lead.ref
         }
         return true
+    }
+
+    /// Tapping the accessory opens the voice bar in place and starts hearing, with the tab bar and its
+    /// five tabs left exactly where they are.
+    private func expandVoiceBar() {
+        guard !voiceBarOpen else { return }
+        guard leadBot != nil else {
+            toast = GlassToastItem(icon: "error-warning-line",
+                                   text: L10n.tr("Pick a main bot in Settings first"))
+            return
+        }
+        withAnimation(Motion.reduced(.spring(response: 0.35, dampingFraction: 0.85), reduceMotion)) {
+            voiceBarOpen = true
+        }
+        Task { await voice.begin() }
+    }
+
+    /// The bar goes back to its resting line: stop hearing, and drop whatever was said.
+    private func collapseVoiceBar() {
+        guard voiceBarOpen else { return }
+        guard !voice.hasWords else {
+            confirmBarDiscard = true
+            return
+        }
+        voice.discard()
+        withAnimation(Motion.reduced(.spring(response: 0.35, dampingFraction: 0.85), reduceMotion)) {
+            voiceBarOpen = false
+        }
+    }
+
+    /// Pulling the bar up takes the whole sheet, at half height, with the recording as it is.
+    private func raiseVoiceBar() {
+        guard voiceBarOpen else { return }
+        voiceDetent = .medium
+        showVoice = true
     }
 
     /// The words (or a refusal) are read at half height.
@@ -885,17 +960,27 @@ struct DSHSessionRow: View {
 
 /// The native bottom accessory: one voice capsule, the whole of it a button. Folded into the tab bar
 /// it says only that it listens; expanded, it says who to.
-/// Mounts the bottom accessory only on the tabs that carry it: the `isEnabled:` form of the modifier
-/// is iOS 26.1 and this app builds against 26.0.
+/// Mounts the bottom accessory only on the tabs that carry it, and only at their root.
 private struct VoiceBar: ViewModifier {
     let shown: Bool
-    let botName: String
+    let lead: Bot?
+    let session: VoiceSession
+    let open: Bool
     let onTap: () -> Void
+    let onCollapse: () -> Void
+    let onRaise: () -> Void
+    let onSettings: () -> Void
 
     @ViewBuilder func body(content: Content) -> some View {
         if shown {
             content.tabViewBottomAccessory {
-                HomeVoiceAccessory(botName: botName, onTap: onTap)
+                if open {
+                    // The same pill as the sheet's smallest detent, in the accessory's own place.
+                    VoiceMiniBar(lead: lead, session: session, openSettings: onSettings,
+                                 onRaise: onRaise, onCollapse: onCollapse)
+                } else {
+                    HomeVoiceAccessory(lead: lead, onTap: onTap)
+                }
             }
         } else {
             content
@@ -903,24 +988,45 @@ private struct VoiceBar: ViewModifier {
     }
 }
 
+/// The resting accessory: the lead bot's face and an invitation. Folded into the tab bar only the
+/// face is left.
 struct HomeVoiceAccessory: View {
     @Environment(\.tabViewBottomAccessoryPlacement) private var placement
-    /// Who the words would go to: the lead bot, by name.
-    let botName: String
+    let lead: Bot?
     let onTap: () -> Void
 
+    private var name: String { lead?.name ?? "Coe" }
+
     var body: some View {
-        // The whole bar is the button: a microphone on the left, and what it is for on the right.
         Button(action: onTap) {
-            HStack(spacing: 10) {
-                Image(systemName: "mic.fill")
-                Text(placement == .expanded ? "跟 \(botName) 说点什么…" : "说点什么")
-                    .lineLimit(1)
+            HStack(spacing: 8) {
+                avatar
+                if placement == .expanded {
+                    Text("跟 \(name) 说点什么…")
+                        .font(.system(size: 17))
+                        .foregroundStyle(Palette.secondary)
+                        .lineLimit(1)
+                }
                 Spacer(minLength: 0)
             }
+            // 12pt at both ends, with the tab bar's own edges.
+            .padding(.horizontal, 12)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(Text("跟 \(botName) 说点什么…"))
+        .accessibilityLabel(Text("跟 \(name) 说点什么…"))
+    }
+
+    /// 24pt, round, filled.
+    private var avatar: some View {
+        Group {
+            if let lead {
+                CharacterAvatar(bot: lead, size: 24, animated: false)
+            } else {
+                Circle().fill(Palette.bubbleAgent)
+            }
+        }
+        .frame(width: 24, height: 24)
+        .clipShape(Circle())
     }
 }

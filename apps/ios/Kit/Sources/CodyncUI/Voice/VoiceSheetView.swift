@@ -20,7 +20,6 @@ public struct VoiceSheetView: View {
 
     @Bindable private var bound: VoiceSession
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.capturePhoto) private var capturePhoto
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @FocusState private var typing: Bool
     @State private var breathing = false
@@ -28,6 +27,10 @@ public struct VoiceSheetView: View {
     @State private var confirmDiscard = false
     /// The voice settings open as a second sheet on top of this one: one presenter shows one sheet.
     @State private var showSettings = false
+    /// The words page has flipped round to the camera, and where the flip is.
+    @State private var showingCamera = false
+    @State private var flip: Double = 0
+    @State private var camera = VoiceCamera()
 
     public init(lead: Bot?, session: VoiceSession, detent: Binding<PresentationDetent>,
                 openSystemSettings: @escaping () -> Void) {
@@ -42,10 +45,18 @@ public struct VoiceSheetView: View {
 
     public var body: some View {
         Group {
-            if isSmall {
+            if showingCamera {
+                VoiceCameraPage(camera: camera, onBack: { flipCamera(to: false) }) { image in
+                    session.attach(image)
+                    flipCamera(to: false)
+                }
+                .rotation3DEffect(.degrees(flip), axis: (x: 0, y: 1, z: 0))
+            } else if isSmall {
                 pill
+                    .rotation3DEffect(.degrees(flip), axis: (x: 0, y: 1, z: 0))
             } else {
                 tall
+                    .rotation3DEffect(.degrees(flip), axis: (x: 0, y: 1, z: 0))
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: isSmall ? .center : .top)
@@ -305,11 +316,24 @@ public struct VoiceSheetView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    /// The camera: the app's own capture sheet, handing the photo to this recording.
+    /// The camera: the sheet turns round to its own viewfinder, photo and all.
     private var cameraButton: some View {
         circle("camera-line", label: "Take a photo", tint: nil) {
-            Haptics.impact()
-            capturePhoto { image in session.attach(image) }
+            flipCamera(to: true)
+        }
+    }
+
+    /// Half a turn on the Y axis: the content swaps at the edge-on moment, so it reads as one sheet
+    /// turning over rather than two views cross-fading.
+    private func flipCamera(to camera: Bool) {
+        Haptics.impact()
+        withAnimation(Motion.reduced(.easeInOut(duration: 0.45), reduceMotion)) {
+            flip += 180
+        }
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(225))
+            showingCamera = camera
+            if !camera { self.camera.stop() }
         }
     }
 
