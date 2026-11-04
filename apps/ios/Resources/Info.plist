@@ -2,6 +2,22 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+    <!-- This app draws its own words from JSON; these tell iOS the languages it supports, so
+         system UI inside it (the text edit menu's Copy, Paste, Translate, AutoFill …) comes out
+         in the reader's language instead of English. -->
+    <key>CFBundleDevelopmentRegion</key>
+    <string>en</string>
+    <key>CFBundleLocalizations</key>
+    <array>
+        <string>en</string>
+        <string>zh-Hans</string>
+        <string>zh-Hant</string>
+        <string>ja</string>
+        <string>ko</string>
+        <string>fr</string>
+        <string>de</string>
+        <string>es</string>
+    </array>
     <key>CodyncEnvironment</key><string>$(CODYNC_ENV)</string>
     <key>CodyncAppGroup</key><string>$(CODYNC_APP_GROUP)</string>
     <key>CodyncURLScheme</key><string>$(CODYNC_URL_SCHEME)</string>

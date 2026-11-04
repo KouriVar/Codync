@@ -1042,6 +1042,17 @@
 - 验证：模拟器 DevDebug 截图/连拍确认；真机 DevDebug 编译安装到 iPhone 16 Pro。
 - 关联：C0112。
 
+### C0114 · 2026-11-04 · 输入框长按菜单汉化（系统编辑菜单）
+
+- 原因：输入框长按弹出的是 UIKit 系统编辑菜单（复制/粘贴/翻译/自动填充），它按 App 声明的语言本地化；App 的 Info.plist 没声明 `CFBundleLocalizations`（只有英文），所以在中文手机上也是英文。
+- 变化：
+  - `apps/ios/Resources/Info.plist`：新增 `CFBundleLocalizations`（en、zh-Hans、zh-Hant、ja、ko、fr、de、es）与 `CFBundleDevelopmentRegion`。
+  - `CodyncKit/L10n.swift`：新增 `AppLanguage.applyToSystemMenus(in:)`，`setPreference` 时同步写入 `AppleLanguages`。
+  - `apps/ios/App/CodyncApp.swift`：`@main` 改为 `CodyncAppLauncher`，在 SwiftUI 启动前调用 `applyToSystemMenus()`，让 UIKit 系统菜单跟随 App 内选择的语言。
+- 说明：翻译/自动填充是系统提供项，不能单独改名，只能随语言整体切换。
+- 验证：模拟器与真机 DevDebug 构建通过；真机安装。
+- 关联：C0113。
+
 ### C0115 · 2026-11-04 · 云端关闭时桌面端跳过登录欢迎页，隐藏账号入口
 
 - 原因：本机 host 以 `CODYNC_CLOUD=off` 运行（C0107），账号已无法把任何东西送到别处；但桌面端仍按 `pk_live_` 判断 `configured=true`（`main/account.ts:35`），`welcome-gate.ts` 于是在未登录时把窗口拦在 Apple/Google/GitHub 登录页上，账号入口也照旧显示。
@@ -2014,3 +2025,14 @@
   - host 的 `Bot` 只有 `status`（idle/working/needsInput/error）、`activity`（自由文本）、`startedAt`，**没有**能区分「思考中 / 正在跑某一步」的结构化字段。原来的两种动效（思考时呼吸、工作时扫光）因此合成一种：工作时扫光、等你点同意时静止加黄点。要把呼吸找回来需要 host 增加阶段字段，属 host 改动，本次不做。
   - `de/es/fr/ja/ko` 五个语言包只带上了 C0109 已有的 9 条文案改动，未新增 key。
 - 关联：C0109、C0112、C0113。
+
+### C0188 · 2026-11-05 · 长按菜单汉化：切回「跟随系统」时清掉 AppleLanguages，并提示需重启
+
+- 原因：C0114 让 `AppleLanguages` 跟着 App 内选择走，但 `.system` 分支直接 `return`——只要选过中文再切回「跟随系统」，这条覆盖永远清不掉，UIKit 的编辑菜单会一直停在中文，只有重装才恢复。
+- 变化：
+  - `Kit/Sources/CodyncKit/L10n.swift`：`applyToSystemMenus(in:)` 的 `.system` 分支改为 `removeObject(forKey: "AppleLanguages")`，让 `CFBundleLocalizations` 与设备语言重新决定。
+  - `Views/LanguageSettings.swift`：语言页底部加一行小字 `Restart the app for the new language to take effect`——`AppleLanguages` 是启动时读一次的，切换后要重启才生效。
+  - `Resources/Languages/zh-Hans.json`：新增该 key 一条（「切换后重启 App 生效」）。英文侧不建 json、key 本身即英文；zh-Hant 缺 key 时回落 zh-Hans。
+- 验证：`xcodebuild build -scheme 'iOS Dev' -configuration DevDebug` 通过（0 error / 0 warning）。按要求未跑测试、未截图。
+- 限制/待办：iOS 不允许 App 自行重启，"重启生效"只能靠这行提示，没有其它手段。
+- 关联：C0114。

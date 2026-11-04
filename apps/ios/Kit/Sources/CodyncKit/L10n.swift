@@ -52,7 +52,33 @@ public enum AppLanguage: String, CaseIterable, Sendable, Identifiable, Hashable 
 
     public static func setPreference(_ language: AppLanguage, in store: UserDefaults = defaults) {
         store.set(language.rawValue, forKey: storageKey)
+        applyToSystemMenus(in: store)
         LanguageUpdates.shared.changed()
+    }
+
+    /// System UI inside the app — the text edit menu's Copy, Paste, Translate, AutoFill, and an
+    /// alert's own buttons — is localized by UIKit, which follows `AppleLanguages`, not this
+    /// app's JSON tables. Point it at the language the app shows. `.system` clears the override,
+    /// so the bundle's `CFBundleLocalizations` and the device's language decide again — without
+    /// that, choosing 系統 after 中文 would leave the menus Chinese for good.
+    public static func applyToSystemMenus(in store: UserDefaults = defaults) {
+        let choice = preference(in: store)
+        let code: String?
+        switch choice {
+        case .system: code = nil
+        case .zh: code = "zh-Hans"
+        case .zhHant: code = "zh-Hant"
+        default: code = choice.rawValue
+        }
+        guard let code else {
+            if UserDefaults.standard.object(forKey: "AppleLanguages") != nil {
+                UserDefaults.standard.removeObject(forKey: "AppleLanguages")
+            }
+            return
+        }
+        if UserDefaults.standard.stringArray(forKey: "AppleLanguages") != [code] {
+            UserDefaults.standard.set([code], forKey: "AppleLanguages")
+        }
     }
 
     public static func systemIsChinese(languages: [String] = Locale.preferredLanguages) -> Bool {

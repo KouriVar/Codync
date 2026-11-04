@@ -38,6 +38,10 @@ struct LanguagePage: View {
                 } label: { EmptyView() }
                 .pickerStyle(.inline)
                 .labelsHidden()
+            } footer: {
+                // UIKit reads AppleLanguages once at launch, so the text edit menu follows on the
+                // next start, not the moment the picker changes.
+                Text(L10n.tr("Restart the app for the new language to take effect"))
             }
         }
         .listRowSeparator(.hidden)

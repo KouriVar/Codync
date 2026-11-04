@@ -5,7 +5,16 @@ import Observation
 import UserNotifications
 import WidgetKit
 
+/// Reads the language choice before SwiftUI starts: UIKit's own UI (the text edit menu, an
+/// alert's buttons) is localized from `AppleLanguages`, which is read once at launch.
 @main
+enum CodyncAppLauncher {
+    static func main() {
+        AppLanguage.applyToSystemMenus()
+        CodyncApp.main()
+    }
+}
+
 struct CodyncApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) private var delegate
     @State private var app = AppStore.shared
