@@ -1345,3 +1345,16 @@
 - 限制/待办：真机安装与界面观感未核对。
 - 关联：C0097。
 
+### C0145 · 2026-11-04 · 语音胶囊的语音转写层（本机 Speech + 中文权限说明）
+
+- 原因：首页语音胶囊要把说的话转成文字，并且以后能换成云端服务，所以先只做一层可替换的转写。
+- 变化：
+  - 新增 `SpeechTranscriber` 协议（`locale` / `permission()` / `start()` / `pause()` / `resume()` / `finish()` / `cancel()`）：界面只依赖协议，换云端实现时不改胶囊。
+  - 新增 `OnDeviceSpeechTranscriber`：`SFSpeechRecognizer` 流式给部分结果；`supportsOnDeviceRecognition` 为真时设 `requiresOnDeviceRecognition`，优先本机识别；音量按 -50…0 dB 映射到 0…1；静音 2 秒上报一次 `.silence`；暂停保留已听到的内容，恢复后继续追加；`finish()` 最多等 1.2 秒拿最终文字，等不到就用已有的。
+  - 权限：先 `AVAudioApplication.requestRecordPermission()`，再 `SFSpeechRecognizer.requestAuthorization`，结果分 `granted` / `denied` / `unavailable`，拒了不抛异常由界面给提示。
+  - 麦克风与语音识别的用途说明改为中文。本工程这两条走 `project.yml` 的 `INFOPLIST_KEY_*`（构建设置，覆盖 Info.plist 文件里的同名键），改完重新生成 `project.pbxproj`；生成时被重写的 4 个 scheme 文件已按原样还原，另一会话的未提交改动没有被带走。
+- 文件：`apps/ios/Kit/Sources/CodyncUI/Voice/SpeechTranscriber.swift`（新）、`apps/project.yml`、`apps/Codync.xcodeproj/project.pbxproj`。
+- 验证：按要求只验证编译，`xcodebuild build -scheme 'iOS Dev' -configuration DevDebug -destination 'generic/platform=iOS'` 通过；构建产物 Info.plist 里两条用途说明已是中文。
+- 限制/待办：没有真机录音自测；`Speech` 在模拟器上的行为未验证。
+- 关联：C0148。
+
