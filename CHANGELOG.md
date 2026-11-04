@@ -1689,3 +1689,16 @@
 - 验证：`xcodebuild build -scheme 'iOS Dev' -configuration DevDebug` 通过；已装到 iPhone 16 Pro（2.36.0 / 164）并启动。按要求未自测、未截图。
 - 限制/待办：首页本轮未做任何改动，等对照结果后再定方案。
 - 关联：C0165。
+### C0167 · 2026-11-04 · 方案 B：附属栏只留语音胶囊，相机与键盘收进语音 sheet，+ 只负责新建
+
+- 原因：底部附属栏里再放相机，和「语音 + 相机」两个入口各有去处；相机其实属于「给这条消息配一张图」，键盘属于「不想说就打字」，都该在语音 sheet 里；+ 原来还是「新建 Bot / 新建群聊」，没有按来源分。
+- 变化：
+  - 附属栏：`.tabViewBottomAccessory` 只放一整条语音胶囊——左麦克风、右「跟 <主 Bot 名> 说点什么…」，整条可点，点开现有语音 sheet；相机按钮删除。只在置顶与 Coe 两个 tab 挂载（`selectedTab` 条件，用 `VoiceBar` 这个 ViewModifier 做条件挂载：`tabViewBottomAccessory(isEnabled:)` 需要 iOS 26.1，本工程 target 是 26.0），DS Bot / DSH / 搜索不显示。`inline`（滚动缩小后并入 tab 行）只显示麦克风 +「说点什么」，`expanded` 显示完整文字；系统默认样式，没叠玻璃。
+  - 语音 sheet：76pt 小档不变（头像 36、波形、设置 44、暂停 44）。半屏/全屏底部一行改为 **相机 44 / 键盘 44 / 设置 44 / 暂停 44**，图标均为 Remix line 24pt、玻璃按钮沿用 `VoiceGlass`：相机走 App 现有的 `\.capturePhoto` 拍照/选图，附图挂到本次消息；键盘调用新增的 `VoiceSession.startTyping()`（暂停录音、把已识别文字放进可编辑输入框并弹键盘，可继续打字）。
+  - 附了图片时标题下显示 64pt、圆角 12 的缩略图，右上角 ✕ 可删除；发送时文字与图片一起发给主 bot（`BotStore.sendAndConfirm(_:to:files:)` 新增 files 参数，走与会话打字相同的 `send` 入口）。
+  - v3.4 的既有行为保持不变：标题栏左 ✕、中间头像 24 + 名字、右侧发送按钮（无内容时留空占位）、有内容时关闭二次确认（现在「有内容」包含图片）、键盘「完成」、点空白收起键盘。
+  - +：改成原生 `Menu`，按设置里开着的来源列出「新建 Coe 会话 / 新建 DS Bot 会话 / 新建 DSH 会话」；Coe 与 DS Bot 都进同一个新建表单（DS Bot 即在该表单里填 `command`），DSH 直接 `dsh.newSession()`；菜单里没有任何相机/拍照入口。首页自己的相机 sheet 与 `attachCapturedPhoto` 随之删除（相机只在语音 sheet 里）。
+- 文件：`apps/ios/Views/HomeSourcesView.swift`、`apps/ios/Kit/Sources/CodyncUI/Voice/VoiceSheetView.swift`、`VoiceSession.swift`、`VoiceSend.swift`。
+- 验证：`xcodebuild build -scheme 'iOS Dev' -configuration DevDebug` 通过；已装到 iPhone 16 Pro（2.36.0 / 165）并启动。按要求未自测、未截图。
+- 限制/待办：`tabViewBottomAccessory(isEnabled:)` 需 iOS 26.1，这里用 ViewModifier 条件挂载；DSH 新建依赖网关已连接。
+- 关联：C0163、C0164、C0165、C0166。

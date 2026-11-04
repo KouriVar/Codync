@@ -20,6 +20,7 @@ public struct VoiceSheetView: View {
 
     @Bindable private var bound: VoiceSession
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.capturePhoto) private var capturePhoto
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @FocusState private var typing: Bool
     @State private var breathing = false
@@ -102,10 +103,15 @@ public struct VoiceSheetView: View {
     private var tall: some View {
         VStack(spacing: 12) {
             titleBar
+            if let photo = session.attachment {
+                attachmentRow(photo)
+            }
             transcript
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             HStack(spacing: 12) {
                 waveColumn
+                cameraButton
+                keyboardButton
                 settingsButton
                 micButton
             }
@@ -275,6 +281,42 @@ public struct VoiceSheetView: View {
             } else {
                 dismiss()
             }
+        }
+    }
+
+    /// The camera's photo: 64pt, rounded, with a ✕ that takes it back off.
+    private func attachmentRow(_ photo: UIImage) -> some View {
+        Image(uiImage: photo)
+            .resizable()
+            .scaledToFill()
+            .frame(width: 64, height: 64)
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .overlay(alignment: .topTrailing) {
+                Button { session.attach(nil) } label: {
+                    RemixIcon("close-line", size: 14, weight: .bold)
+                        .foregroundStyle(Palette.onAccent)
+                        .frame(width: 22, height: 22)
+                        .background(Palette.accentFill, in: Circle())
+                }
+                .buttonStyle(VoicePress())
+                .offset(x: 6, y: -6)
+                .accessibilityLabel(Text(L10n.tr("Remove the photo")))
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// The camera: the app's own capture sheet, handing the photo to this recording.
+    private var cameraButton: some View {
+        circle("camera-line", label: "Take a photo", tint: nil) {
+            Haptics.impact()
+            capturePhoto { image in session.attach(image) }
+        }
+    }
+
+    /// The keyboard: stop hearing and type the rest instead.
+    private var keyboardButton: some View {
+        circle("keyboard-line", label: "Type instead", tint: nil) {
+            session.startTyping()
         }
     }
 

@@ -22,7 +22,6 @@ struct HomeSourcesView: View {
     @State private var searchText = ""
     @State private var creating: NewTarget?
     @State private var confirmDelete: RosterItem?
-    @State private var showCameraSheet = false
     /// The voice capsule and what it says to the lead bot.
     @State private var voice = VoiceSession()
     /// The voice sheet is up (it opens on the microphone button).
@@ -85,7 +84,6 @@ struct HomeSourcesView: View {
                 default: break
                 }
             }
-            .sheet(isPresented: $showCameraSheet, content: cameraSheet)
             // The voice sheet: on the home's root view, never from a list row — a rebuilt anchor
             // there takes the sheet, and the home with it (C0035, C0136).
             .sheet(isPresented: $showVoice, onDismiss: {
@@ -122,7 +120,7 @@ struct HomeSourcesView: View {
             }
             .onChange(of: voiceDetent) { _, _ in Haptics.selection() }
             // The bar climbs back the moment the sheet starts down, not after it has gone.
-            .onAppear { voice.onSend = { await sendToLeadBot($0) } }
+            .onAppear { voice.onSend = { words, files in await sendToLeadBot(words, files: files) } }
             .sheet(isPresented: $showDSHConnect, content: dshConnectSheet)
             .codyncSheet(item: $creating) { target in creatingSheet(target) }
             .alert(deleteTitle, isPresented: deleteShown, presenting: confirmDelete) { item in
@@ -175,9 +173,9 @@ struct HomeSourcesView: View {
         }
         // Scrolling down shrinks the bar to the tab you are on and folds the accessory into it.
         .tabBarMinimizeBehavior(.onScrollDown)
-        .tabViewBottomAccessory {
-            HomeVoiceAccessory(onVoice: beginVoice, onCamera: { showCameraSheet = true })
-        }
+        // Only the two tabs that talk to Coe carry the bar; the others leave the screen to their list.
+        .modifier(VoiceBar(shown: selection == .pinned || selection == .coe,
+                           botName: leadBot?.bot.name ?? "Coe", onTap: beginVoice))
         .tint(Palette.text)
         .onChange(of: enabledSources) { _, sources in
             // The tab you were on has just been switched off in Settings: back to 置顶.
@@ -300,9 +298,9 @@ struct HomeSourcesView: View {
 
     /// The same send a typed message uses, so the bot answers exactly as it would in the chat. The
     /// sheet keeps the words and asks again when it comes back false.
-    private func sendToLeadBot(_ words: String) async -> Bool {
+    private func sendToLeadBot(_ words: String, files: [OutgoingFile] = []) async -> Bool {
         guard let lead = leadBot, let store = accounts.store(for: lead.ref.computerId) else { return false }
-        guard await store.sendAndConfirm(words, to: lead.bot.id) else { return false }
+        guard await store.sendAndConfirm(words, to: lead.bot.id, files: files) else { return false }
         // Stay on the home: the pill says where it went and opens it if tapped.
         toast = GlassToastItem(icon: "check-line", text: L10n.tr("Sent to") + " " + lead.bot.name) {
             accounts.selection = lead.ref
@@ -335,16 +333,29 @@ struct HomeSourcesView: View {
         ToolbarItem(placement: .topBarTrailing) { newBotMenu }
     }
 
+    /// The system's own menu: one entry per source Settings leaves on.
     private var newBotMenu: some View {
         Menu {
-            Button(action: newBot) { Label { Text(L10n.tr("New bot")) } icon: { RemixIcon("add-line") } }
-            Button(action: newGroup) { Label { Text(L10n.tr("New group chat")) } icon: { RemixIcon("team-line") } }
-                .disabled(onlineStores.isEmpty)
+            if enabledSources.contains(.coe) {
+                Button(action: { newBot(source: .coe) }) {
+                    Label { Text(L10n.tr("New Coe chat")) } icon: { RemixIcon("ghost-4-line") }
+                }
+            }
+            if enabledSources.contains(.dsBot) {
+                Button(action: { newBot(source: .dsBot) }) {
+                    Label { Text(L10n.tr("New DS Bot chat")) } icon: { RemixIcon("deepseek-line") }
+                }
+            }
+            if enabledSources.contains(.dsh) {
+                Button(action: { dsh.newSession() }) {
+                    Label { Text(L10n.tr("New DSH chat")) } icon: { RemixIcon("chat-ai-line") }
+                }
+            }
         } label: {
             RemixImage("add-line", size: 24)
         }
         .accessibilityLabel(Text(L10n.tr("New")))
-        .disabled(availableStores.isEmpty)
+        .disabled(availableStores.isEmpty && !enabledSources.contains(.dsh))
     }
 
     // MARK: - Empty states
@@ -646,9 +657,11 @@ struct HomeSourcesView: View {
         }
     }
 
-    private func newBot() {
+    /// A new conversation on the named source. Coe and DS Bot share the editor; a DS Bot is that
+    /// same bot with a `command` filled in, which is where the editor comes in.
+    private func newBot(source: HomeSource) {
         guard let store = onlineStores.first ?? availableStores.first else { return }
-        creating = NewTarget(kind: .bot, computerId: store.computer.id)
+        creating = NewTarget(kind: .bot, computerId: store.computer.id, source: source)
     }
 
     private func newGroup() {
@@ -659,23 +672,7 @@ struct HomeSourcesView: View {
         }
     }
 
-    private func attachCapturedPhoto(_ image: UIImage) {
-        showCameraSheet = false
-        guard let store = app.currentStore, let jpeg = image.jpegData(compressionQuality: 0.85) else { return }
-        let candidates = accounts.roster.filter { $0.ref.computerId == store.computer.id && !$0.bot.isGroup }
-        guard let target = candidates.first(where: { $0.bot.lead }) ?? candidates.first else { return }
-        store.attachPendingFile(OutgoingFile(name: "photo-\(Int(Date.now.timeIntervalSince1970)).jpg", data: jpeg),
-                                to: target.bot.id)
-        accounts.selection = target.ref
-    }
-
     // MARK: - Sheets
-
-    private func cameraSheet() -> some View {
-        QuickCaptureSheet(onCapture: attachCapturedPhoto)
-            .presentationDetents([.medium, .large])
-            .presentationDragIndicator(.visible)
-    }
 
     private func dshConnectSheet() -> some View {
         DSHConnectSheet(gateway: dsh, scan: { onCode in
@@ -690,7 +687,7 @@ struct HomeSourcesView: View {
                 case .bot:
                     NewBotView(computers: computerOptions,
                                computer: Binding(get: { target.computerId },
-                                                 set: { creating = NewTarget(kind: .bot, computerId: $0) }))
+                                                 set: { creating = NewTarget(kind: .bot, computerId: $0, source: target.source) }))
                 case .group:
                     NewGroupView()
                 }
@@ -722,7 +719,8 @@ struct HomeSourcesView: View {
         enum Kind { case bot, group }
         let kind: Kind
         let computerId: ComputerID
-        var id: String { "\(kind)-\(computerId)" }
+        var source: HomeSource = .coe
+        var id: String { "\(kind)-\(computerId)-\(source.rawValue)" }
     }
 }
 
@@ -885,28 +883,44 @@ struct DSHSessionRow: View {
     }
 }
 
-/// The native bottom accessory: voice on the left, camera on the right. Shrunk into the tab bar it
-/// shows the two glyphs; expanded, the voice button says what it is for.
+/// The native bottom accessory: one voice capsule, the whole of it a button. Folded into the tab bar
+/// it says only that it listens; expanded, it says who to.
+/// Mounts the bottom accessory only on the tabs that carry it: the `isEnabled:` form of the modifier
+/// is iOS 26.1 and this app builds against 26.0.
+private struct VoiceBar: ViewModifier {
+    let shown: Bool
+    let botName: String
+    let onTap: () -> Void
+
+    @ViewBuilder func body(content: Content) -> some View {
+        if shown {
+            content.tabViewBottomAccessory {
+                HomeVoiceAccessory(botName: botName, onTap: onTap)
+            }
+        } else {
+            content
+        }
+    }
+}
+
 struct HomeVoiceAccessory: View {
     @Environment(\.tabViewBottomAccessoryPlacement) private var placement
-    let onVoice: () -> Void
-    let onCamera: () -> Void
+    /// Who the words would go to: the lead bot, by name.
+    let botName: String
+    let onTap: () -> Void
 
     var body: some View {
-        HStack(spacing: 16) {
-            Button(action: onVoice) {
-                if placement == .expanded {
-                    Label(L10n.tr("说点什么…"), systemImage: "mic.fill")
-                } else {
-                    Image(systemName: "mic.fill")
-                }
+        // The whole bar is the button: a microphone on the left, and what it is for on the right.
+        Button(action: onTap) {
+            HStack(spacing: 10) {
+                Image(systemName: "mic.fill")
+                Text(placement == .expanded ? "跟 \(botName) 说点什么…" : "说点什么")
+                    .lineLimit(1)
+                Spacer(minLength: 0)
             }
-            .accessibilityLabel(Text(L10n.tr("Voice")))
-            Spacer(minLength: 8)
-            Button(action: onCamera) {
-                Image(systemName: "camera.fill")
-            }
-            .accessibilityLabel(Text(L10n.tr("拍照")))
+            .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Text("跟 \(botName) 说点什么…"))
     }
 }

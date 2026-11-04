@@ -72,6 +72,8 @@ public final class VoiceSession {
     public private(set) var sendFailed = false
     /// A send is in flight: the button waits rather than sending twice.
     public private(set) var sending = false
+    /// A photo to send with the words, put there by the sheet's camera.
+    public private(set) var attachment: UIImage?
     /// Something is being heard, but too faintly to trust: the sheet asks the user to speak up.
     public private(set) var lowVolume = false
 
@@ -82,8 +84,8 @@ public final class VoiceSession {
     /// This long of faint-but-not-silent input earns the "a little quiet" line.
     private static let softAfter: TimeInterval = 3
 
-    /// Hands the words over and reports whether they reached the bot.
-    @ObservationIgnored public var onSend: ((String) async -> Bool)?
+    /// Hands the words (and any photo) over and reports whether they reached the bot.
+    @ObservationIgnored public var onSend: ((String, [OutgoingFile]) async -> Bool)?
 
     @ObservationIgnored private let transcriber: SpeechTranscriber
     @ObservationIgnored private var timer: Task<Void, Never>?
@@ -101,16 +103,16 @@ public final class VoiceSession {
     private var words: String { text.trimmingCharacters(in: .whitespacesAndNewlines) }
 
     public var isIdle: Bool { phase == .idle }
-    /// Something to send, and not already on its way.
+    /// Something to send — words, a photo, or both — and not already on its way.
     public var canSend: Bool {
-        (phase == .paused || phase == .confirming) && !sending && !words.isEmpty
+        (phase == .paused || phase == .confirming) && !sending && !(words.isEmpty && attachment == nil)
     }
     /// Automatic mode: pausing with words starts a send nobody asked for, unless they are corrected.
     public var countingDown: Bool {
         phase == .confirming && !editing && !sendFailed && VoiceSendMode.stored == .automatic
     }
-    /// There are words on screen, recording or paused: closing now would throw them away.
-    public var hasWords: Bool { !words.isEmpty }
+    /// There is something on screen to lose — words or a photo: closing now asks first.
+    public var hasWords: Bool { !words.isEmpty || attachment != nil }
     /// Closing now would throw away words the user may still want.
     public var needsConfirm: Bool { hasWords }
 
@@ -171,6 +173,35 @@ public final class VoiceSession {
         }
     }
 
+    /// The camera's photo: shown under the title, sent with the words, and removable until then.
+    public func attach(_ image: UIImage?) {
+        attachment = image
+        if image != nil, words.isEmpty, phase != .confirming {
+            // Nothing said yet: the words area is where the photo's message will come from.
+            phase = .confirming
+        }
+        countdown = 0
+        stopTimer()
+        Haptics.impact()
+    }
+
+    /// The keyboard button: stop hearing and put what was heard into the field, ready to type on.
+    public func startTyping() {
+        guard phase == .recording || phase == .paused || phase == .confirming else { return }
+        if phase == .recording {
+            transcriber.pause()
+            level.set(0)
+            faintSince = nil
+            lowVolume = false
+        }
+        stopTimer()
+        countdown = 0
+        notHeard = false
+        editing = true
+        phase = .confirming
+        Haptics.impact()
+    }
+
     /// Send now: the button, and the end of an automatic countdown.
     public func sendNow() async {
         guard canSend else { return }
@@ -180,7 +211,7 @@ public final class VoiceSession {
         // The recognizer's last words land a moment after the microphone closes.
         try? await Task.sleep(for: .milliseconds(200))
         let toSend = words
-        guard !toSend.isEmpty else {
+        guard !toSend.isEmpty || attachment != nil else {
             sending = false
             notHeard = true
             phase = .paused
@@ -188,7 +219,10 @@ public final class VoiceSession {
             return
         }
         voiceLog.info("sending \(toSend.count, privacy: .public) chars")
-        let delivered = await onSend?(toSend) ?? false
+        let files = attachment
+            .flatMap { $0.jpegData(compressionQuality: 0.85) }
+            .map { [OutgoingFile(name: "photo.jpg", data: $0)] } ?? []
+        let delivered = await onSend?(toSend, files) ?? false
         sending = false
         guard delivered else {
             // Kept: the words stay on screen and the button tries again.
@@ -246,6 +280,7 @@ public final class VoiceSession {
 
     private func reset() {
         stopTimer()
+        attachment = nil
         faintSince = nil
         lowVolume = false
         text = ""
