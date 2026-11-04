@@ -1511,5 +1511,14 @@
   "This computer isn't in an account: it uses a private relay": "Este ordenador no está en ninguna cuenta: usa un relé privado",
   "This computer isn't in your account": "Este ordenador no está en tu cuenta",
   "This iPhone stops getting the account's notifications and keeps its computers, so signing back in needs no scan. To take it off them, use Start over in Settings instead.": "Este iPhone deja de recibir las notificaciones de la cuenta y conserva sus ordenadores, así que al volver a iniciar sesión no hace falta escanear. Para quitarlo de ellos, usa en su lugar «Empezar de nuevo» en Ajustes.",
-  "This phone stops getting the account's notifications and keeps its computers, so signing back in needs no scan. To take it off them, use Start over in Settings instead.": "Este teléfono deja de recibir las notificaciones de la cuenta y conserva sus ordenadores, así que al volver a iniciar sesión no hace falta escanear. Para quitarlo de ellos, usa en su lugar «Empezar de nuevo» en Ajustes."
+  "This phone stops getting the account's notifications and keeps its computers, so signing back in needs no scan. To take it off them, use Start over in Settings instead.": "Este teléfono deja de recibir las notificaciones de la cuenta y conserva sus ordenadores, así que al volver a iniciar sesión no hace falta escanear. Para quitarlo de ellos, usa en su lugar «Empezar de nuevo» en Ajustes.",
+  "Getting your point": "Entiendo tu petición",
+  "Waiting for your OK": "Esperando tu confirmación",
+  "Running a command": "Ejecutando un comando",
+  "Reading a file": "Mirando un archivo",
+  "Editing a file": "Editando un archivo",
+  "Looking something up": "Buscando información",
+  "Planning the steps": "Preparando los pasos",
+  "Working on it": "Procesando",
+  "Taking a while, hang on": ", está tardando un poco"
 }

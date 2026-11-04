@@ -984,6 +984,21 @@
 > 说明：下面 C0109–C0114 六节是同一批工作的补记，**部分内容已于更早的提交落地**
 > （例如 C0110 的桌面端代码、C0109 的 zh-Hans/zh-Hant 文案），实际提交状态以 Git 历史为准。
 
+### C0109 · 2026-11-04 · 对话页思考状态行（去掉工具名胶囊）
+
+- 原因：对话底部原先是胶囊（转圈 + 工具名如 `bash` + 计时器），像终端日志，且把工具名暴露给用户。
+- 变化：
+  - 新增 `apps/ios/Kit/Sources/CodyncUI/Thread/ThinkingStatus.swift`：状态行 = 24pt 角色头像 + 14pt 灰字 + 可选耗时；头像按状态呼吸/扫光，"减少动态效果"时静止；文案切换 180ms 淡入淡出，每句至少显示 600ms。
+  - 工具标题在客户端映射为人话（`bash`→跑一下命令、`read_file`→看一下文件、`edit`→改一下文件、`search`→查查资料，未知→正在处理）；`needsInput`→等你点一下同意。
+  - 前 10 秒不显示耗时，10 秒后显示 `Ns`；60 秒后追加"，有点久，再等等"。
+  - `ChatRows.swift` 的 `WorkingIndicator` 去掉背景胶囊，改为左对齐一行；"思考详情"展开保留（步骤区改圆角底）。
+  - `BotRow.swift` 列表预览同样走这套人话映射，列表里也不再出现工具名。
+  - `Resources/Languages/zh-Hans.json`、`zh-Hant.json` 各新增 9 条文案。
+- 文件：`apps/ios/Kit/Sources/CodyncUI/Thread/ThinkingStatus.swift`（新）、`apps/ios/Kit/Sources/CodyncUI/Thread/ChatRows.swift`、`apps/ios/Kit/Sources/CodyncUI/Bots/BotRow.swift`、`apps/ios/Kit/Sources/CodyncKit/Resources/Languages/zh-Hans.json`、`zh-Hant.json`。
+- 验证：`xcodebuild build -scheme 'iOS Dev' -configuration DevDebug -destination 'iPhone 18 Pro'` 通过；真机效果待你验收。
+- 未做（需 host 改动）：文档 §5 的主路径"模型每次调工具前输出 `status_title`"；当前用工具类型映射兜底。§7 的可展开过程沿用现有"思考详情"。
+- 关联：C0107、C0108。
+
 ### C0110 · 2026-11-04 · 桌面端移除 App 自动更新
 
 - 原因：二开版本不应被官方 release 覆盖。
@@ -1011,6 +1026,21 @@
 - 验证：`xcodebuild -scheme 'iOS Dev' -configuration DevDebug` 模拟器与真机均通过；已安装并启动到 iPhone 16 Pro（`com.suiyikou.codync.uipreview`）。
 - 保留：`BotStore.requestHostUpdate()`（已无入口）、`HostUpdateOffer` 展示状态。
 - 关联：C0110。
+
+### C0112 · 2026-11-04 · 思考状态行：12pt 间距、16pt 文字与文字扫光
+
+- 变化：
+  - `ThreadView.swift`：状态行上间距 6 → 12。
+  - `ChatRows.swift`：去掉状态行左侧 16pt 缩进，头像左缘与消息气泡左缘对齐。
+  - `ThinkingStatus.swift`：文字 14 → 16pt、行高 24；新增文字扫光——主文字色 95% 的柔边高光带（约文字宽 36%），从左到右 1.6s 线性、停 0.3s 循环，只作用于文字；换文案时从头开始；"减少动态效果"时关闭。
+- 验证：模拟器 DevDebug 截图 + 录屏确认（高光带逐帧右移）；真机 DevDebug 编译安装到 iPhone 16 Pro。
+- 关联：C0109、C0111。
+
+### C0113 · 2026-11-04 · 状态行头像 32、文字 17pt
+
+- `ThinkingStatus.swift`：头像 24 → 32、文字 16 → 17（行高仍 24）；扫光与 12pt 间距不变。
+- 验证：模拟器 DevDebug 截图/连拍确认；真机 DevDebug 编译安装到 iPhone 16 Pro。
+- 关联：C0112。
 
 ### C0115 · 2026-11-04 · 云端关闭时桌面端跳过登录欢迎页，隐藏账号入口
 
@@ -1969,3 +1999,18 @@
 - 验证：`xcodebuild build -scheme 'iOS Dev' -configuration DevDebug` 通过（0 error / 0 warning）。按要求未跑测试、未截图。
 - 限制/待办：`UpdateNeededText.notUpdated(.requested)` 的文案仍写「Try again, or update Codync on that computer.」，而"再试一次"的按钮已不存在；这句属清单外，未改，留待后续。
 - 关联：C0110、C0111。
+
+### C0187 · 2026-11-05 · 思考状态行：与 Live Activity 合成一套文字，phase 改用结构化字段
+
+- 原因：C0109–C0113 的状态行只改了聊天页，Live Activity 仍走 `BotActivityPresentation.caption` 直接显示原始 `activity`（`bash`）——同一个 bot 在锁屏说「bash」、在聊天说「跑一下命令」；状态行区分「思考/工作」也还是靠 `activity` 的英文前缀（`Thinking`/`Starting`/`Typing`/`Writing a reply`）在猜，host 一发中文就永远判成「正在工作」。
+- 变化：
+  - `Kit/Sources/CodyncKit/Models/ThinkingStatusText.swift`（新）：`ThinkingStatusText` 从 CodyncUI 上移到 CodyncKit，成为这一行文字的**唯一来源**；顺带把「10 秒后才显示耗时」「60 秒算久」「耗时标签格式」收成这里的常量与函数。
+  - `Kit/Sources/CodyncKit/Models/BotActivityPresentation.swift`：`caption` 的 `working`/`needsInput` 分支改走 `ThinkingStatusText.text(...)`，Live Activity 与聊天页从此同一句话。
+  - `Kit/Sources/CodyncUI/Thread/ThinkingStatus.swift`：删掉本地文字映射（已上移）；`ThinkingStatusRow` 的 phase 只看结构化字段 `bot.needsInput`（host `status` = `working`/`needsInput`），不再对 `activity` 做英文前缀匹配；耗时统一走 `ThinkingStatusText.elapsed(_:)` / `.suffix(seconds:)`。
+  - `Kit/Tests/CodyncKitTests/ActivityPresentationTests.swift`：`caption` 断言改成新措辞（`needsInput`→`Waiting for your OK`、空 activity→`Typing…`、`bash`→`Running a command`）。
+- 计时选了哪一套：聊天页那套「按 `startedAt` 算秒数 + 1s 时钟」。理由：只有它能同时表达「10 秒前不显示」和「60 秒后加一句」，`Text(style: .timer)` 是系统自走的文本、取不到秒数，判断不了这两个阈值。Live Activity 仍保留 `Text(style: .timer)`——ActivityKit 的卡片不能跑 1s 的 `TimelineView`，只能靠系统 timer 文本或推送刷新；但它的**文字**已与聊天页同源。
+- 验证：`xcodebuild build -scheme 'iOS Dev' -configuration DevDebug` 通过（0 error / 0 warning）。按要求未跑测试、未截图。
+- 限制/待办：
+  - host 的 `Bot` 只有 `status`（idle/working/needsInput/error）、`activity`（自由文本）、`startedAt`，**没有**能区分「思考中 / 正在跑某一步」的结构化字段。原来的两种动效（思考时呼吸、工作时扫光）因此合成一种：工作时扫光、等你点同意时静止加黄点。要把呼吸找回来需要 host 增加阶段字段，属 host 改动，本次不做。
+  - `de/es/fr/ja/ko` 五个语言包只带上了 C0109 已有的 9 条文案改动，未新增 key。
+- 关联：C0109、C0112、C0113。

@@ -1511,5 +1511,14 @@
   "This computer isn't in an account: it uses a private relay": "이 컴퓨터는 어떤 계정에도 없습니다: 개인 릴레이를 사용합니다",
   "This computer isn't in your account": "이 컴퓨터는 내 계정에 없습니다",
   "This iPhone stops getting the account's notifications and keeps its computers, so signing back in needs no scan. To take it off them, use Start over in Settings instead.": "이 iPhone은 계정 알림을 더 이상 받지 않지만 컴퓨터는 그대로 남아 있어, 다시 로그인하면 스캔할 필요가 없습니다. 컴퓨터에서 제거하려면 대신 설정에서 '처음부터 시작'을 사용하세요.",
-  "This phone stops getting the account's notifications and keeps its computers, so signing back in needs no scan. To take it off them, use Start over in Settings instead.": "이 휴대폰은 계정 알림을 더 이상 받지 않지만 컴퓨터는 그대로 남아 있어, 다시 로그인하면 스캔할 필요가 없습니다. 컴퓨터에서 제거하려면 대신 설정에서 '처음부터 시작'을 사용하세요."
+  "This phone stops getting the account's notifications and keeps its computers, so signing back in needs no scan. To take it off them, use Start over in Settings instead.": "이 휴대폰은 계정 알림을 더 이상 받지 않지만 컴퓨터는 그대로 남아 있어, 다시 로그인하면 스캔할 필요가 없습니다. 컴퓨터에서 제거하려면 대신 설정에서 '처음부터 시작'을 사용하세요.",
+  "Getting your point": "요청을 이해하는 중",
+  "Waiting for your OK": "확인을 기다리는 중",
+  "Running a command": "명령을 실행하는 중",
+  "Reading a file": "파일을 보는 중",
+  "Editing a file": "파일을 고치는 중",
+  "Looking something up": "자료를 찾는 중",
+  "Planning the steps": "순서를 정리하는 중",
+  "Working on it": "처리 중",
+  "Taking a while, hang on": "、 조금 오래 걸리고 있어요"
 }

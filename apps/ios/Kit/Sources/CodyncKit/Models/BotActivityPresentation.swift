@@ -50,9 +50,12 @@ public struct BotActivityPresentation: Hashable, Sendable {
     }
 
     /// The one line of text beside the orb: the bot's current step while it's live, else the state.
+    /// A live step goes through `ThinkingStatusText`, the same words the chat's status row uses —
+    /// a tool title (`bash`) never reaches the reader.
     public var caption: String {
         switch phase {
-        case .working, .needsInput: activity.isEmpty ? title : activity
+        case .working: ThinkingStatusText.text(activity: activity, needsInput: false)
+        case .needsInput: ThinkingStatusText.text(activity: activity, needsInput: true)
         case .sending, .queued, .completed, .failed, .stale, .waiting, .onCall: title
         }
     }

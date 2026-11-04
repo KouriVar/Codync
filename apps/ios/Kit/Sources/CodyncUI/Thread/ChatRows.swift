@@ -268,7 +268,9 @@ struct NoticeRow: View {
     }
 }
 
-/// The bot's current activity and elapsed time; with thinking details on (Settings), a tap unfolds the turn's steps.
+/// The waiting line where the reply will appear: the bot's avatar, what it is doing in plain
+/// words, and (after ten seconds) how long. With thinking details on (Settings), a tap unfolds
+/// the turn's steps.
 struct WorkingIndicator: View {
     let bot: Bot
     let steps: [Entry]
@@ -279,49 +281,33 @@ struct WorkingIndicator: View {
     private var open: Bool { details && expanded }
 
     var body: some View {
-        let shape = RoundedRectangle(cornerRadius: 18, style: .continuous)
-        VStack(alignment: .leading, spacing: 0) {
+        VStack(alignment: .leading, spacing: 10) {
             if details {
                 Button {
                     withAnimation(Motion.reduced(Motion.layout, reduceMotion)) { expanded.toggle() }
                 } label: {
-                    status.contentShape(Rectangle())
+                    row.contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .accessibilityHint(L10n.tr(open ? "Hide steps" : "Show steps"))
                 .accessibilityValue(open ? "Expanded" : "Collapsed")
             } else {
-                status
+                row
             }
             if open {
                 WorkingSteps(steps: steps)
-                    .padding(.top, 12)
+                    .padding(12)
+                    .background(Palette.bubbleAgent, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                     .transition(.opacity)
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .frame(maxWidth: open ? .infinity : nil, alignment: .leading)
-        .background(Palette.bubbleAgent, in: shape)
-        // Folding steps never cross the pill's edge.
-        .clipShape(shape)
-        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.trailing, 40)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private var status: some View {
+    private var row: some View {
         HStack(spacing: 8) {
-            ThinkingOrb(state: bot.needsInput ? .listening : .working, size: 16, color: bot.needsInput ? Palette.warning : Palette.secondary)
-            Text(L10n.tr(bot.activity.isEmpty ? "Working…" : bot.activity))
-                .font(.subheadline)
-                .foregroundStyle(bot.needsInput ? Palette.warning : Palette.secondary)
-                .lineLimit(1)
-                .frame(maxWidth: open ? .infinity : nil, alignment: .leading)
-            if let started = bot.startedAt {
-                Text(Date(milliseconds: started), style: .timer)
-                    .font(.footnote.monospacedDigit())
-                    .foregroundStyle(Palette.tertiary)
-            }
+            ThinkingStatusRow(bot: bot)
             if details {
                 RemixIcon("arrow-right-s-line")
                     .font(.caption2.weight(.semibold))

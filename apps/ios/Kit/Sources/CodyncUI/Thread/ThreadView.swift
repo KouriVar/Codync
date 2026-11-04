@@ -328,7 +328,7 @@ extension ThreadView {
                 // Each turn starts folded.
                 WorkingIndicator(bot: bot, steps: Entry.workingSteps(model.chat(botId)))
                     .id(bot.startedAt)
-                    .padding(.top, 6)
+                    .padding(.top, 12)
             })
         }
         // Pull to refresh reconnects, like Reconnect in the computer menu, until the link is back.

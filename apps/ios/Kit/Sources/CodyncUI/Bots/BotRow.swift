@@ -64,7 +64,7 @@ public struct BotRow: View {
     @ViewBuilder private var preview: some View {
         if bot.needsInput {
             Label {
-                Text(L10n.tr(bot.activity.isEmpty ? "Needs your approval" : bot.activity))
+                Text(ThinkingStatusText.text(activity: bot.activity, needsInput: true))
             } icon: {
                 ThinkingOrb(state: .listening, size: 16, color: Palette.warning)
             }
@@ -74,7 +74,7 @@ public struct BotRow: View {
         } else if bot.isWorking {
             HStack(spacing: 6) {
                 ThinkingOrb(size: 13, color: Palette.secondary)
-                Text(L10n.tr(bot.activity.isEmpty ? "Working…" : bot.activity))
+                Text(ThinkingStatusText.text(activity: bot.activity, needsInput: false))
                     .lineLimit(1)
             }
             .font(.system(size: previewSize))

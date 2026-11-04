@@ -26,8 +26,11 @@ import Testing
 }
 
 @Test func activityCaptionIsTheStepWhileLive() {
-    #expect(BotActivityPresentation(status: "needsInput", activity: "Choose a branch").caption == "Choose a branch")
-    #expect(BotActivityPresentation(status: "working", activity: "").caption == "Working")
+    // The live step goes through ThinkingStatusText, the same words the chat's status row uses:
+    // a tool title never reaches the reader, and a waiting approval says so.
+    #expect(BotActivityPresentation(status: "needsInput", activity: "Choose a branch").caption == "Waiting for your OK")
+    #expect(BotActivityPresentation(status: "working", activity: "").caption == "Typing…")
+    #expect(BotActivityPresentation(status: "working", activity: "bash").caption == "Running a command")
     #expect(BotActivityPresentation(status: "idle", activity: "Old step").caption == "Done")
 }
 
@@ -48,7 +51,7 @@ import Testing
     #expect(BotActivityPresentation(status: "idle", activity: "", call: .connecting).caption == "Connecting the call")
     #expect(BotActivityPresentation(status: "working", activity: "", isStale: true, call: .paused).title == "Call paused")
     // While the bot works, its progress is the line; a waiting approval and a failure stay visible.
-    #expect(BotActivityPresentation(status: "working", activity: "Running the tests", call: .speaking).caption == "Running the tests")
+    #expect(BotActivityPresentation(status: "working", activity: "Running the tests", call: .speaking).caption == "Working on it")
     #expect(BotActivityPresentation(status: "needsInput", activity: "Choose", call: .listening).phase == .needsInput)
     #expect(BotActivityPresentation(status: "error", activity: "", call: .listening).phase == .failed)
     #expect(BotActivityPresentation(status: "idle", activity: "").title == "Done")

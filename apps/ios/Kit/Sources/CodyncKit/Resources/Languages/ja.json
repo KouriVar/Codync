@@ -1511,5 +1511,14 @@
   "This computer isn't in an account: it uses a private relay": "このコンピュータはどのアカウントにもありません: プライベートリレーを使っています",
   "This computer isn't in your account": "このコンピュータはあなたのアカウントにありません",
   "This iPhone stops getting the account's notifications and keeps its computers, so signing back in needs no scan. To take it off them, use Start over in Settings instead.": "この iPhone はアカウントの通知を受け取らなくなりますが、コンピュータは残るので、もう一度サインインすればスキャンは不要です。コンピュータから外すには、代わりに設定の「やり直す」を使ってください。",
-  "This phone stops getting the account's notifications and keeps its computers, so signing back in needs no scan. To take it off them, use Start over in Settings instead.": "このスマートフォンはアカウントの通知を受け取らなくなりますが、コンピュータは残るので、もう一度サインインすればスキャンは不要です。コンピュータから外すには、代わりに設定の「やり直す」を使ってください。"
+  "This phone stops getting the account's notifications and keeps its computers, so signing back in needs no scan. To take it off them, use Start over in Settings instead.": "このスマートフォンはアカウントの通知を受け取らなくなりますが、コンピュータは残るので、もう一度サインインすればスキャンは不要です。コンピュータから外すには、代わりに設定の「やり直す」を使ってください。",
+  "Getting your point": "話を理解しています",
+  "Waiting for your OK": "承認を待っています",
+  "Running a command": "コマンドを実行しています",
+  "Reading a file": "ファイルを見ています",
+  "Editing a file": "ファイルを書き換えています",
+  "Looking something up": "調べています",
+  "Planning the steps": "手順を考えています",
+  "Working on it": "処理中です",
+  "Taking a while, hang on": "、少し時間がかかっています"
 }

@@ -1511,5 +1511,14 @@
   "This computer isn't in an account: it uses a private relay": "Dieser Computer ist in keinem Konto: er nutzt ein privates Relay",
   "This computer isn't in your account": "Dieser Computer ist nicht in deinem Konto",
   "This iPhone stops getting the account's notifications and keeps its computers, so signing back in needs no scan. To take it off them, use Start over in Settings instead.": "Dieses iPhone bekommt keine Benachrichtigungen des Kontos mehr und behält seine Computer, sodass du nach dem erneuten Anmelden nichts scannen musst. Um es von ihnen zu entfernen, nutze stattdessen „Neu beginnen“ in den Einstellungen.",
-  "This phone stops getting the account's notifications and keeps its computers, so signing back in needs no scan. To take it off them, use Start over in Settings instead.": "Dieses Telefon bekommt keine Benachrichtigungen des Kontos mehr und behält seine Computer, sodass du nach dem erneuten Anmelden nichts scannen musst. Um es von ihnen zu entfernen, nutze stattdessen „Neu beginnen“ in den Einstellungen."
+  "This phone stops getting the account's notifications and keeps its computers, so signing back in needs no scan. To take it off them, use Start over in Settings instead.": "Dieses Telefon bekommt keine Benachrichtigungen des Kontos mehr und behält seine Computer, sodass du nach dem erneuten Anmelden nichts scannen musst. Um es von ihnen zu entfernen, nutze stattdessen „Neu beginnen“ in den Einstellungen.",
+  "Getting your point": "Ich verstehe deine Anfrage",
+  "Waiting for your OK": "Warte auf deine Freigabe",
+  "Running a command": "Ich führe einen Befehl aus",
+  "Reading a file": "Ich sehe mir eine Datei an",
+  "Editing a file": "Ich ändere eine Datei",
+  "Looking something up": "Ich suche etwas nach",
+  "Planning the steps": "Ich plane die Schritte",
+  "Working on it": "Wird bearbeitet",
+  "Taking a while, hang on": ", das dauert etwas"
 }
