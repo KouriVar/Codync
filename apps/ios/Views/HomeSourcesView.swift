@@ -91,15 +91,11 @@ struct HomeSourcesView: View {
                 voice.discard()
                 voiceDetent = VoiceSheetView.small
                 isTransitioning = true
-                // Back in exactly the state it left in — down 40 and invisible — and only on the next
-                // frame does it climb home, so the first layout is not folded into the animation.
-                accessoryMounted = true
-                accessoryLeaving = true
-                DispatchQueue.main.async {
-                    withAnimation(Self.barFade) {
-                        accessoryLeaving = false
-                        tabBarHidden = false
-                    }
+                // The capsule never left the screen — it is still mounted, down 40 and invisible — so
+                // it can climb straight home from where it went down, with the tab bar beside it.
+                withAnimation(Self.barFade) {
+                    capsuleLeaving = false
+                    tabBarHidden = false
                 }
                 Task { @MainActor in
                     try? await Task.sleep(for: .milliseconds(320))
@@ -186,12 +182,11 @@ struct HomeSourcesView: View {
                 stack(voiceSheet: tabBarHidden) { searchList }
             }
         }
-        // Scrolling down shrinks the bar to the tab you are on and folds the accessory into it.
+        // Scrolling down shrinks the bar to the tab you are on. The capsule does not shrink with it.
         .tabBarMinimizeBehavior(.onScrollDown)
-        // Only the two tabs that talk to Coe carry the bar; the others leave the screen to their list.
-        .modifier(VoiceBar(shown: (selection == .pinned || selection == .coe) && isTabRoot && accessoryMounted,
-                           leaving: accessoryLeaving,
-                           lead: leadBot?.bot, onTap: beginVoice))
+        // The capsule is drawn here rather than by the system: `.tabViewBottomAccessory` takes the
+        // whole bar away with it and cannot be animated either way.
+        .overlay(alignment: .bottom) { voiceCapsule }
         .tint(Palette.text)
         .onChange(of: enabledSources) { _, sources in
             // The tab you were on has just been switched off in Settings: back to 置顶.
@@ -206,10 +201,16 @@ struct HomeSourcesView: View {
         NavigationStack(path: path) {
             content()
                 .toolbar(voiceSheet ? .hidden : .visible, for: .tabBar)
+                // The bar's footprint, for the capsule drawn outside the tab view: SwiftUI tells a
+                // tab's own content the safe area but says nothing to anything above it. Only the
+                // larger value is kept, so hiding the bar does not drag the capsule down with it.
+                .onGeometryChange(for: CGFloat.self) { $0.safeAreaInsets.bottom } action: { inset in
+                    if inset > tabBarInset { tabBarInset = inset }
+                }
                 .navigationTitle("")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar { toolbarContent }
-                // A pushed page is not the tab's root: the tab bar and the accessory go with it.
+                // A pushed page is not the tab's root: the tab bar goes with it.
                 .navigationDestination(for: BotReference.self) { ref in
                     ChatScreen(ref: ref).toolbar(.hidden, for: .tabBar)
                 }
@@ -223,12 +224,11 @@ struct HomeSourcesView: View {
     /// whichever tab is on screen.
     /// The system bar is hidden while the voice sheet is up.
     @State private var tabBarHidden = false
-    /// Whether the accessory draws its content. The accessory itself is mounted for the life of the
-    /// tab view (see `VoiceBar`): swapping the modifier in and out changes the tab view's view type
-    /// and rebuilds the whole tab view, which flashed the screen and killed the entrance animation.
-    @State private var accessoryMounted = true
-    /// The accessory's content is down 40pt and invisible: on its way out, or waiting to come back.
-    @State private var accessoryLeaving = false
+    /// The capsule is down 40pt and invisible: on its way out, or waiting to come back. It is never
+    /// unmounted, so both ends of the transition are just this pair of values animating.
+    @State private var capsuleLeaving = false
+    /// How tall the system tab bar is, measured from a tab's own safe area: what the capsule sits on.
+    @State private var tabBarInset: CGFloat = 0
     /// One transition at a time: the bar and the sheet can't be summoned twice.
     @State private var isTransitioning = false
     /// The bar's exit and entrance: one ease, both ways.
@@ -236,6 +236,9 @@ struct HomeSourcesView: View {
 
     /// Nothing is pushed on the tab in front, so its root is what the user is looking at.
     private var isTabRoot: Bool { accounts.selection == nil && openDSHSession == nil }
+
+    /// The two tabs that talk to Coe carry the capsule; the others leave the screen to their list.
+    private var capsuleShown: Bool { (selection == .pinned || selection == .coe) && isTabRoot }
 
     private var path: Binding<[BotReference]> {
         Binding(get: { accounts.selection.map { [$0] } ?? [] }, set: { accounts.selection = $0.last })
@@ -324,6 +327,21 @@ struct HomeSourcesView: View {
         accounts.roster.first { $0.bot.lead && !$0.bot.isGroup }
     }
 
+    /// The capsule over the tab bar. It is never unmounted: the two ends of the transition are an
+    /// offset and an opacity on the same view, so the sheet can never catch it half built.
+    private var voiceCapsule: some View {
+        VoiceCapsule(lead: leadBot?.bot, onTap: beginVoice)
+            // The tab bar's own 16pt sides, so the capsule lines up with it.
+            .padding(.horizontal, 16)
+            // Directly above the bar: its measured footprint, plus 8pt of air.
+            .padding(.bottom, tabBarInset + 8)
+            .offset(y: capsuleLeaving ? 40 : 0)
+            .opacity(capsuleShown && !capsuleLeaving ? 1 : 0)
+            .allowsHitTesting(capsuleShown && !capsuleLeaving)
+            // Measured from the screen's bottom edge, not from the safe area above the bar.
+            .ignoresSafeArea(.container, edges: .bottom)
+    }
+
     /// No lead bot is a setup problem, not a recording one: say where to fix it instead of opening the mic.
     private func beginVoice() {
         guard !isTransitioning else { return }
@@ -333,16 +351,15 @@ struct HomeSourcesView: View {
             return
         }
         isTransitioning = true
-        // The content slides down 40pt and fades on one ease while the tab bar hides. The accessory
-        // itself stays mounted, so the tab view is never rebuilt and the page underneath never moves.
+        // The capsule slides down 40pt and fades on one ease while the tab bar hides. It stays
+        // mounted throughout, so the sheet has nothing but the capsule's own values to wait for and
+        // the page underneath never moves.
         withAnimation(Self.barFade) {
-            accessoryLeaving = true
+            capsuleLeaving = true
             tabBarHidden = true
         }
         Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(300))
-            // By now it is invisible and about to be covered: the slot can go empty.
-            accessoryMounted = false
             voiceDetent = VoiceSheetView.small
             showVoice = true
             await voice.begin()
@@ -937,34 +954,23 @@ struct DSHSessionRow: View {
     }
 }
 
-/// Keeps the accessory mounted for the whole life of the tab view and swaps only its content, so
-/// showing and hiding the bar never changes the tab view's view type. An `if` around
-/// `.tabViewBottomAccessory` rebuilt the entire tab view on every change, which is what flashed the
-/// screen and left the bar with no entrance.
-private struct VoiceBar: ViewModifier {
-    let shown: Bool
-    /// Down 40pt and invisible: on the way out, or waiting to slide back in.
-    let leaving: Bool
+/// The resting capsule: the lead bot's face and an invitation, in one glass pill. Drawn by the home
+/// itself rather than handed to the system, so it can slide and fade on both ends of the sheet.
+private struct VoiceCapsule: View {
     let lead: Bot?
     let onTap: () -> Void
 
-    func body(content: Content) -> some View {
-        content.tabViewBottomAccessory {
-            if shown {
-                HomeVoiceAccessory(lead: lead, onTap: onTap)
-                    .offset(y: leaving ? 40 : 0)
-                    .opacity(leaving ? 0 : 1)
-            } else {
-                EmptyView()
-            }
+    var body: some View {
+        GlassEffectContainer(spacing: 12) {
+            HomeVoiceAccessory(lead: lead, onTap: onTap)
+                .padding(.vertical, 10)
+                .glassEffect(.regular.interactive(), in: Capsule())
         }
     }
 }
 
-/// The resting accessory: the lead bot's face and an invitation. Folded into the tab bar only the
-/// face is left.
+/// What the capsule says: the lead bot's face and an invitation.
 struct HomeVoiceAccessory: View {
-    @Environment(\.tabViewBottomAccessoryPlacement) private var placement
     let lead: Bot?
     let onTap: () -> Void
 
@@ -974,15 +980,13 @@ struct HomeVoiceAccessory: View {
         Button(action: onTap) {
             HStack(spacing: 8) {
                 avatar
-                if placement == .expanded {
-                    Text("跟 \(name) 说点什么…")
-                        .font(.system(size: 17))
-                        .foregroundStyle(Palette.secondary)
-                        .lineLimit(1)
-                }
+                Text("跟 \(name) 说点什么…")
+                    .font(.system(size: 17))
+                    .foregroundStyle(Palette.secondary)
+                    .lineLimit(1)
                 Spacer(minLength: 0)
             }
-            // 12pt at both ends, with the tab bar's own edges.
+            // 12pt at both ends, inside the capsule's own edges.
             .padding(.horizontal, 12)
             .contentShape(Rectangle())
         }

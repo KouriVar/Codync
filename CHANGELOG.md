@@ -1,4 +1,5 @@
 
+
 # Fork 改动记录
 
 本文件记录本 fork 的定制与修复；上游发布说明仍在原有文档中维护。
@@ -1889,3 +1890,24 @@
 - 限制/待办（按你的要求先停在这里，等你报现象）：**附属栏常驻后、内容为 `EmptyView` 时系统是否仍留一条空白玻璃胶囊，我无法自测**。需要看三种静止状态：① 置顶 / Coe 正常显示；② DS Bot / DSH / 搜索 tab（这三处原本完全不挂 accessory）；③ 会话页、设置页等二级页。任一处仍留空玻璃条，就说明空内容不塌缩——请告诉我，我不自行换方案（overlay / 隐藏 slot 等）。
 - 另一处按你的要求未动：状态变量仍叫 `accessoryMounted`，语义已变成「附属栏是否画内容」；要不要改名成 `accessoryShown`，你说了我再改。
 - 关联：C0178、C0180、C0181。
+### C0183 · 2026-11-05 · 语音条从系统附属栏改成自绘 overlay 玻璃胶囊
+
+- 原因：`.tabViewBottomAccessory` 两个方向都做不出动画——它只能整条挂载/卸载，且挂载即终值。C0182 虽然消掉了闪（不再重建 TabView）、把内容 offset/opacity 加回来了，但那层内容仍活在系统槽位里，入场依旧被系统接管。
+- 变化：
+  - 删掉 `VoiceBar` 条件修饰符与 `.tabViewBottomAccessory`：`TabView` 不再挂系统附属栏。
+  - `tabs` 改为 `.overlay(alignment: .bottom) { voiceCapsule }`；新增 `VoiceCapsule`：`GlassEffectContainer(spacing: 12)` 包住 `HomeVoiceAccessory` + `.padding(.vertical, 10)`，外面 `.glassEffect(.regular.interactive(), in: Capsule())`。内容与样式照搬原 `HomeVoiceAccessory`（主 bot 头像 24pt、`跟 xx 说点什么…` 17pt `Palette.secondary`、左 12、间距 8）。
+  - `HomeVoiceAccessory` 去掉 `@Environment(\.tabViewBottomAccessoryPlacement)` 和 `placement == .expanded` 判断——没有系统附属栏了，文字改为常显（否则读到空 placement，文字会整段消失）。
+  - 位置：横向 `.padding(.horizontal, 16)`（与列表行/工具栏同一侧距）；纵向 `.padding(.bottom, tabBarInset + 8)`，`tabBarInset` 是新增 `@State`，由每个 tab 的 `stack(...)` 里 `.onGeometryChange` 读自身 `safeAreaInsets.bottom` 得到（只保留更大值，tab bar 隐藏时不跟着缩），`ignoresSafeArea(.container, edges: .bottom)` 让它从屏幕底边量起——胶囊因此落在 tab bar 正上方 8pt。
+  - 显隐：`capsuleShown = (selection == .pinned || selection == .coe) && isTabRoot`，规则与原来一致（DS Bot / DSH / 搜索 tab 与二级页不显示）。胶囊**始终挂载**，只改 `.offset(y: capsuleLeaving ? 40 : 0)` 与 `.opacity(capsuleShown && !capsuleLeaving ? 1 : 0)`，加 `.allowsHitTesting(...)` 关掉隐藏时的点击。
+  - 进场：`withAnimation(.easeInOut(duration: 0.3))` 里 `capsuleLeaving = true`（下移 40 + 渐隐）与 `tabBarHidden = true`；300ms 后弹 sheet，时序与之前一致。
+  - 关闭：`onDismiss` 里同一个 `withAnimation(.easeInOut(duration: 0.3))` 把 `capsuleLeaving` 归零、`tabBarHidden = false`。胶囊没卸载过，所以不再需要 C0182 那套「先挂成 40/0、下一帧再起播」。
+  - 滚动：`.tabBarMinimizeBehavior(.onScrollDown)` 保留（系统 tab bar 仍会缩），胶囊不再跟着缩——`HomeVoiceAccessory` 里对 placement 的依赖已删，胶囊只做 offset/opacity。
+  - 页面内容仍然没有任何位移。
+- 文件：`apps/ios/Views/HomeSourcesView.swift`。
+- 验证：`xcodebuild build -scheme 'iOS Dev' -configuration DevDebug -destination 'generic/platform=iOS'` 通过（2.36.0 / 181）。**未装到 iPhone 16 Pro**：按设备 UDID 的构建在设备掉线后失败（`xcodebuild` 报 "Unable to find a destination matching the provided destination specifier"，`devicectl` 显示该机 `unavailable`，USB 也未枚举到），先停在编译通过这一步。按要求未自测、未截图。
+- 限制/待办：
+  - **装机待补**：手机重新连上后需再跑一次设备构建并安装启动（2.36.0 / 181）。
+  - `.toolbar(.hidden, for: .tabBar)` 是否吃这个 `withAnimation` 事务仍未验证（C0180、C0181 就挂着这条）。若真机上 tab bar 是硬切、只有胶囊在下移渐隐，按你的要求我先停下报给你，不自行换方案。
+  - 胶囊几何是按 app 现有约定推的，没有真机核对：横向 16pt（与列表行/工具栏同一侧距）、纵向 `tabBarInset + 8`、胶囊高 44（24pt 头像 + 上下各 10）。
+  - `tabBarInset` 取自 tab 内容自身的 `safeAreaInsets.bottom`（应为 tab bar 总高，含 Home 指示条）。若它读到 0 或偏小，胶囊会贴到屏幕底边甚至压住 tab bar——真机上位置一偏就报我，我不自己调这个数。
+- 关联：C0178、C0180、C0181、C0182。
