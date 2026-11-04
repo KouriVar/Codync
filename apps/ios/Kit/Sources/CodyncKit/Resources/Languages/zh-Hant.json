@@ -1586,5 +1586,8 @@
   "Manual": "手動傳送",
   "Sends 1.5 seconds after the recording ends. Tap the words to correct them instead.": "結束錄音 1.5 秒後自動傳送；點文字可以改成手動傳送。",
   "Nothing is sent until you tap send.": "結束錄音後等你點傳送才送出。",
-  "Continue recording": "繼續錄音"
+  "Continue recording": "繼續錄音",
+  "Discard this voice message?": "捨棄這段語音？",
+  "Discard": "捨棄",
+  "Keep editing": "繼續編輯"
 }

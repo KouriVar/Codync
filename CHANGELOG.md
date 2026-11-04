@@ -1502,3 +1502,20 @@
 - 验证：`xcodebuild build -scheme 'iOS Dev' -configuration DevDebug` 通过；已装到 iPhone 16 Pro（2.36.0 / 152）并启动。按要求未自测、未截图。
 - 限制/待办：去重是字符级启发式，识别器给的标点恰好落在接缝时可能留下一个多余标点；`.large` 仍复用半屏布局（二期连续通话）。
 - 关联：C0148、C0151、C0152、C0153。
+### C0155 · 2026-11-04 · 语音 sheet v3.3：进出对称、半屏标题栏、按状态显示按钮、去掉关闭按钮
+
+- 原因：C0154 真机上关闭 sheet 时它往右下角缩没（`matchedGeometryEffect` 的 zoom 转场）、底栏也不原路回来；半屏标题栏还挂着「正在听…」这类状态文字；按钮不看状态、四处都有 ✕。
+- 变化：
+  - 动画进出对称：删掉 sheet 内所有 `matchedGeometryEffect`（以及随之的 morph 命名空间），只留系统默认的 sheet 上下滑；底栏改成 `barAway` 状态驱动，打开时先置位（整排下移 30pt + 淡出），`showVoice` 变 false 的瞬间（sheet 开始下滑）再置回（从下方升回 + 淡入），`onDismiss` 兜底复位，进出同一组 spring（0.3 / 0.9）。
+  - 关闭即结束录音：删掉所有档位的 ✕ 按钮；去掉固定 `.interactiveDismissDisabled()`，改为只在「暂停/有文字」时禁用系统下拉（否则下拉直接关）；关闭时 `voice.discard()` 停止录音、丢弃本次文字、不发送，`onDismiss` 里复位 detent 与底栏。
+  - 丢弃确认：暂停或已结束且**有文字**时，下拉（sheet 内加了 `DragGesture` 阈值 70pt）先弹 `confirmationDialog`「丢弃这段语音？」→「丢弃」（红色，关闭）／「继续编辑」；录音中或没文字直接关。
+  - 半屏/全屏标题栏：左侧主 Bot 头像 32 + 名字（17pt semibold），去掉「正在听…」「录音已暂停」等状态文字；头像只在录音时呼吸（1.0↔1.06 + 外光），暂停时静止 1.0、不发光（小档同一规则）。右上按状态显示：录音中不显示；暂停/已结束且有文字才显示发送按钮（44，强调色 tint，白色 24pt 向上箭头），自动发送模式的 1.5 秒倒计时环挂在该按钮上；没文字时文字区显示「没听清，再说一次」。「发送失败，点发送重试」从标题移到文字区顶部的红色小字。
+  - 小档 76pt：头像 36 → 波形 → 设置 44 → 暂停/继续 44（贴右边距 16），没有关闭按钮、也没有发送按钮。
+  - 暂停/继续：图标换成 Remix `pause-fill` / `play-fill`（24pt）；显示播放三角时给图标 `.offset(x: 1.5)` 做光学居中，按钮尺寸与内边距不变。
+  - 流畅度：音量从 `VoiceSession` 里拆出来成独立的 `VoiceLevelModel`，只有波形读它（在 Canvas 里读，不订阅就不会重绘 sheet）；档位切换的布局变化统一走 `withAnimation(.spring(response: 0.35, dampingFraction: 0.9))` / 同参数的 `.animation(..., value: isSmall)`；没有不带 `value` 的隐式动画。
+  - 语义修正（顺带）：暂停按钮现在同时承担「结束」——暂停时把已听到的文字定格，有文字就进入可发送状态（自动模式开始倒计时），没文字就提示「没听清」；继续则接着录。
+  - 退到后台：直接关闭 sheet 并丢弃本次录音（`showVoice = false` + `discard()`），不再在后台挂一个录音界面。
+- 文件：`apps/ios/Kit/Sources/CodyncUI/Voice/VoiceSheetView.swift`、`VoiceSession.swift`、`VoiceWaveform.swift`、`apps/ios/Views/HomeSourcesView.swift`、`Resources/Languages/zh-Hans.json`、`zh-Hant.json`（新增「丢弃这段语音？」「丢弃」「继续编辑」）。
+- 验证：`xcodebuild build -scheme 'iOS Dev' -configuration DevDebug` 通过；已装到 iPhone 16 Pro（2.36.0 / 153）并启动。按要求未自测、未截图。
+- 限制/待办：`.large` 仍复用半屏布局（二期连续通话）；「丢弃」确认依赖 sheet 内下拉手势 + 系统下拉禁用，若真机上从文字区下拉没弹确认，需要改成按钮触发。
+- 关联：C0151、C0152、C0153、C0154。

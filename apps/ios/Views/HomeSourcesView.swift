@@ -27,6 +27,9 @@ struct HomeSourcesView: View {
     @State private var voice = VoiceSession()
     /// The voice sheet is up (it opens on the microphone button).
     @State private var showVoice = false
+    /// The bar is out of the way: driven by the sheet's presentation *and* its dismissal, so it
+    /// always comes back the way it left.
+    @State private var barAway = false
     /// Which height it rests at: the 76pt pill, half, or full.
     @State private var voiceDetent: PresentationDetent = VoiceSheetView.small
     /// The glass pill that says what was just sent.
@@ -77,8 +80,9 @@ struct HomeSourcesView: View {
                 switch phase {
                 case .background:
                     dsh.disconnect()
-                    // iOS stops the microphone when the app leaves: no capsule may stay up.
-                    voice.cancel()
+                    // iOS takes the microphone away when the app leaves, so the sheet goes too.
+                    showVoice = false
+                    voice.discard()
                 case .active: syncDSHConnection()
                 default: break
                 }
@@ -86,24 +90,33 @@ struct HomeSourcesView: View {
             .sheet(isPresented: $showCameraSheet, content: cameraSheet)
             // The voice sheet: on the home's root view, never from a list row — a rebuilt anchor
             // there takes the sheet, and the home with it (C0035, C0136).
-            .sheet(isPresented: $showVoice, onDismiss: { voiceDetent = VoiceSheetView.small }) {
+            .sheet(isPresented: $showVoice, onDismiss: {
+                // Pulled down or sent: either way the recording is over and the bar comes back.
+                voice.discard()
+                voiceDetent = VoiceSheetView.small
+                barAway = false
+            }) {
                 VoiceSheetView(lead: leadBot?.bot, session: voice, detent: $voiceDetent,
                                openSystemSettings: { openSystemVoiceSettings() })
                     .presentationDetents([VoiceSheetView.small, .medium, .large], selection: $voiceDetent)
-                    // The system's grabber and glass are the whole point: no hand-drawn handle.
+                    // The system's grabber, glass and dismissal are the whole point: no hand-drawn
+                    // handle, no custom transition, so it leaves exactly the way it came in.
                     .presentationDragIndicator(.visible)
                     // At the pill the home stays live; halfway and up it dims and locks itself.
                     .presentationBackgroundInteraction(.enabled(upThrough: VoiceSheetView.small))
-                    .interactiveDismissDisabled()
+                    // Pulling down closes the sheet — unless there are words to lose, in which case
+                    // the sheet asks first (the gesture in the sheet is what asks).
+                    .interactiveDismissDisabled(voice.needsConfirm)
             }
             .glassToast($toast, topPadding: 6)
             .onChange(of: voice.phase) { _, phase in
                 switch phase {
                 // The words are read at half height: come up if the pill is where it still sits.
                 case .confirming, .notice:
-                    if showVoice, voiceDetent == VoiceSheetView.small {
-                        withAnimation(Motion.reduced(Motion.layout, reduceMotion)) { voiceDetent = .medium }
-                    }
+                    raiseSheet()
+                case .paused where voice.notHeard:
+                    // Nothing heard: the hint only lives in the taller sheet.
+                    raiseSheet()
                 // Sent or cancelled: the sheet has done its work.
                 case .idle:
                     if showVoice { showVoice = false }
@@ -111,6 +124,8 @@ struct HomeSourcesView: View {
                 }
             }
             .onChange(of: voiceDetent) { _, _ in Haptics.selection() }
+            // The bar climbs back the moment the sheet starts down, not after it has gone.
+            .onChange(of: showVoice) { _, shown in if !shown { barAway = false } }
             .onAppear { voice.onSend = { await sendToLeadBot($0) } }
             .navigationDestination(item: $openDSHSession) { _ in
                 DSHConversationView(gateway: dsh)
@@ -179,8 +194,8 @@ struct HomeSourcesView: View {
     }
 
     private var bottomBar: some View {
-        // The bar steps down and fades out with the sheet, and comes back when it closes.
-        HomeBottomBar(searchText: $searchText, hidden: showVoice, startVoice: beginVoice) {
+        // The bar steps down and fades out with the sheet, and climbs back the same way.
+        HomeBottomBar(searchText: $searchText, hidden: barAway, startVoice: beginVoice) {
             showCameraSheet = true
         }
     }
@@ -200,6 +215,7 @@ struct HomeSourcesView: View {
             return
         }
         voiceDetent = VoiceSheetView.small
+        barAway = true
         showVoice = true
         Task { await voice.begin() }
     }
@@ -214,6 +230,14 @@ struct HomeSourcesView: View {
             accounts.selection = lead.ref
         }
         return true
+    }
+
+    /// The words (or a refusal) are read at half height.
+    private func raiseSheet() {
+        guard showVoice, voiceDetent == VoiceSheetView.small else { return }
+        withAnimation(Motion.reduced(.spring(response: 0.35, dampingFraction: 0.9), reduceMotion)) {
+            voiceDetent = .medium
+        }
     }
 
     private func openSystemVoiceSettings() {

@@ -3,12 +3,15 @@ import SwiftUI
 
 /// The voice sheet: the system's own sheet at three detents — a 76pt pill, half height and full —
 /// with the lead bot, the waveform and the microphone inside. Recording, recognition and sending
-/// stay in `VoiceSession`; this view only draws them.
+/// stay in `VoiceSession`; this view only draws them. Closing the sheet is what ends a recording:
+/// there is no close button anywhere, because pulling the sheet down is the way out.
 public struct VoiceSheetView: View {
     /// The resting detent: 44pt buttons with 16pt of air on every side.
     public static let small: PresentationDetent = .height(76)
     /// Every circle's glyph, against the 44pt button.
     private static let icon: CGFloat = 24
+    /// The one spring the layout changes on.
+    private static let settle = Animation.spring(response: 0.35, dampingFraction: 0.9)
 
     private let lead: Bot?
     private let session: VoiceSession
@@ -16,11 +19,12 @@ public struct VoiceSheetView: View {
     let openSystemSettings: () -> Void
 
     @Bindable private var bound: VoiceSession
+    @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @FocusState private var typing: Bool
-    /// Moves the buttons between the pill's row and the half sheet's corners.
-    @Namespace private var morph
     @State private var breathing = false
+    /// Pulling down with words to lose asks first.
+    @State private var confirmDiscard = false
     /// The voice settings open as a second sheet on top of this one: one presenter shows one sheet.
     @State private var showSettings = false
 
@@ -44,9 +48,18 @@ public struct VoiceSheetView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: isSmall ? .center : .top)
-        .animation(Motion.reduced(Motion.layout, reduceMotion), value: isSmall)
-        .animation(Motion.reduced(Motion.layout, reduceMotion), value: session.phase)
-        .animation(Motion.reduced(Motion.layout, reduceMotion), value: session.sendFailed)
+        // One spring for the change between detents: nothing else animates the layout.
+        .animation(Motion.reduced(Self.settle, reduceMotion), value: isSmall)
+        .animation(Motion.reduced(Self.settle, reduceMotion), value: session.sendFailed)
+        // Pulling the sheet down is the way out; with words on screen it asks first.
+        .simultaneousGesture(DragGesture(minimumDistance: 24).onEnded { value in
+            if value.translation.height > 70, session.needsConfirm { confirmDiscard = true }
+        })
+        .confirmationDialog(L10n.tr("Discard this voice message?"), isPresented: $confirmDiscard,
+                            titleVisibility: .visible) {
+            Button(L10n.tr("Discard"), role: .destructive) { dismiss() }
+            Button(L10n.tr("Keep editing"), role: .cancel) {}
+        }
         .onChange(of: session.phase) { _, phase in
             breathing = phase == .recording && !reduceMotion
         }
@@ -62,19 +75,13 @@ public struct VoiceSheetView: View {
 
     // MARK: the 76pt pill
 
-    /// No send button here: the words live in the taller sheet, so nothing sends from the pill.
+    /// Avatar, waveform, settings, pause: no send, and no close — the sheet itself is the exit.
     private var pill: some View {
         HStack(spacing: 12) {
             avatar(36)
-                .matchedGeometryEffect(id: "avatar", in: morph)
             waveform
-                .matchedGeometryEffect(id: "wave", in: morph)
             settingsButton
-                .matchedGeometryEffect(id: "settings", in: morph)
             micButton
-                .matchedGeometryEffect(id: "mic", in: morph)
-            closeButton
-                .matchedGeometryEffect(id: "close", in: morph)
         }
         .padding(.horizontal, 16)
         // No vertical padding: the row centres in whatever the 76pt detent leaves after the system
@@ -87,29 +94,23 @@ public struct VoiceSheetView: View {
     private var tall: some View {
         VStack(spacing: 12) {
             HStack(spacing: 12) {
-                // Title on the left, buttons on the right, like a sheet's own title bar.
-                Text(L10n.tr(title))
+                avatar(32)
+                Text(lead?.name ?? L10n.tr("Voice"))
                     .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(session.sendFailed ? Palette.danger : Palette.text)
+                    .foregroundStyle(Palette.text)
                     .lineLimit(1)
-                    .minimumScaleFactor(0.8)
                 Spacer(minLength: 8)
+                // Nothing while it hears; the send button only once there are words to send.
                 if session.canSend || session.sending {
                     sendButton
-                        .matchedGeometryEffect(id: "send", in: morph)
                 }
-                closeButton
-                    .matchedGeometryEffect(id: "close", in: morph)
             }
             transcript
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             HStack(spacing: 12) {
                 waveform
-                    .matchedGeometryEffect(id: "wave", in: morph)
                 settingsButton
-                    .matchedGeometryEffect(id: "settings", in: morph)
                 micButton
-                    .matchedGeometryEffect(id: "mic", in: morph)
             }
         }
         .padding(.horizontal, 16)
@@ -119,24 +120,24 @@ public struct VoiceSheetView: View {
 
     /// TODO: `.large` runs the same layout as `.medium` for now; a continuous call mode belongs here.
     private var waveform: some View {
-        VoiceWaveform(level: session.level, paused: session.phase == .paused)
+        VoiceWaveform(level: session.level, paused: session.phase != .recording)
             .frame(maxWidth: .infinity)
-    }
-
-    /// "Listening" while it hears, "Send to XX" once the words are in, and the trouble when there is.
-    private var title: String {
-        if session.sendFailed { return "Sending failed, tap send to retry" }
-        switch session.phase {
-        case .recording: return "Listening"
-        case .paused: return "Recording paused"
-        case .confirming, .notice: return lead.map { L10n.tr("Send to") + " " + $0.name } ?? "Send to"
-        case .idle: return "Listening"
-        }
     }
 
     // MARK: the words
 
     @ViewBuilder private var transcript: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if session.sendFailed {
+                Text(L10n.tr("Sending failed, tap send to retry"))
+                    .font(.footnote)
+                    .foregroundStyle(Palette.danger)
+            }
+            content
+        }
+    }
+
+    @ViewBuilder private var content: some View {
         if session.editing {
             TextField(L10n.tr("Say something"), text: $bound.text, axis: .vertical)
                 .focused($typing)
@@ -173,9 +174,7 @@ public struct VoiceSheetView: View {
                 .scrollIndicators(.hidden)
                 // The newest words stay in sight as they are recognized.
                 .onChange(of: session.text) { _, _ in
-                    withAnimation(Motion.reduced(Motion.fade, reduceMotion)) {
-                        proxy.scrollTo("end", anchor: .bottom)
-                    }
+                    proxy.scrollTo("end", anchor: .bottom)
                 }
                 .contentShape(Rectangle())
                 .onTapGesture { session.startEditing() }
@@ -211,7 +210,8 @@ public struct VoiceSheetView: View {
 
     // MARK: pieces
 
-    /// 36pt, breathing 1.0 → 1.06 inside a halo of the bot's own colour while it listens.
+    /// 32 or 36pt. Breathing 1.0 → 1.06 inside a halo of the bot's own colour while it hears; frozen
+    /// and unlit while it is paused, so the sheet reads as silent at a glance.
     private func avatar(_ size: CGFloat) -> some View {
         let tint = lead.map { AvatarPalette.color($0.avatarColor) } ?? Palette.secondary
         return ZStack {
@@ -220,7 +220,7 @@ public struct VoiceSheetView: View {
                 .frame(width: size, height: size)
                 .blur(radius: breathing ? 8 : 5)
                 .scaleEffect(breathing ? 1.22 : 1.05)
-                .opacity(breathing ? 0.55 : 0.3)
+                .opacity(breathing ? 0.55 : 0)
             Group {
                 if let lead {
                     CharacterAvatar(bot: lead, size: size, animated: false)
@@ -236,13 +236,6 @@ public struct VoiceSheetView: View {
         .accessibilityHidden(true)
     }
 
-    /// The ✕: pale red glass, red glyph, and the anchor everything else moves away from.
-    private var closeButton: some View {
-        circle("close-line", label: "Close", tint: Palette.danger.opacity(0.25), glyph: Palette.danger) {
-            session.cancel()
-        }
-    }
-
     private var settingsButton: some View {
         circle("settings-3-line", label: "Voice settings", tint: nil) {
             Haptics.impact()
@@ -250,12 +243,14 @@ public struct VoiceSheetView: View {
         }
     }
 
-    /// Pause while hearing, hear again while paused. Accent glass while it is the live control.
+    /// Pause while hearing, continue while paused. Accent glass while it is the live control.
     private var micButton: some View {
         Button {
             session.toggleMicrophone()
         } label: {
             circleLabel(glyph: micGlyph, filled: session.phase == .recording)
+                // A play triangle reads left-heavy; nudge it into the circle's optical middle.
+                .offset(x: session.phase == .recording ? 0 : 1.5)
         }
         .buttonStyle(VoicePress())
         .modifier(VoiceGlass(tint: session.phase == .recording ? Palette.accentFill : nil,
@@ -263,7 +258,7 @@ public struct VoiceSheetView: View {
         .accessibilityLabel(Text(L10n.tr(session.phase == .recording ? "Pause recording" : "Continue recording")))
     }
 
-    /// Sends the words. In automatic mode its rim is the countdown; an empty transcript greys it out.
+    /// Sends the words. In automatic mode its rim is the countdown.
     private var sendButton: some View {
         Button {
             Task { await session.sendNow() }
@@ -284,13 +279,11 @@ public struct VoiceSheetView: View {
         }
         .buttonStyle(VoicePress())
         .modifier(VoiceGlass(tint: Palette.accentFill, shape: AnyShape(Circle())))
-        .disabled(!session.canSend)
-        .opacity(session.canSend ? 1 : 0.35)
         .accessibilityLabel(Text(L10n.tr("Send")))
     }
 
     private var micGlyph: String {
-        session.phase == .recording ? "pause-line" : "play-line"
+        session.phase == .recording ? "pause-fill" : "play-fill"
     }
 
     /// One 44pt glyph: 24pt of Remix, the same weight everywhere.

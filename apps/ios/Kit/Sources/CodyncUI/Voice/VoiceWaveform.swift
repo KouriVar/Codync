@@ -11,7 +11,8 @@ import SwiftUI
 ///   flowing right one wavelength a second, its ends pulled to zero so it meets the line it grew from.
 /// - Paused: whatever shape it had, frozen, at 0.4.
 struct VoiceWaveform: View {
-    let level: Float
+    /// The microphone's loudness, its own model so a reading never redraws the sheet around it.
+    let level: VoiceLevelModel
     /// The recording is paused: hold the shape and stop the flow.
     var paused = false
 
@@ -39,8 +40,9 @@ struct VoiceWaveform: View {
     private func draw(_ canvas: GraphicsContext, size: CGSize, time rawTime: TimeInterval) {
         guard size.width > 0, size.height > 0 else { return }
         let time = motion.clock(rawTime, paused: paused)
-        let voice = motion.voice(at: time, level: level)
-        let loudness = motion.loudness(at: time, level: level)
+        let reading = level.value
+        let voice = motion.voice(at: time, level: reading)
+        let loudness = motion.loudness(at: time, level: reading)
         let alpha = paused ? 0.4 : 1
         let middle = size.height / 2
 
