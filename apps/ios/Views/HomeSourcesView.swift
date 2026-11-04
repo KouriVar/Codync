@@ -265,11 +265,10 @@ struct HomeSourcesView: View {
     }
 
     /// The home's one bar, at the conversation page's composer numbers: 16pt at the screen's edges,
-    /// the composer's 8pt between the field and the round button (12pt of visible air, since the
-    /// button is a 36pt circle in the composer's 44pt hit frame), 6pt above, and 28pt — or the
-    /// composer's 12pt while the keyboard is up — below.
+    /// 12pt between the field and the round button, 6pt above, and 28pt — or the composer's 12pt
+    /// while the keyboard is up — below.
     private var bottomBar: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 12) {
             searchBox
             circleButton
         }
@@ -310,19 +309,18 @@ struct HomeSourcesView: View {
 
     /// The round button, in two states over the same circle: the microphone while the field is idle,
     /// a ✕ that empties the field and puts the keyboard away once it has focus. The swap is a fade.
-    /// A 36pt circle in a 44pt target, exactly like the composer's "+" beside it.
+    /// The app's icon circle: 44pt across with a 24pt glyph.
     private var circleButton: some View {
         ZStack {
-            GlassButton(L10n.tr("Voice"), glyph: .remix("mic-line"), size: .compact) { beginVoice() }
+            GlassButton(L10n.tr("Voice"), glyph: .remix("mic-line"), size: .icon) { beginVoice() }
                 .opacity(searchFocused ? 0 : 1)
                 .allowsHitTesting(!searchFocused)
                 .accessibilityHidden(searchFocused)
-            GlassButton(L10n.tr("Close search"), glyph: .remix("close-line"), size: .compact) { endSearch() }
+            GlassButton(L10n.tr("Close search"), glyph: .remix("close-line"), size: .icon) { endSearch() }
                 .opacity(searchFocused ? 1 : 0)
                 .allowsHitTesting(searchFocused)
                 .accessibilityHidden(!searchFocused)
         }
-        .frame(width: ControlMetrics.Size.compact.hitTarget, height: ControlMetrics.Size.compact.hitTarget)
         .animation(Motion.reduced(Motion.fade, reduceMotion), value: searchFocused)
     }
 

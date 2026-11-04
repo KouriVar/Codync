@@ -2206,3 +2206,24 @@
     未运行桌面端的 catalog 对拍测试（按要求不跑测试）。
   - zh-Hant 没有这两条，会按既有规则回退到简体的「搜索」/「没有找到」；要繁体需另加。
 - 关联：C0194。
+
+### C0196 · 2026-11-04 · 首页底部栏的圆钮改回 44pt 图标圆（内 24）
+
+- 原因：C0195 为了让首页底部栏与会话页输入栏逐项一致，把右侧圆钮改成会话页「＋」的 `.compact`
+  36pt 圆（套 44pt 命中框），中间间距也随之按 8 + 命中框 4 算。穗要圆钮回到 App 的图标圆规格：
+  **外 44、内 24**，不再参照会话页的「＋」。
+- 变化（`Views/HomeSourcesView.swift`）：
+  - `circleButton`：两个状态的 `GlassButton` 从 `size: .compact`(36) 改回 `size: .icon`(44，图标 24)；
+    去掉外面那层 `.frame(compact.hitTarget)` 命中框（44 本身已达最小命中区）。
+  - `bottomBar`：`HStack(spacing: 8)` → `spacing: 12`——圆钮恢复 44 后，原来「8 + 命中框 4 = 视觉 12」
+    的算法不再适用，直接给 12，视觉间距与 C0194 一致。
+- 保持不变（C0195 的其余部分）：顶部 6pt、底部 28pt / 键盘弹起 12pt 的垂直数值与
+  `ignoresSafeArea`、`keyboardUp` 通知驱动、搜索框 44 高 / 24 圆角 / 内边距 14、外边距 16，
+  以及 zh-Hans 的「搜索」「没有找到」两条词条。
+- 文件：`apps/ios/Views/HomeSourcesView.swift`。未新建文件，`apps/Codync.xcodeproj` 未重新生成。
+- 验证：`xcodebuild build -project apps/Codync.xcodeproj -scheme 'iOS Dev' -configuration DevDebug`（真机 destination、
+  ui-preview 覆盖、构建号 184）**编译通过，0 error**；`xcrun devicectl device install app` 装到 iPhone 16 Pro
+  （`com.suiyikou.codync.uipreview` 2.36.0 / 184）成功。按要求**不自测**：不跑测试、不截图、不用 CDP。
+- 限制/待办：圆钮 44 比会话页「＋」的 36 大一号，两边不再等大——这是本次明确要的效果；
+  首页栏高度 44 仍与输入栏一致，只有右侧圆钮比会话页的大。
+- 关联：C0194、C0195。
