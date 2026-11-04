@@ -6,6 +6,8 @@ import SwiftUI
 /// Floating home controls, scoped to the roster so a pushed conversation has no bottom bar.
 struct HomeBottomBar: View {
     @Binding var searchText: String
+    /// The voice sheet is up: the bar drops away and fades, so only the sheet is left.
+    let hidden: Bool
     /// The voice button's press: the home checks there is a lead bot, then opens the voice sheet.
     let startVoice: () -> Void
     /// Keyboard up: sit just above it; down: keep the 28pt gap to the screen edge.
@@ -24,6 +26,11 @@ struct HomeBottomBar: View {
         GlassEffectContainer(spacing: 12) {
             controlRow
         }
+        // Away while the voice sheet has the stage; back when it closes.
+        .offset(y: hidden ? 30 : 0)
+        .opacity(hidden ? 0 : 1)
+        .allowsHitTesting(!hidden)
+        .animation(Motion.reduced(.spring(response: 0.3, dampingFraction: 0.9), reduceMotion), value: hidden)
         // One 16pt margin with the toolbar and the list rows.
         .padding(.horizontal, 16)
         .padding(.top, 10)

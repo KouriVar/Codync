@@ -1579,5 +1579,12 @@
   "The microphone is not available right now. Try again in a moment": "现在用不了麦克风，等一下再试。",
   "This device cannot turn speech into text right now": "这台设备暂时没法把语音转成文字。",
   "Say something": "说点什么…",
-  "Send to": "发给"
+  "Send to": "发给",
+  "Did not catch that, say it again": "没听清，再说一次",
+  "Sending failed, tap send to retry": "发送失败，点发送重试",
+  "Send mode": "发送方式",
+  "Manual": "手动发送",
+  "Sends 1.5 seconds after the recording ends. Tap the words to correct them instead.": "结束录音 1.5 秒后自动发送；点文字可以改成手动发送。",
+  "Nothing is sent until you tap send.": "结束录音后等你点发送才发。",
+  "Continue recording": "继续录音"
 }

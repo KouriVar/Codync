@@ -1467,3 +1467,19 @@
 - 验证：`xcodebuild build -scheme 'iOS Dev' -configuration DevDebug` 通过；已装到 iPhone 16 Pro（2.36.0 / 150）并启动。按要求未自测、未截图。
 - 限制/待办：`.large` 一档暂无独立内容；`SpeechTranscriber`、`VoiceSession` 未改。
 - 关联：C0148、C0149、C0150、C0151。
+### C0153 · 2026-11-04 · 语音 sheet v3.1：持续录音、手动/自动发送、按钮归位
+
+- 原因：C0152 真机试出来的五件事——底栏没有一起收起、2 秒静音就结束太急、小档就能发送、按钮位置和官方 sheet 不一致、图标粗细不统一。
+- 变化：
+  - 底栏动画：`HomeBottomBar` 增加 `hidden`，语音 sheet 打开时底栏下移 30pt 并淡出（spring 0.3/0.9）、同时关闭点击，关闭 sheet 时同路径回来；由 `showVoice` 与 sheet 弹出同一时刻驱动。
+  - 持续录音：删掉「连续 2 秒无声自动结束」——`SpeechEvent.silence`、静音看门狗、`VoiceSession` 的 `.silence` 分支一并移除；不点暂停/结束就一直录。
+  - 识别任务续接：SFSpeechRecognizer 单个任务约 1 分钟，`OnDeviceSpeechTranscriber` 现在把一长段录音拆成任务链——任务给出最终结果（或被系统结束）时把文字并入 `committed`，麦克风不断、立刻用新 request 起下一个任务，文字无缝接上；麦克风缓冲区通过一把锁的 `BufferSink` 写进「当前」request，音频线程不再为了拿 request 每帧回主线程。
+  - 空结果：用户主动结束且文字为空时不再收尾/关闭，标题区下方显示「没听清，再说一次」（`notHeard`），sheet 保持打开、麦克风可直接继续录。
+  - 发送方式（新设置）：`VoiceSendMode`（`@AppStorage("voiceSendMode")`，默认手动），在语音设置 sheet 里「识别语言」下面新增「发送方式」两行（自动发送 / 手动发送，带说明）。手动：结束后升到半屏、无倒计时、点发送才发；自动：升到半屏并显示 1.5 秒倒计时环，点文字编辑即停表转为手动。发送按钮在文字为空时置灰不可点（`canSend`）。
+  - 按钮布局：小档从左到右 = 头像 36（呼吸保留）→ 波形 → 设置 44 → 暂停/继续 44 → 关闭 44（最右），离边缘 16、间距 12，小档不再有发送；半屏/全屏 = 左对齐标题（正在听… / 发给 XX，失败时「发送失败，点发送重试」并转红）+ 右上发送 44、关闭 44；底部波形 + 设置 44 + 暂停 44（最右）。关闭用 `matchedGeometryEffect` 从小档最右移到半屏右上，设置与暂停移到右下。
+  - 关闭时机：只有发送成功才自动关 sheet（并弹玻璃吐司「已发送给 XX」）；没听清、识别出错、暂停、结束都不关；发送失败 sheet 不关、文字保留，可再点发送重试。发送改成 `BotStore.sendAndConfirm(_:to:)`（await 投递结果，`failed` 才算失败，走与会话打字完全相同的 `send` 入口）。
+  - 图标：所有 44pt 圆按钮里的 Remix 图标统一 24pt、同一字重；关闭=浅红 tint 玻璃 + 红 ✕，暂停录音时=强调色 tint + 白 pause 图标，发送=强调色 tint + 白色向上箭头，设置=普通玻璃。
+- 文件：`apps/ios/Kit/Sources/CodyncUI/Voice/SpeechTranscriber.swift`、`VoiceSession.swift`、`VoiceRecognitionSettings.swift`、`VoiceSheetView.swift`、`VoiceSend.swift`（新）、`apps/ios/Views/HomeBottomBar.swift`、`HomeSourcesView.swift`、`BotListView.swift`、`Resources/Languages/zh-Hans.json`、`zh-Hant.json`。
+- 验证：`xcodebuild build -scheme 'iOS Dev' -configuration DevDebug` 通过；已装到 iPhone 16 Pro（2.36.0 / 151）并启动。按要求未自测、未截图。
+- 限制/待办：`.large` 仍复用半屏布局（二期连续通话）；识别任务续接真机上的实际断点只有跑长句才能确认。
+- 关联：C0148、C0150、C0151、C0152。

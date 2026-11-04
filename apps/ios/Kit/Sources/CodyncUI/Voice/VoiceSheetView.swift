@@ -7,6 +7,8 @@ import SwiftUI
 public struct VoiceSheetView: View {
     /// The resting detent: 44pt buttons with 16pt of air on every side.
     public static let small: PresentationDetent = .height(76)
+    /// Every circle's glyph, against the 44pt button.
+    private static let icon: CGFloat = 24
 
     private let lead: Bot?
     private let session: VoiceSession
@@ -16,10 +18,10 @@ public struct VoiceSheetView: View {
     @Bindable private var bound: VoiceSession
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @FocusState private var typing: Bool
-    /// Moves the buttons between the pill's row and the half-sheet's title bar.
+    /// Moves the buttons between the pill's row and the half sheet's corners.
     @Namespace private var morph
     @State private var breathing = false
-    /// The voice settings open as a second sheet on top of this one: one presenter can only show one.
+    /// The voice settings open as a second sheet on top of this one: one presenter shows one sheet.
     @State private var showSettings = false
 
     public init(lead: Bot?, session: VoiceSession, detent: Binding<PresentationDetent>,
@@ -44,6 +46,7 @@ public struct VoiceSheetView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: isSmall ? .center : .top)
         .animation(Motion.reduced(Motion.layout, reduceMotion), value: isSmall)
         .animation(Motion.reduced(Motion.layout, reduceMotion), value: session.phase)
+        .animation(Motion.reduced(Motion.layout, reduceMotion), value: session.sendFailed)
         .onChange(of: session.phase) { _, phase in
             breathing = phase == .recording && !reduceMotion
         }
@@ -59,10 +62,9 @@ public struct VoiceSheetView: View {
 
     // MARK: the 76pt pill
 
+    /// No send button here: the words live in the taller sheet, so nothing sends from the pill.
     private var pill: some View {
         HStack(spacing: 12) {
-            cancelButton
-                .matchedGeometryEffect(id: "cancel", in: morph)
             avatar(36)
                 .matchedGeometryEffect(id: "avatar", in: morph)
             waveform
@@ -71,6 +73,8 @@ public struct VoiceSheetView: View {
                 .matchedGeometryEffect(id: "settings", in: morph)
             micButton
                 .matchedGeometryEffect(id: "mic", in: morph)
+            closeButton
+                .matchedGeometryEffect(id: "close", in: morph)
         }
         .padding(.horizontal, 16)
         // No vertical padding: the row centres in whatever the 76pt detent leaves after the system
@@ -83,16 +87,19 @@ public struct VoiceSheetView: View {
     private var tall: some View {
         VStack(spacing: 12) {
             HStack(spacing: 12) {
-                cancelButton
-                    .matchedGeometryEffect(id: "cancel", in: morph)
-                Spacer(minLength: 8)
+                // Title on the left, buttons on the right, like a sheet's own title bar.
                 Text(L10n.tr(title))
                     .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(Palette.text)
+                    .foregroundStyle(session.sendFailed ? Palette.danger : Palette.text)
                     .lineLimit(1)
+                    .minimumScaleFactor(0.8)
                 Spacer(minLength: 8)
-                micButton
-                    .matchedGeometryEffect(id: "mic", in: morph)
+                if session.canSend || session.sending {
+                    sendButton
+                        .matchedGeometryEffect(id: "send", in: morph)
+                }
+                closeButton
+                    .matchedGeometryEffect(id: "close", in: morph)
             }
             transcript
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -101,6 +108,8 @@ public struct VoiceSheetView: View {
                     .matchedGeometryEffect(id: "wave", in: morph)
                 settingsButton
                     .matchedGeometryEffect(id: "settings", in: morph)
+                micButton
+                    .matchedGeometryEffect(id: "mic", in: morph)
             }
         }
         .padding(.horizontal, 16)
@@ -114,8 +123,9 @@ public struct VoiceSheetView: View {
             .frame(maxWidth: .infinity)
     }
 
-    /// "Listening" until the words are in, then who they are going to.
+    /// "Listening" while it hears, "Send to XX" once the words are in, and the trouble when there is.
     private var title: String {
+        if session.sendFailed { return "Sending failed, tap send to retry" }
         switch session.phase {
         case .recording: return "Listening"
         case .paused: return "Recording paused"
@@ -135,6 +145,11 @@ public struct VoiceSheetView: View {
                 .lineLimit(1...6)
         } else if session.phase == .notice {
             noticeLines
+        } else if session.notHeard {
+            Text(L10n.tr("Did not catch that, say it again"))
+                .font(.system(size: 20))
+                .foregroundStyle(Palette.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
         } else if session.text.isEmpty {
             VStack(alignment: .leading, spacing: 0) {
                 Text(L10n.tr("Say something"))
@@ -168,7 +183,7 @@ public struct VoiceSheetView: View {
         }
     }
 
-    /// A refusal, or "did not catch that", with the settings jump when there is one.
+    /// A refusal with the settings jump when there is one.
     private var noticeLines: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(L10n.tr(session.notice?.message ?? ""))
@@ -188,7 +203,7 @@ public struct VoiceSheetView: View {
                         .contentShape(Capsule())
                 }
                 .buttonStyle(VoicePress())
-                .modifier(VoiceGlass(tint: nil))
+                .modifier(VoiceGlass(tint: nil, shape: AnyShape(Capsule())))
             }
             Spacer(minLength: 0)
         }
@@ -221,37 +236,45 @@ public struct VoiceSheetView: View {
         .accessibilityHidden(true)
     }
 
-    private var cancelButton: some View {
-        glassButton("close-line", label: "Cancel", tint: Palette.danger.opacity(0.25), glyph: Palette.danger) {
+    /// The ✕: pale red glass, red glyph, and the anchor everything else moves away from.
+    private var closeButton: some View {
+        circle("close-line", label: "Close", tint: Palette.danger.opacity(0.25), glyph: Palette.danger) {
             session.cancel()
         }
     }
 
     private var settingsButton: some View {
-        glassButton("settings-3-line", label: "Voice settings", tint: nil) {
+        circle("settings-3-line", label: "Voice settings", tint: nil) {
             Haptics.impact()
             showSettings = true
         }
     }
 
-    /// 44pt: pause while hearing, end while paused, send once the words are in. The countdown is the
-    /// ring on its rim.
+    /// Pause while hearing, hear again while paused. Accent glass while it is the live control.
     private var micButton: some View {
-        Button(action: {
-            switch session.phase {
-            case .confirming: session.sendNow()
-            case .paused: Task { await session.end() }
-            default: session.toggleMicrophone()
-            }
-        }) {
+        Button {
+            session.toggleMicrophone()
+        } label: {
+            circleLabel(glyph: micGlyph, filled: session.phase == .recording)
+        }
+        .buttonStyle(VoicePress())
+        .modifier(VoiceGlass(tint: session.phase == .recording ? Palette.accentFill : nil,
+                             shape: AnyShape(Circle())))
+        .accessibilityLabel(Text(L10n.tr(session.phase == .recording ? "Pause recording" : "Continue recording")))
+    }
+
+    /// Sends the words. In automatic mode its rim is the countdown; an empty transcript greys it out.
+    private var sendButton: some View {
+        Button {
+            Task { await session.sendNow() }
+        } label: {
             ZStack {
-                RemixIcon(glyph, size: 20, weight: .medium)
-                    .foregroundStyle(micFilled ? Palette.onAccent : Palette.text)
-                if session.phase == .confirming {
+                circleLabel(glyph: "arrow-up-line", filled: true)
+                if session.countingDown {
                     Circle()
                         .stroke(Palette.text.opacity(0.15), lineWidth: 3)
                     Circle()
-                        .trim(from: 0, to: session.editing ? 0 : session.countdown)
+                        .trim(from: 0, to: session.countdown)
                         .stroke(Palette.accentFill, style: StrokeStyle(lineWidth: 3, lineCap: .round))
                         .rotationEffect(.degrees(-90))
                 }
@@ -260,63 +283,54 @@ public struct VoiceSheetView: View {
             .contentShape(Circle())
         }
         .buttonStyle(VoicePress())
-        .modifier(VoiceGlass(tint: micFilled ? Palette.accentFill : nil))
-        .accessibilityLabel(Text(L10n.tr(micLabel)))
+        .modifier(VoiceGlass(tint: Palette.accentFill, shape: AnyShape(Circle())))
+        .disabled(!session.canSend)
+        .opacity(session.canSend ? 1 : 0.35)
+        .accessibilityLabel(Text(L10n.tr("Send")))
     }
 
-    private var glyph: String {
-        switch session.phase {
-        case .confirming: return "arrow-up-line"
-        case .paused: return "mic-fill"
-        default: return "pause-line"
-        }
+    private var micGlyph: String {
+        session.phase == .recording ? "pause-line" : "play-line"
     }
 
-    private var micLabel: String {
-        switch session.phase {
-        case .confirming: return session.editing ? "Send" : "Send now"
-        case .paused: return "End recording"
-        default: return "Pause recording"
-        }
+    /// One 44pt glyph: 24pt of Remix, the same weight everywhere.
+    private func circleLabel(glyph: String, filled: Bool) -> some View {
+        RemixIcon(glyph, size: Self.icon, weight: .medium)
+            .foregroundStyle(filled ? Palette.onAccent : Palette.text)
+            .frame(width: 44, height: 44)
+            .contentShape(Circle())
     }
 
-    /// Accent glass while it is the thing to press: hearing, and the words waiting to go.
-    private var micFilled: Bool {
-        switch session.phase {
-        case .recording, .confirming: return true
-        case .paused, .notice, .idle: return false
-        }
-    }
-
-    private func glassButton(_ icon: String, label: String, tint: Color?, glyph: Color? = nil,
-                             action: @escaping () -> Void) -> some View {
+    private func circle(_ icon: String, label: String, tint: Color?, glyph: Color? = nil,
+                        action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            RemixIcon(icon, size: 18, weight: .bold)
+            RemixIcon(icon, size: Self.icon, weight: .medium)
                 .foregroundStyle(glyph ?? Palette.text)
                 .frame(width: 44, height: 44)
                 .contentShape(Circle())
         }
         .buttonStyle(VoicePress())
-        .modifier(VoiceGlass(tint: tint))
+        .modifier(VoiceGlass(tint: tint, shape: AnyShape(Circle())))
         .accessibilityLabel(Text(L10n.tr(label)))
     }
 }
 
-/// The sheet's buttons: Liquid Glass on iOS 26, `ultraThinMaterial` with a hairline before that.
+/// The sheet's glass: Liquid Glass on iOS 26, `ultraThinMaterial` with a hairline before that.
 private struct VoiceGlass: ViewModifier {
     let tint: Color?
+    let shape: AnyShape
 
     func body(content: Content) -> some View {
         if #available(iOS 26, *) {
             content.glassEffect(tint.map { Glass.regular.tint($0).interactive() } ?? .regular.interactive(),
-                                in: Circle())
+                                in: shape)
         } else {
             content
                 .background {
-                    Circle().fill(.ultraThinMaterial)
-                    if let tint { Circle().fill(tint) }
+                    shape.fill(.ultraThinMaterial)
+                    if let tint { shape.fill(tint) }
                 }
-                .overlay { Circle().strokeBorder(.white.opacity(0.5), lineWidth: 0.5) }
+                .overlay { shape.stroke(.white.opacity(0.5), lineWidth: 0.5) }
         }
     }
 }

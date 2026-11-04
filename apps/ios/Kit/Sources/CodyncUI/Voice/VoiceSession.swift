@@ -2,20 +2,17 @@ import CodyncKit
 import Foundation
 import SwiftUI
 
-/// Why the voice capsule stopped early, in the caller's words (`message` is a dictionary key).
+/// Why the voice sheet stopped early, in the caller's words (`message` is a dictionary key).
 public enum VoiceNotice: Sendable, Equatable {
     case permissionDenied
     case microphone
     case unavailable
-    /// Nothing was recognized: sending that would be sending an empty message.
-    case notEnough
 
     public var message: String {
         switch self {
         case .permissionDenied: return "Microphone and speech recognition are off. Open Settings, turn them on, and try again"
         case .microphone: return "The microphone is not available right now. Try again in a moment"
         case .unavailable: return "This device cannot turn speech into text right now"
-        case .notEnough: return "Did not catch that"
         }
     }
 
@@ -23,43 +20,49 @@ public enum VoiceNotice: Sendable, Equatable {
     public var offersSettings: Bool { self == .permissionDenied }
 }
 
-/// One voice capsule: hear, pause, end, confirm, send. The controller for `VoiceCapsule`; it knows
-/// nothing about bots or stores, so the home decides who receives what `onSend` hands over.
+/// One voice sheet: hear, pause, end, read, send. The controller for `VoiceSheetView`; it knows
+/// nothing about bots or stores, so the sheet's owner decides who receives what `onSend` hands over.
 @MainActor
 @Observable
 public final class VoiceSession {
     public enum Phase: Equatable {
-        /// The bottom bar is showing.
+        /// Nothing is open.
         case idle
         case recording
         case paused
-        /// The words are in the capsule, the countdown is running.
+        /// The words are in the sheet, waiting to be read or corrected.
         case confirming
-        /// A line in the capsule (a permission refusal, "没听清") instead of the controls.
+        /// A line the sheet shows instead of the words (a permission refusal, say).
         case notice
     }
 
-    /// Seconds the confirmed words wait before they send themselves.
+    /// Seconds the words wait before they send themselves, in automatic mode.
     public static let confirmWindow: Double = 1.5
 
     public private(set) var phase: Phase = .idle
     public private(set) var level: Float = 0
-    /// The words so far while recording, the confirmed words afterwards.
+    /// The words so far while recording, the words to send afterwards.
     public var text = ""
     public private(set) var notice: VoiceNotice?
     /// 1 → 0 across `confirmWindow`, for the send button's ring.
     public private(set) var countdown: Double = 1
     /// The transcript is being corrected: the countdown holds.
     public var editing = false
-    /// Hands the final words over; the home sends them to the lead bot.
-    @ObservationIgnored public var onSend: ((String) -> Void)?
+    /// The user ended with nothing heard: worth saying, not worth sending.
+    public private(set) var notHeard = false
+    /// The last send did not reach the bot: the words stay, ready to try again.
+    public private(set) var sendFailed = false
+    /// A send is in flight: the button waits rather than sending twice.
+    public private(set) var sending = false
+
+    /// Hands the words over and reports whether they reached the bot.
+    @ObservationIgnored public var onSend: ((String) async -> Bool)?
 
     @ObservationIgnored private let transcriber: SpeechTranscriber
     @ObservationIgnored private var timer: Task<Void, Never>?
-    @ObservationIgnored private var typed = ""
     /// `finish` is waiting on the recognizer: the mic button must not start another one.
     @ObservationIgnored private var ending = false
-    /// Bumped by every start and stop, so a slow permission answer can't revive a cancelled capsule.
+    /// Bumped by every start and stop, so a slow permission answer can't revive a cancelled sheet.
     @ObservationIgnored private var generation = 0
 
     public init(transcriber: SpeechTranscriber = OnDeviceSpeechTranscriber()) {
@@ -67,10 +70,14 @@ public final class VoiceSession {
     }
 
     public var isIdle: Bool { phase == .idle }
-    /// The capsule shows as soon as the bar steps aside, so it animates in while the mic opens.
-    public var isPresented: Bool { phase != .idle }
+    /// There is something to send, and it isn't already on its way.
+    public var canSend: Bool {
+        phase == .confirming && !sending && !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+    /// Automatic mode: the words send themselves unless the user is correcting them.
+    public var countingDown: Bool { phase == .confirming && !editing && !sendFailed && VoiceSendMode.stored == .automatic }
 
-    // MARK: what the capsule's buttons do
+    // MARK: what the sheet's buttons do
 
     /// The voice button: open the microphone and start hearing.
     public func begin() async {
@@ -78,9 +85,10 @@ public final class VoiceSession {
         generation += 1
         let generation = generation
         text = ""
-        typed = ""
         editing = false
         notice = nil
+        notHeard = false
+        sendFailed = false
         level = 0
         // Shown at once: the mic takes a moment to open.
         phase = .recording
@@ -98,7 +106,7 @@ public final class VoiceSession {
         Haptics.impact()
     }
 
-    /// The mic button: pause while hearing, hear again while paused, end and confirm while paused.
+    /// Pause while hearing, hear again while paused.
     public func toggleMicrophone() {
         // The words are already on their way out: the button does nothing until they land.
         guard !ending else { return }
@@ -109,6 +117,7 @@ public final class VoiceSession {
             level = 0
             Haptics.impact()
         case .paused:
+            notHeard = false
             if transcriber.resume() {
                 phase = .recording
             } else {
@@ -121,7 +130,7 @@ public final class VoiceSession {
         }
     }
 
-    /// The end button (or two seconds of silence): fix the words and start the countdown.
+    /// End the recording and make the words ready: nothing heard says so, and the mic stays usable.
     public func end() async {
         guard phase == .recording || phase == .paused, !ending else { return }
         ending = true
@@ -132,15 +141,21 @@ public final class VoiceSession {
         ending = false
         guard phase != .idle else { return }
         text = words
-        if words.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            stop(with: .notEnough, after: Self.confirmWindow)
+        sendFailed = false
+        guard !words.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            // Not heard: the sheet stays, the words area says so, and the mic can go again.
+            notHeard = true
+            editing = false
+            phase = .paused
             return
         }
+        notHeard = false
         phase = .confirming
-        startCountdown()
+        // Automatic mode: the ring runs and the words go; manual waits for the button.
+        if VoiceSendMode.stored == .automatic { startCountdown() } else { countdown = 0 }
     }
 
-    /// The red button: stop now, keep nothing.
+    /// The red button: stop now, keep nothing, and let the sheet close.
     public func cancel() {
         generation += 1
         ending = false
@@ -148,54 +163,38 @@ public final class VoiceSession {
         transcriber.cancel()
         // A light tap: cancelling is the quiet way out.
         Haptics.impact()
-        text = ""
-        typed = ""
-        editing = false
-        notice = nil
-        level = 0
+        reset()
         phase = .idle
     }
 
-    /// The words send now, without waiting out the countdown.
-    public func sendNow() {
-        guard phase == .confirming else { return }
-        let words = (editing ? typed : text).trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !words.isEmpty else { return stop(with: .notEnough, after: Self.confirmWindow) }
+    /// Send now: the button, and the end of the countdown.
+    public func sendNow() async {
+        guard canSend else { return }
+        let words = text.trimmingCharacters(in: .whitespacesAndNewlines)
         stopTimer()
+        sending = true
+        sendFailed = false
+        let delivered = await onSend?(words) ?? false
+        sending = false
+        guard delivered else {
+            // Kept: the words stay on screen and the button tries again.
+            sendFailed = true
+            countdown = 0
+            Haptics.notification()
+            return
+        }
+        Haptics.notification()
+        reset()
         phase = .idle
-        text = ""
-        typed = ""
-        editing = false
-        onSend?(words)
     }
 
-    /// Tapping the words: correct them; the countdown holds until they send or the capsule closes.
+    /// Tapping the words: correct them; correcting stops an automatic send.
     public func startEditing() {
-        guard phase == .confirming else { return }
-        typed = text
+        guard phase == .confirming, !sending else { return }
         editing = true
         stopTimer()
+        countdown = 0
         Haptics.impact()
-    }
-
-    /// A missed `begin` (nothing heard, no permission) waits here instead of hanging.
-    private func stop(with notice: VoiceNotice, after: Double? = nil) {
-        generation += 1
-        ending = false
-        stopTimer()
-        transcriber.cancel()
-        level = 0
-        text = ""
-        editing = false
-        self.notice = notice
-        phase = .notice
-        if let after {
-            timer = Task { @MainActor [weak self] in
-                try? await Task.sleep(for: .seconds(after))
-                guard !Task.isCancelled else { return }
-                self?.dismissNotice()
-            }
-        }
     }
 
     public func dismissNotice() {
@@ -207,6 +206,31 @@ public final class VoiceSession {
 
     // MARK: internals
 
+    private func reset() {
+        stopTimer()
+        text = ""
+        editing = false
+        notice = nil
+        notHeard = false
+        sendFailed = false
+        sending = false
+        level = 0
+        countdown = 0
+    }
+
+    /// A missed `begin` (no permission, no microphone) waits here instead of hanging.
+    private func stop(with notice: VoiceNotice) {
+        generation += 1
+        ending = false
+        stopTimer()
+        transcriber.cancel()
+        level = 0
+        text = ""
+        editing = false
+        self.notice = notice
+        phase = .notice
+    }
+
     private func apply(_ event: SpeechEvent) {
         switch event {
         case let .level(value):
@@ -215,11 +239,9 @@ public final class VoiceSession {
         case let .partial(words):
             guard phase == .recording || phase == .paused else { return }
             text = words
-        case .silence:
-            guard phase == .recording else { return }
-            Task { await end() }
         case let .failed(reason):
-            stop(with: reason == .permissionDenied ? .permissionDenied : reason == .microphone ? .microphone : .unavailable)
+            stop(with: reason == .permissionDenied ? .permissionDenied
+                 : reason == .microphone ? .microphone : .unavailable)
         }
     }
 
@@ -231,12 +253,12 @@ public final class VoiceSession {
             var left = Self.confirmWindow
             while !Task.isCancelled, left > 0 {
                 try? await Task.sleep(for: .seconds(step))
-                guard let self, !Task.isCancelled, self.phase == .confirming, !self.editing else { return }
+                guard let self, !Task.isCancelled, self.countingDown else { return }
                 left -= step
                 self.countdown = max(0, left / Self.confirmWindow)
             }
-            guard let self, !Task.isCancelled, self.phase == .confirming, !self.editing else { return }
-            self.sendNow()
+            guard let self, !Task.isCancelled, self.countingDown else { return }
+            await self.sendNow()
         }
     }
 

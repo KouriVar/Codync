@@ -111,7 +111,7 @@ struct HomeSourcesView: View {
                 }
             }
             .onChange(of: voiceDetent) { _, _ in Haptics.selection() }
-            .onAppear { voice.onSend = { sendToLeadBot($0) } }
+            .onAppear { voice.onSend = { await sendToLeadBot($0) } }
             .navigationDestination(item: $openDSHSession) { _ in
                 DSHConversationView(gateway: dsh)
             }
@@ -179,7 +179,8 @@ struct HomeSourcesView: View {
     }
 
     private var bottomBar: some View {
-        HomeBottomBar(searchText: $searchText, startVoice: beginVoice) {
+        // The bar steps down and fades out with the sheet, and comes back when it closes.
+        HomeBottomBar(searchText: $searchText, hidden: showVoice, startVoice: beginVoice) {
             showCameraSheet = true
         }
     }
@@ -203,15 +204,16 @@ struct HomeSourcesView: View {
         Task { await voice.begin() }
     }
 
-    /// The same send a typed message uses, so the bot answers exactly as it would in the chat.
-    private func sendToLeadBot(_ words: String) {
-        guard let lead = leadBot, let store = accounts.store(for: lead.ref.computerId) else { return }
-        store.send(words, to: lead.bot.id)
-        Haptics.notification()
+    /// The same send a typed message uses, so the bot answers exactly as it would in the chat. The
+    /// sheet keeps the words and asks again when it comes back false.
+    private func sendToLeadBot(_ words: String) async -> Bool {
+        guard let lead = leadBot, let store = accounts.store(for: lead.ref.computerId) else { return false }
+        guard await store.sendAndConfirm(words, to: lead.bot.id) else { return false }
         // Stay on the home: the pill says where it went and opens it if tapped.
         toast = GlassToastItem(icon: "check-line", text: L10n.tr("Sent to") + " " + lead.bot.name) {
             accounts.selection = lead.ref
         }
+        return true
     }
 
     private func openSystemVoiceSettings() {
