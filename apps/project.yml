@@ -15,6 +15,8 @@ packages:
     exactVersion: "8.0.0"
   CodyncKit:
     path: ios/Kit
+  DSHKit:
+    path: ios/DSHKit
   WebRTC:
     url: https://github.com/stasel/WebRTC
     exactVersion: 153.0.0
@@ -147,6 +149,8 @@ targets:
           - Widgets
           - NotificationService
           - WhatsNew.md
+          # Its own Swift package (DSHKit), added as a package below.
+          - DSHKit
           # The app's shared Swift package (models, client, screens), added as a package below.
           - Kit
       # The widget's bot buttons and the call's Live Activity buttons run these intents in the app.
@@ -159,6 +163,8 @@ targets:
         product: CodyncKit
       - package: CodyncKit
         product: CodyncUI
+      - package: DSHKit
+        product: DSHKit
       - target: Widgets
         embed: true
       - target: NotificationService

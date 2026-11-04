@@ -89,6 +89,7 @@
 		E0D116BF893B81AEC0D2135A /* BotShortcuts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 300202AE0BDAB4961D1E4423 /* BotShortcuts.swift */; };
 		E1C181D77EA48DCDFEC2F15D /* CustomActivityIcon.swift in Sources */ = {isa = PBXBuildFile; fileRef = 365F24B61AEDCFE6C389E904 /* CustomActivityIcon.swift */; };
 		E695251CFD06AC6F4E3396B7 /* OpenBotIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C4EB0DBA2F08CD7C0E25E30 /* OpenBotIntent.swift */; };
+		E6E1151C7CB5AC3ED6DB9980 /* DSHKit in Frameworks */ = {isa = PBXBuildFile; productRef = C0C92E501FEC7D1785629015 /* DSHKit */; };
 		E78E3B5FAFEB79F31AAC104D /* CodyncBot-teardrop-Tint.ttf in Resources */ = {isa = PBXBuildFile; fileRef = C8F46BD8301E7E2C83C35111 /* CodyncBot-teardrop-Tint.ttf */; };
 		EBB0417A5FB2CE6D514D21BE /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = 126601E503A8BD04CF7A5765 /* GoogleSignIn */; };
 		ECE1339FED40D7D5D8806608 /* CallLiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5B2717A8DFD43DC6DAA9D8C /* CallLiveActivity.swift */; };
@@ -148,6 +149,7 @@
 		1FB8080D4CB79347C36A7E75 /* ComputerSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComputerSection.swift; sourceTree = "<group>"; };
 		1FECC371F3CD98687C0B69FA /* CodyncBot-pebble-Tint.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "CodyncBot-pebble-Tint.ttf"; sourceTree = "<group>"; };
 		203A43D8DF8D3832F95FA837 /* CodyncBot-teardrop-Ink.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "CodyncBot-teardrop-Ink.ttf"; sourceTree = "<group>"; };
+		2725741FD5B1BCDAC0375E1D /* DSHKit */ = {isa = PBXFileReference; lastKnownFileType = folder; name = DSHKit; path = ios/DSHKit; sourceTree = SOURCE_ROOT; };
 		28B2CB561A43ED9F2F1A4391 /* ScreenHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenHelper.swift; sourceTree = "<group>"; };
 		2C0E04490F5C56FD070539E6 /* ViewingBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewingBadge.swift; sourceTree = "<group>"; };
 		300202AE0BDAB4961D1E4423 /* BotShortcuts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BotShortcuts.swift; sourceTree = "<group>"; };
@@ -257,6 +259,7 @@
 				EBB0417A5FB2CE6D514D21BE /* GoogleSignIn in Frameworks */,
 				52CF04B855C6AAEC47B75B8F /* CodyncKit in Frameworks */,
 				F171F16563D1FF6308697173 /* CodyncUI in Frameworks */,
+				E6E1151C7CB5AC3ED6DB9980 /* DSHKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -440,6 +443,7 @@
 		AD54741A2330C502CD3BB628 /* Packages */ = {
 			isa = PBXGroup;
 			children = (
+				2725741FD5B1BCDAC0375E1D /* DSHKit */,
 				3F4C4D3B64C608AEF2F85F91 /* Kit */,
 			);
 			name = Packages;
@@ -537,6 +541,7 @@
 				126601E503A8BD04CF7A5765 /* GoogleSignIn */,
 				1285DDFA0390A76ECDAAD6C0 /* CodyncKit */,
 				06C9F37C6502131CAF0F145E /* CodyncUI */,
+				C0C92E501FEC7D1785629015 /* DSHKit */,
 			);
 			productName = iOS;
 			productReference = 60422D3CA8FEBCDC5AC465E0 /* iOS.app */;
@@ -621,6 +626,7 @@
 				7783B78673BEF42F6305B25E /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */,
 				979123F21565A4068586B502 /* XCRemoteSwiftPackageReference "WebRTC" */,
 				1971A679A8497DA8D0C8B77A /* XCLocalSwiftPackageReference "ios/Kit" */,
+				274AB30CC8FA1C814408DC83 /* XCLocalSwiftPackageReference "ios/DSHKit" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 3EC1FDCCFFFB4BA1A23FDDB0 /* Products */;
@@ -1595,6 +1601,10 @@
 			isa = XCLocalSwiftPackageReference;
 			relativePath = ios/Kit;
 		};
+		274AB30CC8FA1C814408DC83 /* XCLocalSwiftPackageReference "ios/DSHKit" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ios/DSHKit;
+		};
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCRemoteSwiftPackageReference section */
@@ -1642,6 +1652,10 @@
 		59F5D19A417A7A50596902FA /* CodyncKit */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = CodyncKit;
+		};
+		C0C92E501FEC7D1785629015 /* DSHKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = DSHKit;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

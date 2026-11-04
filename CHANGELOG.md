@@ -1002,3 +1002,20 @@
 - 保留：`CodyncVersionRow` 里的 host 更新入口（`installHostUpdate`、`hostUpdateStatus`、`UpdateNeededCard` 的 host 分支）未动 —— 停用的只是 App 自动更新，host 二进制更新仍然有效。
 - 验证：`npm run typecheck` 通过；`npm test` 见 C0115。未实机核对三平台观感。
 - 关联：C0110。
+
+### C0117 · 2026-11-04 · iOS 首页新增「DSH 对话」分组（Phase 1：列会话、发消息、流式回复）
+
+- 原因：DSH（DeepSeek Harness）的会话现在经 `dsh-plugin-mobile-gateway` 的 `wss://<host>/ws/mobile` 提供，手机端需要一个能看到并继续这些会话的入口。Phase 1 只做最小闭环：连上网关、列出会话、发一句话、看到流式回复；工具调用、审批、文件、语音等留在后续阶段。
+- 变化：
+  - `apps/ios/DSHKit/`（新）：Swift 5 模式的独立 Swift Package（宿主是 Swift 6 + 完整并发检查，所以不共用语言模式）。
+    - `DSHGateway.swift`：单条 `URLSessionWebSocketTask`（legacy 通道，兼容所有网关）、`hello`/`sessions`/`subscribe`/`message`/`sent`/`event`/`assistant-stream`/`session-snapshot` 处理、指数退避重连、`4003`/`4004`/`401` 处理、配对 25 秒超时与多地址兜底。
+    - `DSHPairing.swift`：解析 Mac 上 DSH 生成的配对二维码（payload v2，base64url 原文或 URL 形式、百分号解码、去空白）、Keychain 保存设备 token（service `com.suiyikou.codync.dsh-gateway`）、稳定 `X-DSH-Device-ID`。
+    - `DSHViews.swift`：首页分组、会话列表、聊天页（流式气泡）、连接/扫码表单。
+    - `DSHModels.swift`：会话摘要（`items[].projections.values.title`）、消息、hello。
+    - `build-kmp-framework.sh`：把 KMP `shared` 编成 Release framework 再合并 XCFramework 的脚本（P0 产物，P1 不链接；`Vendor/` 已忽略）。用 `DEVELOPER_DIR` 指向完整 Xcode、`JAVA_HOME` 指向 Homebrew JDK 17，不改系统 `xcode-select`。
+  - `apps/project.yml`：新增 `DSHKit` 本地包、加为 iOS target 依赖、并把 `DSHKit` 排除出 app target 的源码目录（避免重复编译）。
+  - `apps/ios/Views/RootView.swift`：首页在 BotListView 上方加 DSH 分组（`DSHHomeSection`），扫码复用现有 `QRScanner`。
+  - `apps/ios/Views/QRScanner.swift`：新增 `acceptedPrefixes` 参数（默认仍是 codync 的 scheme，`PairingView` 行为不变；DSH 传 `nil` 接受任意 payload）；`qualityLevel` 可配（DSH 用 `.accurate` 以便读高密度二维码）；扫到的内容先 trim 再判断前缀。
+- 保留：codync 自身的配对扫码、Bot 列表与拖动排序、Coe/DS Bot 的现有行为都未改；KMP 共享层本轮不链接。
+- 验证：`xcodebuild` DevDebug 对真机（`generic/platform=iOS`）与模拟器均构建通过；真机安装后，配对、会话列表、发消息、流式回复均实测正常。旧网关的兼容路径未改。
+- 已知待办（未在本条处理）：DSH 注入的「Time sampled…」系统时间消息会被显示成用户气泡；Coe 的后台会话（`<bot-profile>` / `You keep the memory` 开头或「未命名」）应隐藏；首页 DSH 分组样式待改为「会话切换菜单 + 混排列表」。

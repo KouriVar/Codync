@@ -1,4 +1,5 @@
 import CodyncKit
+import DSHKit
 import CodyncUI
 import SwiftUI
 import UIKit
@@ -83,11 +84,21 @@ struct RootView: View {
     /// State and Settings live in the avatar sheet; the experimental tab remains hidden.
     private var home: some View {
         NavigationStack(path: path) {
-            BotListView()
-                .safeAreaInset(edge: .bottom, spacing: 0) { AccessBanners() }
-                .navigationDestination(for: BotReference.self) { ref in
-                    ChatScreen(ref: ref)
-                }
+            VStack(spacing: 0) {
+                // DSH conversations sit above the Codync roster as their own group. Tapping a
+                // session opens the DSH chat inside the same stack (a sheet), so the roster's
+                // own drag-and-drop list stays untouched.
+                DSHHomeSection(scan: { onCode in
+                    AnyView(QRScanner(onCode: onCode, onError: { _ in }, acceptedPrefixes: nil))
+                })
+                .background(Palette.background)
+                Divider()
+                BotListView()
+            }
+            .safeAreaInset(edge: .bottom, spacing: 0) { AccessBanners() }
+            .navigationDestination(for: BotReference.self) { ref in
+                ChatScreen(ref: ref)
+            }
         }
         .tint(Palette.text)
         .tracked(.screenViewed(.bots))

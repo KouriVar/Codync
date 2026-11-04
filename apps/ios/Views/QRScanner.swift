@@ -7,14 +7,20 @@ import VisionKit
 struct QRScanner: UIViewControllerRepresentable {
     let onCode: (String) -> Void
     let onError: (String) -> Void
+    /// Payload prefixes to accept. nil accepts any barcode, which is what the DSH pairing QR
+    /// needs: it carries a base64url payload, not a codync:// link.
+    var acceptedPrefixes: [String]? = [AppEnvironment.current.urlScheme + "://"]
+    /// `.accurate` reads dense codes better than `.fast`; it costs a little power.
+    var qualityLevel: DataScannerViewController.QualityLevel = .accurate
 
     func makeUIViewController(context: Context) -> Controller {
-        Controller(onCode: onCode, onError: onError)
+        Controller(onCode: onCode, onError: onError, acceptedPrefixes: acceptedPrefixes, qualityLevel: qualityLevel)
     }
 
     func updateUIViewController(_ controller: Controller, context: Context) {
         controller.onCode = onCode
         controller.onError = onError
+        controller.acceptedPrefixes = acceptedPrefixes
     }
 
     static func dismantleUIViewController(_ controller: Controller, coordinator: ()) {
@@ -24,19 +30,23 @@ struct QRScanner: UIViewControllerRepresentable {
     final class Controller: UIViewController, DataScannerViewControllerDelegate {
         var onCode: (String) -> Void
         var onError: (String) -> Void
-        private let scanner = DataScannerViewController(
-            recognizedDataTypes: [.barcode(symbologies: [.qr])],
-            qualityLevel: .fast,
-            isGuidanceEnabled: false,
-            isHighlightingEnabled: true
-        )
+        var acceptedPrefixes: [String]?
+        private let scanner: DataScannerViewController
         private var startTask: Task<Void, Never>?
         private var visible = false
         private var done = false
 
-        init(onCode: @escaping (String) -> Void, onError: @escaping (String) -> Void) {
+        init(onCode: @escaping (String) -> Void, onError: @escaping (String) -> Void,
+             acceptedPrefixes: [String]?, qualityLevel: DataScannerViewController.QualityLevel) {
             self.onCode = onCode
             self.onError = onError
+            self.acceptedPrefixes = acceptedPrefixes
+            scanner = DataScannerViewController(
+                recognizedDataTypes: [.barcode(symbologies: [.qr])],
+                qualityLevel: qualityLevel,
+                isGuidanceEnabled: true,
+                isHighlightingEnabled: true
+            )
             super.init(nibName: nil, bundle: nil)
         }
 
@@ -92,8 +102,10 @@ struct QRScanner: UIViewControllerRepresentable {
         func dataScanner(_ scanner: DataScannerViewController, didAdd items: [RecognizedItem], allItems: [RecognizedItem]) {
             guard visible, !done else { return }
             for case let .barcode(code) in items {
-                guard let value = code.payloadStringValue,
-                      value.hasPrefix(AppEnvironment.current.urlScheme + "://") else { continue }
+                guard let raw = code.payloadStringValue else { continue }
+                let value = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !value.isEmpty else { continue }
+                if let acceptedPrefixes, !acceptedPrefixes.contains(where: { value.hasPrefix($0) }) { continue }
                 done = true
                 scanner.stopScanning()
                 onCode(value)
