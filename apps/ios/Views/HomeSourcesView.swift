@@ -78,7 +78,7 @@ struct HomeSourcesView: View {
                 case .background:
                     dsh.disconnect()
                     // iOS takes the microphone away when the app leaves, so the sheet goes too.
-                    withAnimation(Self.barSpring) { showVoice = false }
+                    showVoice = false
                     voice.discard()
                 case .active: syncDSHConnection()
                 default: break
@@ -87,10 +87,16 @@ struct HomeSourcesView: View {
             // The voice sheet: on the home's root view, never from a list row — a rebuilt anchor
             // there takes the sheet, and the home with it (C0035, C0136).
             .sheet(isPresented: $showVoice, onDismiss: {
-                // Pulled down or sent: either way the recording is over and the bar comes back.
+                // Pulled down or sent: the recording is over, and the bar climbs back the way it left.
                 voice.discard()
                 voiceDetent = VoiceSheetView.small
-                withAnimation(Self.barSpring) { showVoice = false }
+                isTransitioning = true
+                tabBarHidden = false
+                withAnimation(Self.barSpring) { barLifted = false }
+                Task { @MainActor in
+                    try? await Task.sleep(for: .milliseconds(350))
+                    isTransitioning = false
+                }
             }) {
                 VoiceSheetView(lead: leadBot?.bot, session: voice, detent: $voiceDetent,
                                openSystemSettings: { openSystemVoiceSettings() })
@@ -115,7 +121,7 @@ struct HomeSourcesView: View {
                     raiseSheet()
                 // Sent or cancelled: the sheet has done its work.
                 case .idle:
-                    if showVoice { withAnimation(Self.barSpring) { showVoice = false } }
+                    if showVoice { showVoice = false }
                 default: break
                 }
             }
@@ -149,34 +155,37 @@ struct HomeSourcesView: View {
     private var tabs: some View {
         TabView(selection: $selection) {
             Tab(HomeTab.pinned.title, systemImage: HomeTab.pinned.symbol, value: HomeTab.pinned) {
-                stack(voiceSheet: showVoice) { rosterList(pinnedEntries, pinnedEmpty: true) }
+                stack(voiceSheet: tabBarHidden) { rosterList(pinnedEntries, pinnedEmpty: true) }
             }
             if enabledSources.contains(.coe) {
                 Tab(HomeTab.coe.title, systemImage: HomeTab.coe.symbol, value: HomeTab.coe) {
-                    stack(voiceSheet: showVoice) { rosterList(botEntries(for: .coe)) }
+                    stack(voiceSheet: tabBarHidden) { rosterList(botEntries(for: .coe)) }
                 }
             }
             if enabledSources.contains(.dsBot) {
                 Tab(HomeTab.dsBot.title, systemImage: HomeTab.dsBot.symbol, value: HomeTab.dsBot) {
-                    stack(voiceSheet: showVoice) { rosterList(botEntries(for: .dsBot)) }
+                    stack(voiceSheet: tabBarHidden) { rosterList(botEntries(for: .dsBot)) }
                 }
             }
             if enabledSources.contains(.dsh) {
                 Tab(HomeTab.dsh.title, systemImage: HomeTab.dsh.symbol, value: HomeTab.dsh) {
-                    stack(voiceSheet: showVoice) { rosterList(dshEntries, hint: dshHint) }
+                    stack(voiceSheet: tabBarHidden) { rosterList(dshEntries, hint: dshHint) }
                 }
             }
             // No label of our own: with role .search and the system's default label, iOS draws this
             // as the separate round button on the right instead of a fifth tab.
             Tab(value: HomeTab.search, role: .search) {
-                stack(voiceSheet: showVoice) { searchList }
+                stack(voiceSheet: tabBarHidden) { searchList }
             }
         }
         // Scrolling down shrinks the bar to the tab you are on and folds the accessory into it.
         .tabBarMinimizeBehavior(.onScrollDown)
         // Only the two tabs that talk to Coe carry the bar; the others leave the screen to their list.
-        .modifier(VoiceBar(shown: (selection == .pinned || selection == .coe) && isTabRoot && !showVoice,
+        .modifier(VoiceBar(shown: (selection == .pinned || selection == .coe) && isTabRoot && !tabBarHidden,
                            lead: leadBot?.bot, onTap: beginVoice))
+        // The bar and its accessory step down and fade as one; the tab bar is part of the same view.
+        .offset(y: barLifted ? Self.barDrop : 0)
+        .opacity(barLifted ? 0 : 1)
         .tint(Palette.text)
         .onChange(of: enabledSources) { _, sources in
             // The tab you were on has just been switched off in Settings: back to 置顶.
@@ -208,6 +217,14 @@ struct HomeSourcesView: View {
     /// whichever tab is on screen.
     /// One spring for the bar going and coming, so it does not jump either way.
     private static let barSpring = Animation.spring(response: 0.35, dampingFraction: 0.9)
+    /// How far the bar and the accessory drop before the sheet takes over.
+    private static let barDrop: CGFloat = 40
+    /// The bar has stepped aside: it is 40pt down and invisible, and the sheet is taking over.
+    @State private var barLifted = false
+    /// The system bar is really hidden — set only after the drop has played, so it never jumps.
+    @State private var tabBarHidden = false
+    /// One transition at a time: the bar and the sheet can't be summoned twice.
+    @State private var isTransitioning = false
 
     /// Nothing is pushed on the tab in front, so its root is what the user is looking at.
     private var isTabRoot: Bool { accounts.selection == nil && openDSHSession == nil }
@@ -301,14 +318,24 @@ struct HomeSourcesView: View {
 
     /// No lead bot is a setup problem, not a recording one: say where to fix it instead of opening the mic.
     private func beginVoice() {
+        guard !isTransitioning else { return }
         guard leadBot != nil else {
             toast = GlassToastItem(icon: "error-warning-line",
                                    text: L10n.tr("Pick a main bot in Settings first"))
             return
         }
-        voiceDetent = VoiceSheetView.small
-        withAnimation(Self.barSpring) { showVoice = true }
-        Task { await voice.begin() }
+        isTransitioning = true
+        // First the bar goes down and fades, on its own spring; the sheet follows once that is under
+        // way, so the system's own hide never shows as a jump.
+        withAnimation(Self.barSpring) { barLifted = true }
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(150))
+            tabBarHidden = true
+            voiceDetent = VoiceSheetView.small
+            showVoice = true
+            await voice.begin()
+            isTransitioning = false
+        }
     }
 
     /// The same send a typed message uses, so the bot answers exactly as it would in the chat. The

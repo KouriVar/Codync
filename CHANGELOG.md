@@ -1774,3 +1774,15 @@
 - 验证：`xcodebuild build -scheme 'iOS Dev' -configuration DevDebug` 通过；已装到 iPhone 16 Pro（2.36.0 / 171）并启动。按要求未自测、未截图。
 - 限制/待办：「更多」暂未接任何功能（相册、前后摄后续放这里）。
 - 关联：C0168、C0169、C0171。
+### C0174 · 2026-11-04 · 语音 sheet 的进出过渡：先下沉淡出，再弹 sheet；关闭反向对称
+
+- 原因：C0172 直接用 `.toolbar(.hidden)` 触发的系统动画太生硬，tab bar 会「跳」一下。
+- 变化：
+  - 打开（点语音条）：先把 tab bar 与附属栏所在的外层用 `.offset(y: 40)` + `.opacity(0)` 在 `spring(response: 0.35, dampingFraction: 0.9)` 下沉淡出；约 150ms 后（位移动画过半）再设 `tabBarHidden = true`、弹出原生语音 sheet 停在 76 小档。系统 `.hidden` 只在已经看不见之后生效，因此不会跳。
+  - 关闭：sheet 先按系统动画降下去；`onDismiss` 里先取消 `.hidden`（此时外层仍处于下沉+透明状态），再用**同一个 spring** 从 `offset 40 / opacity 0` 升回原位并淡入——进出方向与时长完全对称。
+  - 过渡期间 `isTransitioning` 为真，附属栏点击被忽略，避免重复触发。
+  - 其它关闭路径（发送成功、退到后台）只置 `showVoice = false`，由 `onDismiss` 统一负责让底栏回来。
+- 文件：`apps/ios/Views/HomeSourcesView.swift`。
+- 验证：`xcodebuild build -scheme 'iOS Dev' -configuration DevDebug` 通过；已装到 iPhone 16 Pro（2.36.0 / 172）并启动。按要求未自测、未截图。
+- 限制/待办：`offset` / `opacity` 作用在 `TabView` 这一层（系统 tab bar 无法单独位移），因此过渡瞬间页面内容也会随之下移淡出约 0.35s——若观感不合适，可改成只对附属栏做动效。
+- 关联：C0170、C0172。
