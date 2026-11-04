@@ -88,7 +88,8 @@ public struct ChatTranscriptView: View {
                     out.append(ConversationRow("sep-\(item.id)") { TimeSeparator(date: date) })
                 }
                 lastDate = date
-                out.append(ConversationRow(item.id, isUserMessage: item.isUserMessage) {
+                out.append(ConversationRow(item.id, isUserMessage: item.isUserMessage,
+                                           revision: Self.revision(of: entry)) {
                     ChatEntryRow(entry: entry)
                 })
             case .summary(let summary):
@@ -101,6 +102,12 @@ public struct ChatTranscriptView: View {
             out.append(ConversationRow("working") { typing })
         }
         return out
+    }
+
+    /// What counts as "this row changed": the entry's own revision plus the text it now holds, so a
+    /// growing streaming reply re-renders alone while the rest of the transcript stays put.
+    private static func revision(of entry: Entry) -> Int {
+        (entry.data.text ?? "").hashValue &* 31 &+ Int(truncatingIfNeeded: entry.rev)
     }
 
     private var typing: some View {

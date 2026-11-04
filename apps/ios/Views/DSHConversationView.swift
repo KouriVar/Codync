@@ -12,18 +12,24 @@ struct DSHConversationView: View {
     @State private var draft = ""
 
     var body: some View {
-        VStack(spacing: 0) {
-            ChatTranscriptView(items: items, following: $following, working: gateway.isStreaming) { summary in
-                details = summary
+        ChatTranscriptView(items: items, following: $following, working: gateway.isStreaming) { summary in
+            details = summary
+        }
+        .background(Palette.background)
+        // The input bar is an inset rather than a stacked row: the transcript runs under it and
+        // comes up with the keyboard.
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            ConversationComposer(text: $draft, placeholder: "给 DSH 发一条消息",
+                                 canSend: canSend, bottomPadding: 12) {
+                send()
             }
             .background(Palette.background)
-            Divider()
-            composer
         }
-        .navigationTitle(title)
+        .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .primaryAction) {
+            ToolbarItem(placement: .principal) { profile }
+            ToolbarItem(placement: .topBarTrailing) {
                 Button { gateway.newSession() } label: { Image(systemName: "square.and.pencil") }
                     .accessibilityLabel("新建会话")
             }
@@ -90,21 +96,33 @@ struct DSHConversationView: View {
         return sections.joined(separator: "\n\n")
     }
 
-    private var composer: some View {
-        HStack(spacing: 8) {
-            TextField("给 DSH 发一条消息", text: $draft, axis: .vertical)
-                .lineLimit(1...5)
-                .textFieldStyle(.roundedBorder)
-            Button {
-                let text = draft
-                draft = ""
-                gateway.send(text: text)
-            } label: {
-                Image(systemName: "arrow.up.circle.fill").font(.title2)
-            }
-            .disabled(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || gateway.openSessionId == nil)
+    /// The page's title button, in the bar: a 24pt avatar and the conversation's name at 16pt
+    /// semibold, on the same glass capsule Coe's page uses. A DSH conversation has no profile page
+    /// of its own, so this one only shows.
+    private var profile: some View {
+        HStack(spacing: 7) {
+            RemixIcon("chat-ai-line", size: 24)
+                .foregroundStyle(Palette.text)
+                .frame(width: 24, height: 24)
+                .clipShape(Circle())
+            Text(title)
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(Palette.text)
+                .lineLimit(1)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
+        .padding(.horizontal, 14)
+        .frame(height: 44)
+        .glass(in: Capsule(), interactive: false)
+        .accessibilityElement(children: .combine)
+    }
+
+    private var canSend: Bool {
+        !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && gateway.openSessionId != nil
+    }
+
+    private func send() {
+        let text = draft
+        draft = ""
+        gateway.send(text: text)
     }
 }

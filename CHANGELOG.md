@@ -2680,3 +2680,38 @@
   - `Copy code` / `Copied` 两条 a11y 文案没有 zh-Hans 词条（回退英文）；块间距改用 MarkdownUI 默认，
     与旧实现的 VStack spacing 8 不完全一致。
 - 关联：C0206（只读盘点报告 `/tmp/codync-audit/dsh-mobile-inventory.md`）。备份 tag：`backup/before-markdown-c0207`。
+
+### C0208 · 2026-11-05 · 会话页搬迁第 1 步：共用行/输入框骨架 + 流式只重绘变化行，DSH 页先接上
+
+- 背景：穗要求把 dsh-mobile 的「输入框 / 消息气泡与行 / 时间线 / 顶部栏与页骨架」四块搬过来，Coe 与 DSH 共用。
+  按确认的三条做：**保留 SwiftUI 列表**（不引入 ChatLayout/UIKit 视口）、**只搬骨架**（旧 App 的折叠胶囊、队列 dock、
+  附件菜单、语音、slash/@ 弹层、引用、长按菜单、重试、跳到底部等一律不带）、**新建共用行模型 + 适配器**。
+  为避免一次性改坏 Coe，按允许的拆单方式分两次：本条 C0208 落共用件与 DSH 页，C0209 再把 Coe 的 `ThreadView` 接上。
+- 对照表（已落地部分）：
+  | dsh-mobile | Sully Coe | 方式 |
+  |---|---|---|
+  | `Core/ConversationTimeline.swift` 的「只重绘变化行」思路 | `Thread/ConversationList.swift`：`ConversationRow` 新增 `revision`，列表只对 revision 变化的行 `reconfigureItems` | **改着搬**（我们的列表已经是 UIKit collection，缺的正是这一层） |
+  | `Views/ConversationView.swift:1077-1760` 的 composer 骨架 | 新增 `Thread/ConversationComposer.swift`（48 高输入框 + 48×48 按钮 + 24 图标，`ControlMetrics.bar` / `GlassButton` / `glass(in:)`） | **改着搬**（尺寸/字体/玻璃全换 token，功能只留文字 + 发送） |
+  | `Views/ConversationView.swift` 顶部资料胶囊 | `Views/DSHConversationView.swift` 的 `profile`（24 图标 + 16pt semibold 名称 + 玻璃胶囊，标准 `ToolbarItem(.principal)`） | **改着搬**（不搬旧 App 的模糊/导航栏补丁，顶部仍用系统 `.scrollEdgeEffectStyle(.soft, for: .top)`） |
+  | 行/气泡 | DSH 页继续用既有 `ChatTranscriptView` 的行（`ChatEntryRow`：用户右侧气泡、助手 Markdown、时间分隔），并接上 revision | **沿用 + 接 revision**；Coe 的 `ChatRows` 换行放 C0209 |
+- 变化：
+  - `Kit/Sources/CodyncUI/Thread/ConversationList.swift`：`ConversationRow` 加 `revision`（默认 0）；协调器记 `revisions[id]`，
+    只把 revision 变了的行放进 `reconfigureItems`，其余行不再每帧重配 —— 这是「流式输出不整页重算」在我们的
+    UIKit 列表里的落点（原来每帧对**所有**可见行 `reconfigureItems`）。
+  - `Kit/Sources/CodyncUI/Thread/ChatTranscript.swift`：行 revision = `text.hashValue &* 31 &+ entry.rev`，流式增长的字只让
+    自己那一行重绘。
+  - 新增 `Kit/Sources/CodyncUI/Thread/ConversationComposer.swift`：`public struct ConversationComposer`，输入框 `bar.hitTarget`
+    (48) 高 + 圆角 24 玻璃，右侧发送 `GlassButton(size: .bar)`（不可发送时用 `Palette.accentDim`），可选左侧按钮
+    `leading`（Coe 的附件入口留给 C0209）；`.safeAreaInset(edge: .bottom)` 挂载，键盘弹起跟着走；行内边距 16 / 上 6 / 下 12。
+  - `Views/DSHConversationView.swift`：删掉自带的 `TextField` + `Image(systemName:)` 组合，改用 `ConversationComposer`；
+    顶部加 `profile` 玻璃胶囊（DSH 会话没有资料页，只展示）；`navigationTitle` 改空 + inline，标题挪到 principal。
+- 未做（C0209）：Coe 的 `ThreadView` 换成同一套行与 `ConversationComposer`；`ChatRows`/旧 `Composer` 的清理；
+  附件/语音/命令/引用/长按菜单是否回到新输入框与行上（按本轮答复：暂不带）。
+- 未接上的数据：DSH 侧 `jsonTool` / `toolResult` / `status` / `context` / `system` 这几类旧行在本项目没有对应数据；
+  DSH 会话也没有"资料页"可点，顶部胶囊只展示。
+- 文件：`apps/ios/Kit/Sources/CodyncUI/Thread/ConversationList.swift`、`…/Thread/ChatTranscript.swift`、
+  `…/Thread/ConversationComposer.swift`（新）、`apps/ios/Views/DSHConversationView.swift`。
+- 验证：`xcodebuild build -project apps/Codync.xcodeproj -scheme 'iOS Dev' -configuration DevDebug`（真机 destination、
+  ui-preview 覆盖、构建号 196）**编译通过，0 error**，改动文件 0 warning；`xcrun devicectl device install app`
+  装到 iPhone 16 Pro（`com.suiyikou.codync.uipreview` 2.36.0 / 196）成功。按要求**不自测**。
+- 关联：C0207（Markdown）、备份 tag `backup/before-chat-port-c0208`（`99a6937b`）、盘点报告 `/tmp/codync-audit/dsh-mobile-inventory.md`。

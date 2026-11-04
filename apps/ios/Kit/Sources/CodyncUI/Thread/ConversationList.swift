@@ -7,11 +7,16 @@ struct ConversationRow {
     let id: String
     /// The reader's own new message: the list goes back down to it.
     var isUserMessage = false
+    /// Changes when this row's content changed: a streaming reply only bumps its own row, so the
+    /// list re-renders that one and leaves the rest of the conversation alone.
+    var revision = 0
     let content: AnyView
 
-    init(_ id: String, isUserMessage: Bool = false, @ViewBuilder content: () -> some View) {
+    init(_ id: String, isUserMessage: Bool = false, revision: Int = 0,
+         @ViewBuilder content: () -> some View) {
         self.id = id
         self.isUserMessage = isUserMessage
+        self.revision = revision
         self.content = AnyView(content())
     }
 }
@@ -81,6 +86,8 @@ private struct ConversationCollection: UIViewRepresentable {
         private var view: ConversationCollectionView!
         private var dataSource: UICollectionViewDiffableDataSource<Int, String>!
         private var contents: [String: AnyView] = [:]
+        /// The revision each row had last time: a row whose number didn't move is left alone.
+        private var revisions: [String: Int] = [:]
         private var environment = EnvironmentValues()
         private var parent: ConversationCollection?
         /// What the list is telling `following` (it reaches the binding after the update).
@@ -163,9 +170,12 @@ private struct ConversationCollection: UIViewRepresentable {
             var snapshot = NSDiffableDataSourceSnapshot<Int, String>()
             snapshot.appendSections([0])
             snapshot.appendItems(ids)
-            // Rows that stay re-render with their new content (SwiftUI skips what didn't change).
+            // Only the rows whose content actually changed are reconfigured: a streaming reply
+            // bumps its own revision, and everything else stays as it is.
             let kept = Set(old)
-            snapshot.reconfigureItems(ids.filter(kept.contains))
+            let moved = Dictionary(rows.map { ($0.id, $0.revision) }, uniquingKeysWith: { a, _ in a })
+            snapshot.reconfigureItems(ids.filter { kept.contains($0) && revisions[$0] != moved[$0] })
+            revisions = moved
             let first = lastId == nil
             lastId = rows.last?.id
 
