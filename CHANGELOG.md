@@ -1106,3 +1106,15 @@
 - 限制/待办：聊天页底层是 UIKit 集合视图，`.scrollEdgeEffectStyle` 在聊天页是否生效需要真机确认（未截图）。
 - 关联：C0122、C0125。
 
+### C0127 · 2026-11-04 · 首页长按恢复自绘消息卡片与完整菜单
+
+- 原因：首页改版换了行组件，长按只剩整行高亮，消息预览卡片没了，菜单项也少了。
+- 变化：
+  - 从 `BotListView`（含工作树里未提交的改动）复用原实现：`BotMenuPreview` + 原生 `contextMenu` 的 preview，圆角用 `.contentShape(.contextMenuPreview, RoundedRectangle(cornerRadius: 34, style: .continuous))` 控制（不是 clipShape），行仍用 `onTapGesture`、不包在 Button 里。
+  - 置顶页和三个来源页都走这套；DSH 新增 `DSHSessionMenuPreview`（标题 + 最后一条消息预览）。
+  - 菜单恢复：标为未读/标为已读、置顶/取消置顶、新建分组（host 支持时）、分享为模板、更多；「更多」里含 复制 ID、钉在首页/从首页移除、编辑资料/编辑群、移到分组、设为主 Bot、隐藏、删除。DSH 只保留它支持的：复制 ID、钉选。
+- 文件：`apps/ios/Views/HomeSourcesView.swift`。
+- 验证：按要求本轮只验证编译通过（DevDebug 真机构建）。
+- 限制/待办：长按卡片的视觉（34 圆角、卡片宽度）沿用 BotMenuPreview，未截图核对。
+- 关联：C0125。
+

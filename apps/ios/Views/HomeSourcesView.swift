@@ -24,6 +24,10 @@ struct HomeSourcesView: View {
     @State private var showDSHChat = false
     @State private var showDSHConnect = false
     @State private var page = 0
+    @State private var naming: SectionNaming?
+    @State private var sharingTemplate: EditTarget?
+    @State private var editing: EditTarget?
+    @State private var editingGroup: GroupTarget?
     @AppStorage("manualUnreadConversations") private var manualUnreadData = Data()
 
     private var enabledSources: Set<HomeSource> {
@@ -72,6 +76,18 @@ struct HomeSourcesView: View {
                 deleteButtons(item)
             } message: { item in
                 deleteMessage(item)
+            }
+            .sectionNameDialog($naming)
+            .codyncSheet(item: $sharingTemplate) { target in BotTemplateView(draft: target.draft) }
+            .codyncSheet(item: $editing) { target in
+                if let store = accounts.store(for: target.computerId) {
+                    BotEditorView(draft: target.draft).environment(store)
+                }
+            }
+            .codyncSheet(item: $editingGroup) { target in
+                if let store = accounts.store(for: target.computerId) {
+                    GroupEditorView(group: target.group).environment(store)
+                }
             }
     }
 
@@ -284,8 +300,9 @@ struct HomeSourcesView: View {
                           sourceBadge: AnyView(SourceBadge(source: .dsh)))
                 .contentShape(Rectangle())
                 .onTapGesture { openDSH(session) }
-                .contextActions {
-                    [MenuItem("More", icon: "more-line", submenu: [pinMenuItem(.dsh, session.id)])]
+                .contentShape(.contextMenuPreview, RoundedRectangle(cornerRadius: 34, style: .continuous))
+                .contextActions(preview: { DSHSessionMenuPreview(session: session, message: dshPreviewText(session)) }) {
+                    dshMenuItems(session)
                 }
                 .rosterRow()
         }
@@ -306,7 +323,10 @@ struct HomeSourcesView: View {
             }
             .contentShape(Rectangle())
             .onTapGesture { accounts.selection = item.ref }
-            .contextActions { botMenuItems(item, store: store) }
+            .contentShape(.contextMenuPreview, RoundedRectangle(cornerRadius: 34, style: .continuous))
+            .contextActions(preview: { BotMenuPreview(bot: item.bot).environment(store) }) {
+                botMenuItems(item, store: store)
+            }
             .rosterRow()
     }
 
@@ -368,7 +388,7 @@ struct HomeSourcesView: View {
         manualUnreadData = marks.data
     }
 
-    /// The long-press menu; the pinned switch lives in its "More" submenu.
+    /// The long-press menu, restored to the roster's set; copy/pin/edit live in "More".
     private func botMenuItems(_ item: RosterItem, store: BotStore) -> [MenuItem] {
         let bot = item.bot
         let unread = bot.unread > 0 || manuallyUnread(item)
@@ -379,16 +399,67 @@ struct HomeSourcesView: View {
         }, MenuItem(bot.pinned ? "Unpin" : "Pin", icon: bot.pinned ? "unpin-line" : "pushpin-2-line") {
             store.setPinned(bot, !bot.pinned)
         }]
-        items.append(MenuItem("Copy ID", icon: "file-copy-line") { UIPasteboard.general.string = bot.id })
-        if !bot.lead {
-            items.append(MenuItem("Hide", icon: "eye-off-line", destructive: true) { store.setHidden(bot, true) })
+        if store.supportsSections {
+            items.append(MenuItem("New section", icon: "folder-add-line") {
+                naming = SectionNaming(title: "New section", name: "") { store.setSection(bot, to: $0) }
+            })
         }
-        var more = [pinMenuItem(HomeSource.of(bot: bot), bot.id)]
+        items.append(MenuItem("Share as template", icon: "share-forward-line") {
+            sharingTemplate = EditTarget(computerId: item.ref.computerId, draft: BotDraft(bot))
+        })
+
+        var more = [MenuItem("Copy ID", icon: "file-copy-line") { UIPasteboard.general.string = bot.id },
+                    pinMenuItem(HomeSource.of(bot: bot), bot.id)]
+        more.append(bot.isGroup
+            ? MenuItem("Edit group", icon: "group-line") {
+                editingGroup = GroupTarget(computerId: item.ref.computerId, group: bot)
+            }
+            : MenuItem("Edit profile", icon: "edit-line") {
+                editing = EditTarget(computerId: item.ref.computerId, draft: BotDraft(bot))
+            })
+        if store.supportsSections { more.append(sectionMenu(bot, store: store)) }
+        if !bot.lead && !bot.isGroup && store.supportsLeadChoice {
+            more.append(MenuItem("Make lead agent", icon: "star-line") { store.setLead(bot) })
+        }
+        if !bot.lead {
+            more.append(MenuItem("Hide", icon: "eye-off-line", destructive: true) { store.setHidden(bot, true) })
+        }
         if !bot.lead || store.supportsLeadChoice {
-            more.append(MenuItem("Delete", icon: "delete-bin-line", destructive: true, divider: true) { confirmDelete = item })
+            more.append(MenuItem("Delete", icon: "delete-bin-line", destructive: true, divider: true) {
+                confirmDelete = item
+            })
         }
         items.append(MenuItem("More", icon: "more-line", submenu: more))
         return items
+    }
+
+    /// "Move to section ▸": the computer's other sections, a new one, and out of its own.
+    private func sectionMenu(_ bot: Bot, store: BotStore) -> MenuItem {
+        var rows = store.sections.filter { $0 != bot.section }.map { name in
+            MenuItem(name, icon: "inbox-line", verbatim: true) { store.setSection(bot, to: name) }
+        }
+        rows.append(MenuItem("New section…", icon: "add-line", divider: !rows.isEmpty) {
+            naming = SectionNaming(title: "New section", name: "") { store.setSection(bot, to: $0) }
+        })
+        if bot.section != nil {
+            rows.append(MenuItem("Remove from section", icon: "indeterminate-circle-line") {
+                store.setSection(bot, to: nil)
+            })
+        }
+        return MenuItem("Move to section", icon: "inbox-line", submenu: rows)
+    }
+
+    /// A DSH session only supports what the gateway can do: copy its id, or pin it to the home.
+    private func dshMenuItems(_ session: DSHSession) -> [MenuItem] {
+        [MenuItem("More", icon: "more-line", submenu: [
+            MenuItem("Copy ID", icon: "file-copy-line") { UIPasteboard.general.string = session.id },
+            pinMenuItem(.dsh, session.id),
+        ])]
+    }
+
+    private func dshPreviewText(_ session: DSHSession) -> String {
+        if let preview = dsh.previews[session.id], !preview.isEmpty { return preview }
+        return session.running ? "运行中" : "还没有消息"
     }
 
     private var onlineStores: [BotStore] {
@@ -505,6 +576,53 @@ private extension View {
             .scrollContentBackground(.hidden)
             .environment(\.defaultMinListRowHeight, 0)
             .scrollDismissesKeyboard(.interactively)
+    }
+}
+
+// MARK: - DSH long-press card
+
+/// The DSH counterpart of `BotMenuPreview`: title and the session's last message, in the same card.
+struct DSHSessionMenuPreview: View {
+    let session: DSHSession
+    let message: String
+    @Environment(\.colorScheme) private var colorScheme
+
+    private var cardBackground: Color {
+        colorScheme == .dark ? Color(red: 0x14 / 255, green: 0x14 / 255, blue: 0x14 / 255) : Color(uiColor: .systemBackground)
+    }
+    private var bubbleBackground: Color {
+        colorScheme == .dark ? Color(red: 0x23 / 255, green: 0x23 / 255, blue: 0x23 / 255) : Color(uiColor: .secondarySystemGroupedBackground)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 10) {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(Palette.surface)
+                    .frame(width: 30, height: 30)
+                    .overlay {
+                        Image(systemName: "sparkles")
+                            .font(.system(size: 13))
+                            .foregroundStyle(Palette.warning)
+                    }
+                Text(session.title).font(.headline).lineLimit(1)
+                Spacer(minLength: 0)
+            }
+            .padding(16)
+
+            Text(message)
+                .font(.body)
+                .lineLimit(8)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 12)
+                .background(bubbleBackground, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+                .padding(.horizontal, 16)
+                .padding(.top, 2)
+                .padding(.bottom, 16)
+        }
+        .frame(width: 320)
+        .background(cardBackground)
     }
 }
 
