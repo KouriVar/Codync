@@ -14,6 +14,7 @@ import { appLanguages, languageTitle } from '../../lib/l10n'
 import { useTr } from '../../lib/use-language'
 import { DEFAULT_TEXT_SIZE, prefs, TEXT_SIZES, usePref } from '../../lib/prefs'
 import { useAccount } from '../../store/account'
+import { profile, useProfile } from '../../store/profile'
 import { useScreenViewed } from '../../store/analytics'
 import { StoreContext, useApp } from '../../store/context'
 import { ComputerBadge } from '../ComputerBadge'
@@ -118,6 +119,54 @@ function PageContent({ page }: { page: SettingsPage }) {
   }
 }
 
+
+/**
+ * This device's own profile, which the sidebar shows while the Codync account is out of the picture
+ * (cloud off, C0107). The name and the picture are kept on this Mac: the name and the file's path in
+ * host-prefs.json, the file in the app's data folder. Nothing is sent anywhere.
+ */
+function LocalProfileSection() {
+  const tr = useTr()
+  const own = useProfile()
+  const [name, setName] = useState(own.name ?? '')
+  // Follow the store when it changes underneath (a picked avatar, a reload).
+  useEffect(() => setName(own.name ?? ''), [own.name])
+  const commit = () => {
+    const trimmed = name.trim()
+    if (trimmed === (own.name ?? '')) return
+    void profile.setName(trimmed)
+  }
+  return (
+    <CardSection title={tr('This computer')} footer={tr('Shown in the sidebar while the Codync account is not in use. Kept on this Mac.')}>
+      <div className="settings-row">
+        <span className="profile-avatar settings-profile-avatar" aria-hidden>
+          {own.avatarURL ? (
+            <img src={own.avatarURL} alt="" className="profile-avatar-image" />
+          ) : (
+            <span className="profile-avatar-initial">{own.displayName.slice(0, 1)}</span>
+          )}
+        </span>
+        <VStack grow className="settings-stack">
+          <input
+            className="settings-field"
+            aria-label={tr('Display name')}
+            placeholder={tr('This computer')}
+            value={name}
+            spellCheck={false}
+            onChange={(e) => setName(e.target.value)}
+            onBlur={commit}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') e.currentTarget.blur()
+            }}
+          />
+          <Text size="caption" tone="secondary" truncate>{own.email ?? tr('No Google account recorded on this computer')}</Text>
+        </VStack>
+        <Button kind="secondary" onClick={() => void profile.pickAvatar()}>{tr('Choose image…')}</Button>
+      </div>
+    </CardSection>
+  )
+}
+
 /** Account, window and app preferences. */
 function GeneralSettings() {
   const app = useApp()
@@ -177,6 +226,7 @@ function GeneralSettings() {
           </div>
         </CardSection>
       ) : null}
+      {accountInUse ? null : <LocalProfileSection />}
       <CardSection title="Appearance">
         <ValueRow label="Theme">
           <ChoicePicker selection={appearance} options={[...APPEARANCES]} onChange={(value) => void window.codync.app.setAppearance(value).then(setAppearance)} />

@@ -54,17 +54,17 @@ export function SidebarFooter({ accountOpen, onAccount, onExtensions, onComputer
           <Icon name="chevron.right" size={10} color="var(--tertiary)" />
         </button>
       ) : null}
-      {showAccount ? (
-        <button
-          className={`sidebar-account ${accountOpen ? 'active' : ''}`}
-          aria-label="Open account menu for Account"
-          aria-expanded={accountOpen}
-          title="Account menu"
-          onClick={onAccount}
-        >
-          <ProfileAvatar />
-        </button>
-      ) : null}
+      <button
+        className={`sidebar-account ${accountOpen ? 'active' : ''}`}
+        aria-label="Open account menu for Account"
+        aria-expanded={accountOpen}
+        title="Account menu"
+        onClick={onAccount}
+      >
+        {/* The corner is never empty: with the cloud off it carries this device's own profile
+            (a name and avatar picked locally), which is also the way into Settings. */}
+        <ProfileAvatar local={!showAccount} />
+      </button>
       {onExtensions ? (
         <button className="extensions" onClick={onExtensions}>
           <span>{tr('Extensions')}</span>

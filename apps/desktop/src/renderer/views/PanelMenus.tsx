@@ -5,6 +5,7 @@ import { IconSlot, VStack } from '../components/Stack'
 import { Text } from '../components/Text'
 import type { Link } from '@shared/analytics'
 import { account, useAccount } from '../store/account'
+import { useProfile } from '../store/profile'
 import { openLink, useScreenViewed } from '../store/analytics'
 import googleLogo from '../assets/google.svg'
 import { useTr } from '../lib/use-language'
@@ -13,8 +14,26 @@ import { useTr } from '../lib/use-language'
 // The chat window's floating panels: the account menu (with its profile avatar) and the roster's
 // right-click actions, both built on the same keyboard-driven rows.
 
-export function ProfileAvatar() {
+/**
+ * The circle in the sidebar. With the account in use it shows the Codync account's picture; with the
+ * cloud off it shows this device's own profile (a picked image, or the first letter of its name).
+ * `.profile-avatar` clips to a circle and `.profile-avatar-image` covers it, so any aspect ratio
+ * stays round and undistorted.
+ */
+export function ProfileAvatar({ local = false }: { local?: boolean }) {
   const { user, isBusy, isReady } = useAccount()
+  const own = useProfile()
+  if (local) {
+    return (
+      <span className="profile-avatar" aria-hidden>
+        {own.avatarURL ? (
+          <img src={own.avatarURL} alt="" className="profile-avatar-image" />
+        ) : (
+          <span className="profile-avatar-initial">{own.displayName.slice(0, 1)}</span>
+        )}
+      </span>
+    )
+  }
   return (
     <span className="profile-avatar" aria-hidden>
       {isBusy || !isReady ? <Spinner size={14} /> : user?.avatarURL ? (
@@ -43,16 +62,22 @@ export interface PanelItem {
 }
 
 /** The account menu: a window-local floating surface (no system menu styling). */
-export function AccountPanelLayer({ compact, approvals, onDismiss, onUsage, onSettings }: {
+export function AccountPanelLayer({ compact, approvals, onDismiss, onUsage, onSettings, local = false }: {
   compact: boolean
   approvals: number
   onDismiss: () => void
   onUsage: () => void
   onSettings: () => void
+  /**
+   * This computer's cloud is off (account-mode.ts): the menu keeps the local entries and drops the
+   * Codync account ones, and its identity line is this device's own profile.
+   */
+  local?: boolean
 }) {
   const tr = useTr()
   const [page, setPage] = useState<'main' | 'support'>('main')
   const { user, isBusy, errorMessage } = useAccount()
+  const own = useProfile()
   useScreenViewed('account')
   const signedIn = user !== null
   const auth: PanelItem[] = signedIn
@@ -69,7 +94,22 @@ export function AccountPanelLayer({ compact, approvals, onDismiss, onUsage, onSe
     onDismiss()
     openLink(url, link)
   }
+  const localItems: PanelItem[] = [
+    { title: 'Settings', icon: 'gearshape', detail: approvals > 0 ? String(approvals) : null, action: onSettings },
+    { title: 'Usage', icon: 'gauge.with.dots.needle.33percent', chevron: true, action: onUsage },
+    { title: 'Get Codync for mobile', icon: 'iphone', action: () => open('https://apps.apple.com/app/id6760984418', 'app_store') },
+    { title: 'Support', icon: 'book.closed', chevron: true, action: () => setPage('support') },
+  ]
   const items: PanelItem[] =
+    local
+      ? page === 'support'
+        ? [
+            { title: 'Support', icon: 'chevron.left', action: () => setPage('main') },
+            { title: 'Help & documentation', icon: 'book', chevron: true, action: () => open('https://github.com/leepokai/codync#readme', 'docs') },
+            { title: 'Report an issue', icon: 'bubble.left', chevron: true, action: () => open('https://github.com/leepokai/codync/issues', 'issues') },
+          ]
+        : localItems
+      :
     page === 'support'
       ? [
           { title: 'Support', icon: 'chevron.left', action: () => setPage('main') },
@@ -93,18 +133,30 @@ export function AccountPanelLayer({ compact, approvals, onDismiss, onUsage, onSe
             page === 'main' && i === 3 ? (
               <>
                 <div className="panel-divider" />
-                <div className="panel-identity">
-                  <Icon name="person.crop.circle" size={15} />
-                  <Text size="callout" truncate grow>{user?.email ?? tr(`Account`)}</Text>
-                  {signedIn ? null : <Text size="caption">{tr(`Not signed in`)}</Text>}
-                </div>
+                {local ? (
+                  // This device's own profile: the name it goes by, and the Google email the host
+                  // recorded when there is one (nothing else is known locally).
+                  <div className="panel-identity">
+                    <Icon name="person.crop.circle" size={15} />
+                    <VStack>
+                      <Text size="callout" truncate>{own.displayName}</Text>
+                      {own.email ? <Text size="caption" tone="secondary" truncate>{own.email}</Text> : null}
+                    </VStack>
+                  </div>
+                ) : (
+                  <div className="panel-identity">
+                    <Icon name="person.crop.circle" size={15} />
+                    <Text size="callout" truncate grow>{user?.email ?? tr(`Account`)}</Text>
+                    {signedIn ? null : <Text size="caption">{tr(`Not signed in`)}</Text>}
+                  </div>
+                )}
               </>
             ) : page === 'support' && i === 0 ? (
               <div className="panel-divider" />
             ) : null
           }
         />
-        {page === 'main' && errorMessage ? (
+        {page === 'main' && !local && errorMessage ? (
           <Text as="div" size="callout" tone="attention" className="panel-error">{errorMessage}</Text>
         ) : null}
       </div>

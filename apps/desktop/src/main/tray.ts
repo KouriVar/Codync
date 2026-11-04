@@ -92,6 +92,10 @@ export class Tray {
       : state.kind === 'starting' ? 'Connecting…'
       : state.kind === 'failed' ? 'Host problem'
       : (s?.status ?? 'Connected')
+    // Settings opens the app's own page, on its own row at the top; the local quick settings stay
+    // in the submenu further down (cloud/account rows are not offered here at all).
+    items.push({ label: this.tr('Settings'), icon: this.symbol('gearshape'), click: () => send({ kind: 'settings' }) })
+    items.push({ type: 'separator' })
     items.push({ label: this.tr(status), enabled: false })
     items.push({ label: this.tr('Open {name}').replaceAll('{name}', app.getName()), icon: this.symbol('macwindow'), accelerator: 'CmdOrCtrl+O', click: () => this.deps.openChat() })
     if (state.kind === 'running') {
@@ -153,8 +157,10 @@ export class Tray {
     }
 
     items.push({ type: 'separator' })
-    // Settings and Quit close the menu as a pair.
-    items.push({ label: this.tr('Settings'), icon: this.symbol('gearshape'), submenu: this.settingsMenu() })
+    // The quick local switches, one level down: the top row's "Settings" opens the app's page.
+    // Labelled in the user's words; the phrase catalogs live with the iOS resources and are not
+    // touched here.
+    items.push({ label: '快速设置', icon: this.symbol('gearshape'), submenu: this.settingsMenu() })
     items.push({ label: this.tr('Quit {name}').replaceAll('{name}', app.getName()), icon: this.symbol('power'), accelerator: 'CmdOrCtrl+Q', click: () => app.quit() })
     this.tray.setContextMenu(Menu.buildFromTemplate(items))
   }

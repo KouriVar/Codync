@@ -1021,3 +1021,19 @@
 - 测试：`apps/desktop/src/shared/open-settings.test.ts`：正常 pane URL 透传；`undefined / null / '' / https / 数字 / 伪对象` 全部返回 null 而不抛。
 - 验证：`npm run typecheck` 通过；`npm test` 350/351（唯一失败仍是既有 catalogs 键不一致）。重编后从渲染端发一次无参 `openSettings()`，主进程不再打印该 TypeError。
 - 关联：无。
+
+### C0120 · 2026-11-04 · cloud off 时左下角恢复本机头像入口，可本地改名换头像
+
+- 原因：C0115 让 cloud off 时把账号按钮与账号面板一起藏起来，于是左下角空了、设置也没有入口（C0119 只修了白屏）。用户的 Google 姓名/头像在 host 侧并不存在（`google_auth.rs` 只校验 ID token 的 email/sub，从不取 userinfo；桌面端 cloud on 时的姓名头像来自 Clerk）——host 唯一持久化的身份是 `devices.email`。
+- 变化：
+  - `apps/desktop/src/main/profile.ts`（新）：本机资料。名字与头像路径存 `host-prefs.json`（`localProfileName` / `localProfileAvatar`），图片按内容哈希存 `userData/avatar-<sha16>.<ext>`，旧的自动清理，>16 MB 拒收；`profile:state` 返回 `{name, avatarURL(data:), email}`，邮箱取自 host `devices`（有 email 的设备，优先已连接）。
+  - `src/preload/index.ts`、`src/shared/ipc.ts`：新增 `window.codync.profile.{state,setName,pickAvatar}` 与 `LocalProfileState`；`WindowCommand` 新增 `{kind:'settings'}`。
+  - `src/renderer/store/profile.ts`（新）+ `main.tsx`：启动时读取本机资料。
+  - `SidebarFooter.tsx` / `ChatWindow.tsx`：账号按钮**始终显示**；cloud off 时用本机头像（图片或名字首字），点击打开面板；面板不再要求 `accountInUse`。
+  - `PanelMenus.tsx`：`AccountPanelLayer` 新增 `local` 模式——「设置」放在最上方，保留用量/手机版/支持，**不再有** cloud 登录、登出、删除账号等项；身份行显示本机名字，`devices.email` 有值才多显示一行邮箱（为空不显示，也不写「未登录」）。
+  - `SettingsView.tsx`：cloud off 时新增「本机」一栏：改名（失焦/回车提交）、选图片当头像、显示已知 Google 邮箱。全部本地，不发网络请求。
+  - `tray.ts`：菜单最上方新增一行「设置」直接打开设置页；原来那个装着一堆本地开关的子菜单改名为「快速设置」（内容不变：Usage icons、Text Size、Open at login、Show in Dock、Restart host、Open log、Uninstall host、Reset all data，Uninstall host 与 Reset all data 的二次确认照旧）。
+  - CSS：`.profile-avatar` 本就是 50% 圆 + `object-fit: cover`，新增首字母样式与设置页 40px 尺寸。
+- 验证：`npm run typecheck` 通过；`npm test` 350/351（既有 catalogs 项）。重编 arm64 ad-hoc 装真机后 CDP 检查：头像 32×32、`border-radius:50%`、`object-fit:cover`，1279×1279 图片不变形；改名后重启仍生效；设置页本机栏 40px 正圆、含改名框与「选择图片…」；面板首项为「设置」且无 cloud 项；全程无控制台异常。
+- 已知限制：host 不保存 Google 姓名与头像，因此默认显示「本机」；如需真实姓名/头像需改 host 去取 userinfo（本次刻意未做，避免新增网络登录流程）。
+- 关联：C0107、C0115、C0119。

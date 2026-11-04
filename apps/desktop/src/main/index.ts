@@ -6,6 +6,7 @@ import { join } from 'node:path'
 import { app, autoUpdater, BrowserWindow, clipboard, dialog, ipcMain, Menu, nativeTheme, session, shell, type IpcMainInvokeEvent, type OpenDialogOptions } from 'electron'
 import type { HostSnapshot, WindowCommand } from '../shared/ipc'
 import { systemSettingsURL } from '../shared/open-settings'
+import { registerProfileIPC } from './profile'
 import { devPort, HostController } from './host-controller'
 import { registerFileSaves } from './file-saves'
 import { keepArtifactsInFrame, registerArtifacts, registerArtifactScheme } from './artifacts'
@@ -178,6 +179,12 @@ function registerIPC(tray: Tray) {
     if (pane) void shell.openExternal(pane)
   })
   ipcMain.on('app:copy', (_e, text: string) => clipboard.writeText(text))
+  // The profile the sidebar shows when this computer's cloud is off (account-mode.ts): a local
+  // name and avatar, plus the Google email the host recorded for its devices.
+  registerProfileIPC(async () => {
+    const answer = await host.call<{ devices: { email?: string | null; connected?: boolean }[] }>('devices')
+    return answer.devices ?? []
+  })
   ipcMain.handle('app:pickFiles', async (e) => {
     const result = await openDialog(e, { properties: ['openFile', 'multiSelections'] })
     return result.canceled ? [] : readFiles(result.filePaths)

@@ -232,3 +232,8 @@
 .settings-appear {
   animation: fade-in var(--layout) both;
 }
+
+/* The local profile's avatar in Settings: the same circle, a little larger than the sidebar's.
+   Both classes carry the size, so this beats `.profile-avatar`'s 28px whatever the CSS order is. */
+.profile-avatar.settings-profile-avatar { width: 40px; height: 40px; flex: none; }
+.profile-avatar.settings-profile-avatar .profile-avatar-initial { font-size: 16px; }

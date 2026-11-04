@@ -50,6 +50,11 @@ const bridge: CodyncBridge = {
       return host.subscribe(since, onData)
     },
   },
+  profile: {
+    state: async () => ({ name: null, avatarURL: null, email: null }),
+    setName: async () => ({ name: null, avatarURL: null, email: null }),
+    pickAvatar: async () => ({ name: null, avatarURL: null, email: null }),
+  },
   account: {
     state: async () => account,
     onChange: none,

@@ -257,6 +257,7 @@ function ChatSplitView() {
         if (c.kind === 'newBot' && onlineStores.length) create('bot')
         if (c.kind === 'search') setSearching(true)
         if (c.kind === 'networkSettings') setSettings('network')
+        if (c.kind === 'settings') setSettings('general')
         if (c.kind === 'toggleSidebar') setCompact(!prefs.sidebarCompact.get())
         if (c.kind === 'voiceKey') {
           if (c.key === 'double' && !app.selection) app.select(voiceTarget(roster)?.ref ?? null)
@@ -418,11 +419,9 @@ function ChatSplitView() {
             <AnchoredMenu open={railNewMenu} onClose={() => setRailNewMenu(false)} anchor={railNewButton} items={newItems} />
             <IconButton title="Extensions" icon="square.grid.2x2" size={36} onClick={openMarketplace} />
             {accountInUse ? <RailAccountNotice onComputers={() => setSettings('computers')} /> : null}
-            {accountInUse ? (
-              <button className={`rail-profile ${showAccount ? 'open' : ''}`} aria-label="Open account menu for Account" title="Account" onClick={() => setShowAccount((s) => !s)}>
-                <ProfileAvatar />
-              </button>
-            ) : null}
+            <button className={`rail-profile ${showAccount ? 'open' : ''}`} aria-label="Open account menu for Account" title="Account" onClick={() => setShowAccount((s) => !s)}>
+              <ProfileAvatar local={!accountInUse} />
+            </button>
           </div>
         ) : (
           // With several computers each heading opens its own Extensions instead.
@@ -435,8 +434,9 @@ function ChatSplitView() {
         <OpenVoiceSettings.Provider value={openVoiceSettings}>{detail}</OpenVoiceSettings.Provider>
       </main>
 
-      {showAccount && accountInUse ? (
+      {showAccount ? (
         <AccountPanelLayer
+          local={!accountInUse}
           compact={compact}
           approvals={app.approvals.length}
           onDismiss={() => setShowAccount(false)}

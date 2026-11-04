@@ -8,6 +8,7 @@ import { AppModel } from './store/app-model'
 import { AppContext } from './store/context'
 import { applyTextSize, prefs } from './lib/prefs'
 import { account } from './store/account'
+import { profile } from './store/profile'
 import { errorReport } from '@shared/error-report'
 
 // Error tracking: this window's uncaught errors go to the host (shared/error-report.ts).
@@ -33,5 +34,7 @@ if (page === 'island') {
   const app = new AppModel(page !== 'pairing')
   void app.start()
   if (page !== 'pairing') void account.start()
+  // This device's own name and avatar, shown when the account is out of the picture.
+  if (page !== 'pairing') void profile.start()
   root.render(<AppContext.Provider value={app}>{page === 'pairing' ? <PairingWindow /> : <ChatWindow />}</AppContext.Provider>)
 }

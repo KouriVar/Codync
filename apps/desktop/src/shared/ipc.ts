@@ -96,6 +96,8 @@ export type WindowCommand =
   | { kind: 'setRemoteScreen'; on: boolean }
   | { kind: 'computerAccess' }
   | { kind: 'networkSettings' }
+  /** Open the app's own Settings page (the tray's top row). */
+  | { kind: 'settings' }
   | { kind: 'newBot' }
   | { kind: 'search' }
   | { kind: 'toggleSidebar' }
@@ -146,6 +148,20 @@ export type SpeechEvent =
 /** A dropped, pasted or picked file: its name and bytes. */
 export type PickedFile = { name: string; data: Uint8Array }
 
+/**
+ * This device's own profile, used when the Codync account is out of the picture (cloud off). It is
+ * local only: a name the user typed and an avatar file inside the app's data folder, plus the
+ * Google email the host recorded for its devices when there is one.
+ */
+export interface LocalProfileState {
+  /** What to show; null means the default ("This computer"). */
+  name: string | null
+  /** A data: URL for the picked avatar, or null for the default one. */
+  avatarURL: string | null
+  /** The Google email the host knows for this device, when it recorded one. */
+  email: string | null
+}
+
 export interface CodyncBridge {
   platform: 'darwin' | 'linux' | 'win32'
   appName: string
@@ -167,6 +183,18 @@ export interface CodyncBridge {
     call(baseURL: string, token: string, method: string, body: unknown, timeoutMs: number): Promise<unknown>
     /** SSE on a loopback host: each `data:` line, then `onEnd` (with an error when it failed). */
     stream(url: string, token: string, onData: (line: string) => void, onEnd: (error: CallError | null) => void): () => void
+  }
+  /**
+   * The profile shown when this computer runs its cloud off (C0107): a name and an avatar the user
+   * picked on this device, plus whatever Google email the host recorded for its devices. Nothing
+   * here is fetched from the network.
+   */
+  profile: {
+    state(): Promise<LocalProfileState>
+    /** Renames this device's profile; an empty string puts it back to the default. */
+    setName(name: string): Promise<LocalProfileState>
+    /** Asks for an image, copies it into the app's data folder and makes it the avatar. */
+    pickAvatar(): Promise<LocalProfileState>
   }
   account: {
     state(): Promise<AccountState>

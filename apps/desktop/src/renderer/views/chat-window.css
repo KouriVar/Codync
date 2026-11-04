@@ -412,3 +412,13 @@ html[data-platform="darwin"] .sidebar-header {
   right: 0;
   height: 40px;
 }
+
+/* The local profile's initial when no image was picked: the same circle, a letter inside it. */
+.profile-avatar-initial {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--secondary);
+  user-select: none;
+}
+.sidebar-account .profile-avatar-initial { font-size: 14px; }

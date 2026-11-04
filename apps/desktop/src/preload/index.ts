@@ -70,6 +70,11 @@ const bridge: CodyncBridge = {
       }
     },
   },
+  profile: {
+    state: () => ipcRenderer.invoke('profile:state'),
+    setName: (name) => ipcRenderer.invoke('profile:setName', name),
+    pickAvatar: () => ipcRenderer.invoke('profile:pickAvatar'),
+  },
   account: {
     state: () => ipcRenderer.invoke('account:state'),
     onChange: (cb) => listen('account:change', cb),
