@@ -1252,3 +1252,15 @@
 - 限制/待办：系统在 context menu 里的排列（图标在上、文字在下）由 ControlGroup 决定，未截图核对。
 - 关联：C0131。
 
+### C0138 · 2026-11-04 · 首页顶部渐变改挂到滚动视图（与聊天页同一层）
+
+- 原因：首页顶部渐进模糊仍被裁；C0132 认为「导航栏背景盖住」的结论不完整。
+- 结构（本次修前）：`NavigationStack` → `chromeView`（`baseView` = `TabView(.page)` + navigationTitle + toolbar）→ `chromeView.overlay(alignment: .top) { ProgressiveTopBlur() }`；而列表在 `TabView` 的每一页里（`List`）。即 overlay 与滚动的 `List` 不在同一层，挂在被导航栏/内容安全区约束的外层上，`ignoresSafeArea(.top)` 无法让它跨出该层被裁剪的范围。
+- 对比聊天页（正常）：`NavigationStack` → `ThreadView` → `ChatTranscriptList` = `ConversationList(...)` 的 `.overlay(alignment: .top) { ProgressiveTopBlur() }`，overlay 直接挂在**滚动视图**上。
+- 变化：把 `ProgressiveTopBlur` 从 `chromeView` 移到 `pinnedPage` / `sourcePage` 各自的 `List` 上（`.plainRosterList().overlay(alignment: .top) { ProgressiveTopBlur() }`），与聊天页同一层级；去掉 `chromeView` 上的 overlay 和 `.toolbarBackground(.hidden)`。聊天页的模糊没动。
+- 备选（未改，按你要求先说明）：若仍有裁切，可去掉 `TabView(.page)`，改成普通 `List` + 自己处理左右切换（或顶部四页切换），就能完全照聊天页的结构挂。
+- 文件：`apps/ios/Views/HomeSourcesView.swift`。
+- 验证：按要求本轮只验证编译通过（DevDebug 真机构建）。
+- 限制/待办：`TabView(.page)` 的分页容器是否仍会裁页内 overlay 需要真机确认；若裁则采用上面的备选。
+- 关联：C0128、C0132。
+

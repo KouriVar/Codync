@@ -107,13 +107,7 @@ struct HomeSourcesView: View {
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar(.visible, for: .navigationBar)
-            // The overlay lives under the bar; an automatic bar background would cover the top of
-            // the gradient. A transparent bar lets the blur (and the list) show through.
-            .toolbarBackground(.hidden, for: .navigationBar)
             .toolbar { toolbarContent }
-            // A real progressive blur at the top: the paged container clips the system
-            // scrollEdgeEffect, so fade a material in from the top ourselves.
-            .overlay(alignment: .top) { ProgressiveTopBlur() }
     }
 
     private var baseView: some View {
@@ -180,6 +174,8 @@ struct HomeSourcesView: View {
             }
         }
         .plainRosterList()
+        // Mounted on the scroll view itself, exactly where the chat page mounts it.
+        .overlay(alignment: .top) { ProgressiveTopBlur() }
     }
 
     private func sourcePage(_ source: HomeSource) -> some View {
@@ -201,6 +197,8 @@ struct HomeSourcesView: View {
             }
         }
         .plainRosterList()
+        // Mounted on the scroll view itself, exactly where the chat page mounts it.
+        .overlay(alignment: .top) { ProgressiveTopBlur() }
     }
 
     private var pinnedEmptyState: some View {
