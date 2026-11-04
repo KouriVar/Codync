@@ -1,5 +1,3 @@
-
-
 # Fork 改动记录
 
 本文件记录本 fork 的定制与修复；上游发布说明仍在原有文档中维护。
@@ -983,6 +981,37 @@
 - 限制：本机只有 Apple Development 证书（无 Developer ID / 公证凭据）→ App 为 ad-hoc 签名、arm64-only，`spctl` 仍 rejected；可分发需另行签名公证。
 - 关联：C0107。
 
+> 说明：下面 C0109–C0114 六节是同一批工作的补记，**部分内容已于更早的提交落地**
+> （例如 C0110 的桌面端代码、C0109 的 zh-Hans/zh-Hant 文案），实际提交状态以 Git 历史为准。
+
+### C0110 · 2026-11-04 · 桌面端移除 App 自动更新
+
+- 原因：二开版本不应被官方 release 覆盖。
+- 变化：
+  - `apps/desktop/src/main/updates.ts`：`enabled = false`，检查/下载/安装全部短路（`install()` 也加守卫），不再注册 electron-updater 的定时检查。
+  - `apps/desktop/src/main/tray.ts`：托盘菜单去掉「Updates」子菜单（含自动检查/下载开关），删除 `updatesMenu()`。
+  - `apps/desktop/src/renderer/views/settings/SettingsView.tsx`：设置页去掉「Updates」页（类型、导航、`UpdateSettings` 一并删除）。
+  - `apps/desktop/src/renderer/views/ChatWindow.tsx`：移除左下角 `UpdateBadge`。
+  - `apps/desktop/src/renderer/views/UpdateNeededCard.tsx`：不再提供「Update this app」（`updateApp` 卡片直接不显示），只保留本机/其他电脑 host 的重启更新。
+  - 删除 `apps/desktop/src/shared/updates.test.ts`、`apps/desktop/src/shared/test-support/updater.ts`（功能已移除）。
+  - `Resources/Languages/ja|ko|fr|de|es.json` 补齐 C0109 的 9 条状态文案。
+- 验证：`npm run typecheck` 通过；`npm run build` + `electron-builder --mac --dir --arm64`（ad-hoc）产出 2.36.0 并替换 `/Applications/Codync.app`，`codesign --verify --deep --strict` 通过，App 运行中（pid 23741）；`/health` 2.36.0/main。`npm test` 仅剩既有的 catalogs 键不一致（HEAD 上 zh-Hans 比 ja 多 15 个键，与本次无关）。
+- 已知：`views/UpdateButton.tsx` 保留但已无入口；`UpdateNeededCard` 对 `updateApp` 静默。
+- 关联：C0108、C0109。
+
+### C0111 · 2026-11-04 · iOS 端移除 App 更新
+
+- 原因：自编译版本不在 App Store，更新入口只会打开官方页面，或让电脑更新成官方包。
+- 变化：
+  - `apps/ios/App/CodyncApp.swift`：移除 `AppUpdates` 环境、`\.appUpdate`（App Store 跳转）和前台刷新。
+  - `apps/ios/Views/BotListView.swift`：移除「有新版本」提醒条 `AppUpdateReminder`。
+  - `apps/ios/Kit/Sources/CodyncUI/UpdateNeededCard.swift`：删除 `AppUpdateAction`/`AppUpdates`/`UpdateReminderCard`/`AppUpdateReminder`；版本不匹配卡只保留说明，不再有「Update Codync」（App Store）或「Update now」（让电脑更新）按钮。
+  - `apps/ios/Kit/Sources/CodyncKit/Models/Compatibility.swift`：删除 `AppStoreRelease`、`UpdateReminder`。
+  - `apps/ios/Kit/Sources/CodyncUI/Store/BotStore+HostUpdate.swift`：版本行不再给「Update / Try again」按钮，改为提示手动更新；`apps/ios/Views/ComputersView.swift` 对应去掉按钮。
+- 验证：`xcodebuild -scheme 'iOS Dev' -configuration DevDebug` 模拟器与真机均通过；已安装并启动到 iPhone 16 Pro（`com.suiyikou.codync.uipreview`）。
+- 保留：`BotStore.requestHostUpdate()`（已无入口）、`HostUpdateOffer` 展示状态。
+- 关联：C0110。
+
 ### C0115 · 2026-11-04 · 云端关闭时桌面端跳过登录欢迎页，隐藏账号入口
 
 - 原因：本机 host 以 `CODYNC_CLOUD=off` 运行（C0107），账号已无法把任何东西送到别处；但桌面端仍按 `pk_live_` 判断 `configured=true`（`main/account.ts:35`），`welcome-gate.ts` 于是在未登录时把窗口拦在 Apple/Google/GitHub 登录页上，账号入口也照旧显示。
@@ -1925,3 +1954,18 @@
 - 验证：`xcodebuild build -scheme iOS -configuration Release -destination 'platform=iOS,id=<iPhone 16 Pro>' CODE_SIGNING_ALLOWED=NO` 通过（0 error）。签名步骤在环境层面受限：Release 配置用 `ios/Resources/iOS.entitlements`（含 `aps-environment`、`com.apple.developer.usernotifications.communication`），而当前签名身份“穗 许”是 Personal Team，不支持这两个能力，故 iOS scheme 的签名构建失败，与本次改动无关。改用可签名的 `iOS Dev`/`DevDebug`（`UIPreview.entitlements`）构建通过，已装到 iPhone 16 Pro（2.36.0 / build 24）并启动成功。按要求未自测、未截图。
 - 限制/待办：清单外的一律没动——`BotListView` 死岛（连带 `HomeBottomBar`/`RosterSectionHeader`/`ComputerSection`/`EmptyRoster`/`CardMenuOverlay`，约 1 千行）、`AppTab.test`、`CODYNC_QUICKCAPTURE`、L10n json 与孤儿 key、`ChoiceList`/`CardForm`、DSHKit 的 `DSHHomeSection`、Analytics 明文 key、`relayDisabled`/`relayTasks`/`canEditKey` 均留待后续。
 - 关联：C0183。
+
+### C0186 · 2026-11-05 · iOS 移除 App 内更新：清掉只为那个按钮存在的残渣
+
+- 原因：C0111 撤掉 App 内更新入口后，模型层与埋点里还留着只为那个按钮服务的分支和事件，测试也仍在断言已经不存在的 `.button` 配件——"删了 UI 没删底层"。
+- 变化：
+  - `Kit/Sources/CodyncUI/Store/BotStore+HostUpdate.swift`：删掉 `HostVersionLine.Accessory.button(String)`（两处生产者都已在 C0111 移除），`Accessory` 只剩 `.updating`；删掉 `requestHostUpdate()`（生产代码零调用，唯一调用方是测试）。
+  - `Views/ComputersView.swift`：版本行的 `switch` 去掉 `case .button: EmptyView()` 占位分支。
+  - `Kit/Sources/CodyncKit/Analytics/AnalyticsEvent.swift`：删掉 `Link.appStore`（撤掉 App Store 跳转后全仓 0 引用）。
+  - `Kit/Tests/CodyncUITests/HostUpdateTests.swift`：删掉两个由 `requestHostUpdate()` 驱动的用例（更新请求、行内 `.updating`→`.button` 轮回）；剩下两个 `HostVersionLine.make` 用例改为断言新行为——没有按钮，只给一句 "Update Codync on that computer."。
+  - `how(os:)` 保持固定一句，不恢复 macOS/Linux 专属指引；`Views/BotListView.swift` 里 C0111 的 −3 行原样保留。
+  - 同批已处理：`apps/desktop/package.json` 被误删的 `scripts` 与 `devDependencies` 已按 HEAD 还原，不产生提交。
+- 文件：上列 4 个 iOS 文件。
+- 验证：`xcodebuild build -scheme 'iOS Dev' -configuration DevDebug` 通过（0 error / 0 warning）。按要求未跑测试、未截图。
+- 限制/待办：`UpdateNeededText.notUpdated(.requested)` 的文案仍写「Try again, or update Codync on that computer.」，而"再试一次"的按钮已不存在；这句属清单外，未改，留待后续。
+- 关联：C0110、C0111。

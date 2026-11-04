@@ -330,7 +330,6 @@ private struct CodyncVersionRow: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 switch line.accessory {
                 case .updating: Spinner(size: 16)
-                case let .button(title): Button(L10n.tr(title), action: store.requestHostUpdate).buttonStyle(.primary)
                 case nil: EmptyView()
                 }
             }

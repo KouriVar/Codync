@@ -9,8 +9,6 @@ import WidgetKit
 struct CodyncApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) private var delegate
     @State private var app = AppStore.shared
-    /// What the App Store has: greys out an update it doesn't have yet, reminds of newer ones.
-    @State private var updates = AppUpdates()
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage(Appearance.storageKey) private var appearance = Appearance.system
     @AppStorage("onboardingCompleted") private var onboardingCompleted = false
@@ -37,12 +35,6 @@ struct CodyncApp: App {
                     signedIn: app.account.isSignedIn, loading: app.account.isBusy || !app.account.isReady,
                     error: app.account.errorMessage,
                     signIn: { provider in Task { await app.account.signIn(provider: provider) } }))
-                // A computer needs a newer app: its App Store page has the Update button.
-                .environment(\.appUpdate, AppUpdateAction {
-                    Analytics.shared.capture(.linkOpened(.appStore))
-                    UIApplication.shared.open(AppStoreRelease.page)
-                })
-                .environment(updates)
                 .tint(Palette.accent)
                 .background(AppearanceWindow(appearance: appearance).frame(width: 0, height: 0))
                 .environment(\.locale, AppLanguage.locale(
@@ -88,7 +80,6 @@ struct CodyncApp: App {
                     // Back in the app: a computer may have joined the account meanwhile.
                     if phase == .active {
                         Task { await app.accounts.refreshCloud() }
-                        Task { await updates.refresh() }
                     }
                 }
                 #if DEBUG

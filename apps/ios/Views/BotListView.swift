@@ -151,9 +151,6 @@ struct BotListView: View {
         let movingSection = lines.first { $0.id == lifted }?.sectionComputer
         List {
             Group {
-                // A newer app release (dismissible; everything still works). Computers update
-                // themselves, so a newer host gets no reminder here.
-                AppUpdateReminder()
                 if !grouped {
                     // One computer: its update notice leads the list.
                     ForEach(shownStores, id: \.computer.id) { updateCard($0) }

@@ -21,10 +21,10 @@ public enum HostUpdateOffer: Equatable, Sendable {
 /// The Codync row on a computer's card in Computer management: the version it runs, and an update
 /// when one is due (a newer release, or a version too old for this app).
 public struct HostVersionLine: Equatable, Sendable {
-    /// What the row ends with: a spinner while the computer updates, or the button that asks it to.
+    /// What the row ends with: a spinner while the computer updates. This build never asks a
+    /// computer to update itself, so there is no button to ask it.
     public enum Accessory: Equatable, Sendable {
         case updating
-        case button(String)
     }
 
     public var version: String
@@ -47,10 +47,9 @@ public struct HostVersionLine: Equatable, Sendable {
         case (_, nil):
             return HostVersionLine(version: version, detail: latest == nil ? [] : ["Up to date"])
         case let (.available(last?), _?):
-            return HostVersionLine(version: version, detail: [UpdateNeededText.notUpdated(last, host: host)], warns: true,
-                                   accessory: .button("Try again"))
+            return HostVersionLine(version: version, detail: [UpdateNeededText.notUpdated(last, host: host)], warns: true)
         case let (.available(nil), due?):
-            return HostVersionLine(version: version, detail: [due], warns: minimum != nil, accessory: .button("Update"))
+            return HostVersionLine(version: version, detail: [due, UpdateNeededText.how(os: os)], warns: minimum != nil)
         case let (.unavailable, due?):
             return HostVersionLine(version: version, detail: [due, UpdateNeededText.how(os: os)], warns: minimum != nil)
         }
@@ -82,17 +81,5 @@ extension BotStore {
     public func hostUpdateOffer(now: Date = .now) -> HostUpdateOffer {
         if case let .requested(at) = hostUpdate, now.timeIntervalSince(at) < Self.hostUpdateWait { return .updating }
         return hello?.canUpdate == true ? .available(last: hostUpdate) : .unavailable
-    }
-
-    /// Asks the computer to update itself; the notice follows along until its version changes.
-    public func requestHostUpdate() {
-        Motion.animate { hostUpdate = .requested(at: .now) }
-        Task {
-            do {
-                try await withLink { try await $0.installHostUpdate() }
-            } catch {
-                Motion.animate { hostUpdate = .failed(error.localizedDescription) }
-            }
-        }
     }
 }
