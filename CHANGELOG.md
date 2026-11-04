@@ -2288,3 +2288,41 @@
     的限制；若要求严格单一 presenter，只能把语音设置改成 sheet 内的一页（push）而不是第二个 sheet。
   - 变形期间栏高 44 → 76，首页列表会随安全区上移 32pt（`safeAreaInset` 的正常行为）。
 - 关联：C0194、C0195、C0196；评估：`/tmp/codync-audit/voice-morph.md`。
+
+### C0198 · 2026-11-04 · 语音胶囊「展开」时的轻微卡顿：录音启动挪到下一帧、阶段变化不再重建列表
+
+- 原因：C0197 的展开动画在真机上比收起多一点卡顿，且冷启动第一次最明显。只读排查（没有 profile，按代码路径判断）
+  找到三处只在「开启」时发生、且都落在动画首帧同一/相邻 runloop 的主线程工作：
+  1. `VoiceSession.begin()`（`Kit/Sources/CodyncUI/Voice/VoiceSession.swift:122`）在动画开始后的同一轮里同步跑
+     `phase = .recording` → `await transcriber.permission()`（其中又新建一个 `SFSpeechRecognizer`，
+     `SpeechTranscriber.swift:126`）→ `transcriber.start()`：再建一个 `SFSpeechRecognizer`（`:144`）、
+     `recognizer.recognitionTask(...)`（`:233`）、`AVAudioSession.setCategory/setActive(true)`、
+     `AVAudioEngine`（首次 lazy 创建）、`installTap`、`engine.prepare()/start()`
+     （`SpeechTranscriber.swift:404-427`）。这一串是几十毫秒量级（冷启动更久）的主 actor 同步工作。
+  2. `Haptics.impact()`（`VoiceSession.swift:145`）每次现建 `UIImpactFeedbackGenerator`，从不 `prepare()`，
+     而且排在音频启动之后，同一帧再叠一次唤起触感引擎的成本。
+  3. `HomeSourcesView` 的根视图用 `.onChange(of: voice.phase)` 观察录音阶段（改前 `Views/HomeSourcesView.swift:129`），
+     `phase = .recording` 会让整个首页 body（包含会话 `List`）重算一次——正好压在这次变形的第一帧上。
+     「关闭」不碰 `voice.phase`，所以没有这一下。
+- 变化（`Views/HomeSourcesView.swift`）：
+  - `beginVoice()`：`withAnimation` 之后把 `voice.begin()` 推迟一帧（`Task { sleep(16ms); await voice.begin() }`，
+    第 435-440 行）。先让栏的第一帧画出来，再去开麦克风/识别器。
+  - 录音阶段的观察从首页根移到栏自己身上：`.background { VoicePhaseWatcher(...) }`（第 315 行），
+    `VoicePhaseWatcher`（第 893 行）自己 body 里 `.onChange(of: voice.phase)`；回调
+    `handleVoicePhase(_:)`（第 446 行，逻辑与原来逐条相同：`.confirming`/`.notice`/`.paused 且没听到` → 升半屏，
+    `.idle` → 收 sheet）。阶段变化现在只让这个小视图重算，首页列表不再跟着刷新。
+  - 动画本身一行未改：高度 76、时长/曲线（`VoiceSheetView.settle`）、上推开半屏、下拉收起、
+    有文字时确认丢弃、Reduce Motion 的淡入淡出，全部保持 C0197 的样子。
+- 未改动：`SpeechTranscriber.swift`、`VoiceSession.swift`、`Haptics.swift`、`VoicePill.swift`、`VoiceSheetView.swift`。
+- 验证：`xcodebuild build -project apps/Codync.xcodeproj -scheme 'iOS Dev' -configuration DevDebug`
+  （真机 destination、ui-preview 覆盖、构建号 186）**编译通过，0 error**，改动文件 0 warning；
+  `xcrun devicectl device install app` 装到 iPhone 16 Pro（`com.suiyikou.codync.uipreview` 2.36.0 / 186）成功。
+  按要求**不自测**：不跑测试、不截图、不用 CDP，改后的顺滑度未实测。
+- 限制/待办：
+  - 剩下的最大一块是 `SpeechTranscriber.start()` 里的音频/识别启动本身：`SFSpeechRecognizer` 建两次、
+    `recognitionTask`、`setActive(true)`、`AVAudioEngine` 首次创建，全在主 actor 上同步执行；推迟一帧只是
+    让它们不再压住动画第一帧，仍会在动画中段吃掉 2–3 帧。要彻底消除，得把这段挪出主线程（或提前预热
+    引擎/识别器），那会把 `SpeechTranscriber.start` 改成 async 并牵动 `VoiceSession`/按钮回调，属于换实现方案，
+    已按约定先停在这里等确认，未实施。
+  - 冷启动第一次仍会比后续几次慢（识别服务/音频会话首次初始化），这一点只能在主线程外解决。
+- 关联：C0197。

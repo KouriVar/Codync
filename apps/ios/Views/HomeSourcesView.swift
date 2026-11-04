@@ -126,20 +126,6 @@ struct HomeSourcesView: View {
                     .environment(\.dismissModal, DismissModalAction { showVoiceSettings = false })
             }
             .glassToast($toast, topPadding: 6)
-            .onChange(of: voice.phase) { _, phase in
-                switch phase {
-                // The words (or a refusal) are read at half height: come up from the capsule.
-                case .confirming, .notice:
-                    openVoiceSheet()
-                case .paused where voice.notHeard:
-                    // Nothing heard: the hint only lives in the taller sheet.
-                    openVoiceSheet()
-                // Sent or cancelled: the sheet has done its work.
-                case .idle:
-                    if showVoice { showVoice = false }
-                default: break
-                }
-            }
             .onChange(of: voiceDetent) { _, _ in Haptics.selection() }
             .confirmationDialog(L10n.tr("Discard this voice message?"), isPresented: $confirmDiscardVoice,
                                 titleVisibility: .visible) {
@@ -324,6 +310,9 @@ struct HomeSourcesView: View {
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
             keyboardUp = false
         }
+        // The voice's phase changes live in a view of their own: on the home's root they would
+        // rebuild the roster list on every one of them — including the first, while the bar is moving.
+        .background { VoicePhaseWatcher(voice: voice, onPhase: handleVoicePhase) }
     }
 
     /// The field's width is whatever the button is not using, so the two always add up to the row:
@@ -443,7 +432,28 @@ struct HomeSourcesView: View {
             try? await Task.sleep(for: .milliseconds(450))
             if voiceOpen { searchCollapsed = true }
         }
-        Task { @MainActor in await voice.begin() }
+        // The microphone opens on the next frame, not this one: the recognizer, the recognition task
+        // and the audio session are tens of milliseconds on the main actor, and the bar's first frame
+        // must be drawn before any of it runs.
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(16))
+            await voice.begin()
+        }
+    }
+
+    /// Something to read (words, a refusal, "did not catch that") comes up at the half height; a
+    /// finished recording puts the sheet away.
+    private func handleVoicePhase(_ phase: VoiceSession.Phase) {
+        switch phase {
+        case .confirming, .notice:
+            openVoiceSheet()
+        case .paused where voice.notHeard:
+            // Nothing heard: the hint only lives in the taller sheet.
+            openVoiceSheet()
+        case .idle:
+            if showVoice { showVoice = false }
+        default: break
+        }
     }
 
     /// The pull up: the same sheet as before, opened at the half height.
@@ -876,6 +886,19 @@ struct HomeSourcesView: View {
 
     private func deleteMessage(_ item: RosterItem) -> Text {
         Text(L10n.tr(item.bot.isGroup ? "Its bots and their own chats stay." : "Files it changed on your computer stay as they are."))
+    }
+
+    /// Watches the recording's phase without being the home: its own body is what a phase change
+    /// invalidates, so the list behind the bar is left alone.
+    private struct VoicePhaseWatcher: View {
+        let voice: VoiceSession
+        let onPhase: (VoiceSession.Phase) -> Void
+
+        var body: some View {
+            Color.clear
+                .frame(width: 0, height: 0)
+                .onChange(of: voice.phase) { _, phase in onPhase(phase) }
+        }
     }
 
     private struct NewTarget: Identifiable {
