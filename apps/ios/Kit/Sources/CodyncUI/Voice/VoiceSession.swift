@@ -72,6 +72,15 @@ public final class VoiceSession {
     public private(set) var sendFailed = false
     /// A send is in flight: the button waits rather than sending twice.
     public private(set) var sending = false
+    /// Something is being heard, but too faintly to trust: the sheet asks the user to speak up.
+    public private(set) var lowVolume = false
+
+    /// Louder than this is speaking.
+    private static let voiceThreshold: Float = 0.18
+    /// Quieter than this is the room, and not worth mentioning.
+    private static let silentThreshold: Float = 0.04
+    /// This long of faint-but-not-silent input earns the "a little quiet" line.
+    private static let softAfter: TimeInterval = 3
 
     /// Hands the words over and reports whether they reached the bot.
     @ObservationIgnored public var onSend: ((String) async -> Bool)?
@@ -82,6 +91,8 @@ public final class VoiceSession {
     @ObservationIgnored private var ending = false
     /// Bumped by every start and discard, so a slow permission answer can't revive a closed sheet.
     @ObservationIgnored private var generation = 0
+    /// Since when the input has been too faint to trust, if it is.
+    @ObservationIgnored private var faintSince: Date?
 
     public init(transcriber: SpeechTranscriber = OnDeviceSpeechTranscriber()) {
         self.transcriber = transcriber
@@ -98,10 +109,10 @@ public final class VoiceSession {
     public var countingDown: Bool {
         phase == .confirming && !editing && !sendFailed && VoiceSendMode.stored == .automatic
     }
+    /// There are words on screen, recording or paused: closing now would throw them away.
+    public var hasWords: Bool { !words.isEmpty }
     /// Closing now would throw away words the user may still want.
-    public var needsConfirm: Bool {
-        (phase == .paused || phase == .confirming) && !words.isEmpty
-    }
+    public var needsConfirm: Bool { hasWords }
 
     // MARK: what the sheet's buttons do
 
@@ -140,6 +151,8 @@ public final class VoiceSession {
         case .recording:
             transcriber.pause()
             level.set(0)
+            faintSince = nil
+            lowVolume = false
             Haptics.impact()
             settlePaused()
         case .paused, .confirming:
@@ -233,6 +246,8 @@ public final class VoiceSession {
 
     private func reset() {
         stopTimer()
+        faintSince = nil
+        lowVolume = false
         text = ""
         editing = false
         notice = nil
@@ -261,12 +276,32 @@ public final class VoiceSession {
         case let .level(value):
             guard phase == .recording else { return }
             level.set(value)
+            trackFaint(value)
         case let .partial(words):
             guard phase == .recording || phase == .paused || phase == .confirming else { return }
             text = words
+            // Speaking again takes back the "did not catch that" line.
+            if !words.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { notHeard = false }
         case let .failed(reason):
             stop(with: reason == .permissionDenied ? .permissionDenied
                  : reason == .microphone ? .microphone : .unavailable)
+        }
+    }
+
+    /// Hearing something, but faintly: after a few seconds of it, say so. A silent room says nothing,
+    /// and a voice that comes back up takes the line away.
+    private func trackFaint(_ value: Float) {
+        if value >= Self.voiceThreshold {
+            faintSince = nil
+            if lowVolume { lowVolume = false }
+        } else if value <= Self.silentThreshold {
+            faintSince = nil
+            if lowVolume { lowVolume = false }
+        } else {
+            let since = faintSince ?? Date.now
+            faintSince = since
+            let faint = Date.now.timeIntervalSince(since) >= Self.softAfter
+            if faint != lowVolume { lowVolume = faint }
         }
     }
 

@@ -1542,3 +1542,16 @@
 - 验证：`xcodebuild build -scheme 'iOS Dev' -configuration DevDebug` 通过；已装到 iPhone 16 Pro（2.36.0 / 155）并启动。按要求未自测交互。
 - 限制/待办：单任务识别仍受 SFSpeechRecognizer 单次约 1 分钟上限约束（超过后按 1.5 秒规则续接一次；更长的连续通话留待改用 SpeechAnalyzer）；relay 默认关。
 - 关联：C0149、C0152、C0153、C0154。
+### C0158 · 2026-11-04 · 语音 sheet v3.4：系统式标题栏、✕ 关闭与确认、line 图标、低音量提示
+
+- 原因：C0155 把 ✕ 全部删掉后只剩下拉一条出路；标题栏是自己摆的而不是系统样式；暂停/继续用了 fill 图标；没有声音偏小、或什么都没听清时的提示区分。
+- 变化：
+  - 半屏/全屏标题栏按系统 sheet 重排：左 ✕ 44pt（普通玻璃、`close-line` 24pt，不再用红色 tint）；中间主 Bot 头像 24pt + 昵称（17pt semibold）居中，录音时头像呼吸跳动、暂停时静止；右侧发送 44pt（强调色 tint、白色 `arrow-up-line` 24）只在「暂停/已结束且有文字」时出现，否则留 44pt 空占位，保证标题始终居中；自动发送的倒计时环仍挂在发送按钮上。小档 76pt 不变（头像 36、波形、设置、暂停/继续，无关闭无发送）。
+  - 关闭规则统一（✕ 与下拉同一套）：没文字直接关闭（停止录音、丢弃、底栏回来）；有文字（录音中或暂停）先弹 `confirmationDialog`「丢弃这段语音？」→「丢弃」（destructive，关闭并清空）／「继续编辑」。下拉用 `.interactiveDismissDisabled(voice.hasWords)` 挡住，配合 sheet 内下拉手势（阈值 70pt）触发同一个确认；没文字时下拉直接关。
+  - 编辑态：键盘上方加 `ToolbarItemGroup(placement: .keyboard)`「完成」收起键盘；点文字区以外的空白处也收起；标题栏位于 sheet 顶部，键盘弹出时 ✕ 与发送仍可点。
+  - 图标改回线性：暂停 `pause-line`、继续 `play-line`，24pt 与其它按钮同一粗细；显示 `play-line` 时图标 `.offset(x: 1.5)` 做视觉居中。
+  - 提示分档：识别为空（暂停且无文字）时文字区显示「没听清，靠近一点再说」，用户重新开口（有新的部分结果）即自动消失；录音中若音量连续 3 秒处在「有声但偏小」区间（`voiceThreshold` 0.18 / `silentThreshold` 0.04 / `softAfter` 3s，均为常量），在波形下方淡入 13pt `.secondary` 的「声音有点小」，音量恢复或完全静音即淡出；小档把这一行放在波形区域里，不改变行高。
+- 文件：`apps/ios/Kit/Sources/CodyncUI/Voice/VoiceSheetView.swift`、`VoiceSession.swift`、`apps/ios/Views/HomeSourcesView.swift`、`Resources/Languages/zh-Hans.json`、`zh-Hant.json`（新增「声音有点小」「没听清，靠近一点再说」）。
+- 验证：`xcodebuild build -scheme 'iOS Dev' -configuration DevDebug` 通过。本轮真机安装时设备连接隧道一直失败（`The tunnel connection failed`，手机锁屏/同一 Wi-Fi 未就绪），安装未完成；包已产出在 `build/dd-voice/Build/Products/DevDebug-iphoneos/`（2.36.0 / 156），解锁后一条 `devicectl device install app` 即可。
+- 限制/待办：键盘「完成」依赖 `.toolbar(placement: .keyboard)`，若真机上没出现需要改为自绘键盘条；`.large` 仍复用半屏布局（二期连续通话）。
+- 关联：C0155、C0156、C0157。

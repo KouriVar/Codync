@@ -53,7 +53,7 @@ public struct VoiceSheetView: View {
         .animation(Motion.reduced(Self.settle, reduceMotion), value: session.sendFailed)
         // Pulling the sheet down is the way out; with words on screen it asks first.
         .simultaneousGesture(DragGesture(minimumDistance: 24).onEnded { value in
-            if value.translation.height > 70, session.needsConfirm { confirmDiscard = true }
+            if value.translation.height > 70, session.hasWords { confirmDiscard = true }
         })
         .confirmationDialog(L10n.tr("Discard this voice message?"), isPresented: $confirmDiscard,
                             titleVisibility: .visible) {
@@ -64,6 +64,14 @@ public struct VoiceSheetView: View {
             breathing = phase == .recording && !reduceMotion
         }
         .onChange(of: session.editing) { _, editing in typing = editing }
+        // Tapping anywhere that isn't a control puts the keyboard away; so does 完成 above it.
+        .onTapGesture { if typing { typing = false } }
+        .toolbar {
+            ToolbarItemGroup(placement: .keyboard) {
+                Spacer()
+                Button(L10n.tr("Done")) { typing = false }
+            }
+        }
         .onAppear { breathing = session.phase == .recording && !reduceMotion }
         .sheet(isPresented: $showSettings) {
             VoiceLanguageSheet()
@@ -79,7 +87,7 @@ public struct VoiceSheetView: View {
     private var pill: some View {
         HStack(spacing: 12) {
             avatar(36)
-            waveform
+            waveColumn
             settingsButton
             micButton
         }
@@ -93,22 +101,11 @@ public struct VoiceSheetView: View {
 
     private var tall: some View {
         VStack(spacing: 12) {
-            HStack(spacing: 12) {
-                avatar(32)
-                Text(lead?.name ?? L10n.tr("Voice"))
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(Palette.text)
-                    .lineLimit(1)
-                Spacer(minLength: 8)
-                // Nothing while it hears; the send button only once there are words to send.
-                if session.canSend || session.sending {
-                    sendButton
-                }
-            }
+            titleBar
             transcript
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             HStack(spacing: 12) {
-                waveform
+                waveColumn
                 settingsButton
                 micButton
             }
@@ -119,10 +116,43 @@ public struct VoiceSheetView: View {
         .padding(.bottom, 16)
     }
 
-    /// TODO: `.large` runs the same layout as `.medium` for now; a continuous call mode belongs here.
-    private var waveform: some View {
-        VoiceWaveform(level: session.level, paused: session.phase != .recording)
-            .frame(maxWidth: .infinity)
+    /// The line, with the "a little quiet" hint under it — inside the waveform's own space, so the
+    /// pill's row never moves.
+    private var waveColumn: some View {
+        VStack(spacing: 2) {
+            VoiceWaveform(level: session.level, paused: session.phase != .recording)
+                .frame(maxWidth: .infinity)
+            if session.lowVolume {
+                Text(L10n.tr("A little quiet"))
+                    .font(.system(size: 13))
+                    .foregroundStyle(Palette.secondary)
+                    .transition(.opacity)
+            }
+        }
+        .animation(Motion.reduced(.easeInOut(duration: 0.25), reduceMotion), value: session.lowVolume)
+    }
+
+    /// A system sheet's title bar: close on the left, the bot centred, send on the right. The send
+    /// side keeps its 44pt when empty, so the title never drifts off centre.
+    private var titleBar: some View {
+        ZStack {
+            HStack(spacing: 6) {
+                avatar(24)
+                Text(lead?.name ?? L10n.tr("Voice"))
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(Palette.text)
+                    .lineLimit(1)
+            }
+            HStack(spacing: 12) {
+                closeButton
+                Spacer(minLength: 0)
+                if session.canSend || session.sending {
+                    sendButton
+                } else {
+                    Color.clear.frame(width: 44, height: 44)
+                }
+            }
+        }
     }
 
     // MARK: the words
@@ -148,7 +178,7 @@ public struct VoiceSheetView: View {
         } else if session.phase == .notice {
             noticeLines
         } else if session.notHeard {
-            Text(L10n.tr("Did not catch that, say it again"))
+            Text(L10n.tr("Did not catch that, get a little closer"))
                 .font(.system(size: 20))
                 .foregroundStyle(Palette.secondary)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -237,6 +267,17 @@ public struct VoiceSheetView: View {
         .accessibilityHidden(true)
     }
 
+    /// The ✕: plain glass, no red — and the way out, asking first when there are words to lose.
+    private var closeButton: some View {
+        circle("close-line", label: "Close", tint: nil) {
+            if session.hasWords {
+                confirmDiscard = true
+            } else {
+                dismiss()
+            }
+        }
+    }
+
     private var settingsButton: some View {
         circle("settings-3-line", label: "Voice settings", tint: nil) {
             Haptics.impact()
@@ -284,7 +325,7 @@ public struct VoiceSheetView: View {
     }
 
     private var micGlyph: String {
-        session.phase == .recording ? "pause-fill" : "play-fill"
+        session.phase == .recording ? "pause-line" : "play-line"
     }
 
     /// One 44pt glyph: 24pt of Remix, the same weight everywhere.

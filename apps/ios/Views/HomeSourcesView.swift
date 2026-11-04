@@ -106,7 +106,7 @@ struct HomeSourcesView: View {
                     .presentationBackgroundInteraction(.enabled(upThrough: VoiceSheetView.small))
                     // Pulling down closes the sheet — unless there are words to lose, in which case
                     // the sheet asks first (the gesture in the sheet is what asks).
-                    .interactiveDismissDisabled(voice.needsConfirm)
+                    .interactiveDismissDisabled(voice.hasWords)
             }
             .glassToast($toast, topPadding: 6)
             .onChange(of: voice.phase) { _, phase in
