@@ -28,12 +28,6 @@ struct HomeSourcesView: View {
     @State private var showVoice = false
     /// Which tab is showing. The system keeps the accessory and the tab bar in step with it.
     @State private var selection = HomeTab.pinned
-    /// The accessory is open in place as the 76pt pill, recording.
-    @State private var voiceBarOpen = false
-    /// Closing the open bar with words in it asks first.
-    @State private var confirmBarDiscard = false
-    /// The voice settings sheet, opened from the open bar's gear.
-    @State private var showVoiceSettings = false
     /// Which height it rests at: the 76pt pill, half, or full.
     @State private var voiceDetent: PresentationDetent = VoiceSheetView.small
     /// The glass pill that says what was just sent.
@@ -96,7 +90,6 @@ struct HomeSourcesView: View {
                 // Pulled down or sent: either way the recording is over and the bar comes back.
                 voice.discard()
                 voiceDetent = VoiceSheetView.small
-                voiceBarOpen = false
             }) {
                 VoiceSheetView(lead: leadBot?.bot, session: voice, detent: $voiceDetent,
                                openSystemSettings: { openSystemVoiceSettings() })
@@ -111,21 +104,6 @@ struct HomeSourcesView: View {
                     .interactiveDismissDisabled(voice.hasWords)
             }
             .glassToast($toast, topPadding: 6)
-            .sheet(isPresented: $showVoiceSettings) {
-                VoiceLanguageSheet()
-                    .presentationDetents([.medium])
-                    .presentationDragIndicator(.visible)
-            }
-            .confirmationDialog(L10n.tr("Discard this voice message?"), isPresented: $confirmBarDiscard,
-                                titleVisibility: .visible) {
-                Button(L10n.tr("Discard"), role: .destructive) {
-                    voice.discard()
-                    withAnimation(Motion.reduced(.spring(response: 0.35, dampingFraction: 0.85), reduceMotion)) {
-                        voiceBarOpen = false
-                    }
-                }
-                Button(L10n.tr("Keep editing"), role: .cancel) {}
-            }
             .onChange(of: voice.phase) { _, phase in
                 switch phase {
                 // The words are read at half height: come up if the pill is where it still sits.
@@ -197,17 +175,7 @@ struct HomeSourcesView: View {
         .tabBarMinimizeBehavior(.onScrollDown)
         // Only the two tabs that talk to Coe carry the bar; the others leave the screen to their list.
         .modifier(VoiceBar(shown: (selection == .pinned || selection == .coe) && isTabRoot,
-                           lead: leadBot?.bot, session: voice, open: voiceBarOpen,
-                           onTap: expandVoiceBar, onCollapse: collapseVoiceBar,
-                           onRaise: raiseVoiceBar, onSettings: { showVoiceSettings = true }))
-        // Tapping the page while the bar is open puts it away; the bar itself is outside this overlay.
-        .overlay {
-            if voiceBarOpen {
-                Color.clear
-                    .contentShape(Rectangle())
-                    .onTapGesture { collapseVoiceBar() }
-            }
-        }
+                           lead: leadBot?.bot, onTap: beginVoice))
         .tint(Palette.text)
         .onChange(of: enabledSources) { _, sources in
             // The tab you were on has just been switched off in Settings: back to 置顶.
@@ -346,41 +314,6 @@ struct HomeSourcesView: View {
             accounts.selection = lead.ref
         }
         return true
-    }
-
-    /// Tapping the accessory opens the voice bar in place and starts hearing, with the tab bar and its
-    /// five tabs left exactly where they are.
-    private func expandVoiceBar() {
-        guard !voiceBarOpen else { return }
-        guard leadBot != nil else {
-            toast = GlassToastItem(icon: "error-warning-line",
-                                   text: L10n.tr("Pick a main bot in Settings first"))
-            return
-        }
-        withAnimation(Motion.reduced(.spring(response: 0.35, dampingFraction: 0.85), reduceMotion)) {
-            voiceBarOpen = true
-        }
-        Task { await voice.begin() }
-    }
-
-    /// The bar goes back to its resting line: stop hearing, and drop whatever was said.
-    private func collapseVoiceBar() {
-        guard voiceBarOpen else { return }
-        guard !voice.hasWords else {
-            confirmBarDiscard = true
-            return
-        }
-        voice.discard()
-        withAnimation(Motion.reduced(.spring(response: 0.35, dampingFraction: 0.85), reduceMotion)) {
-            voiceBarOpen = false
-        }
-    }
-
-    /// Pulling the bar up takes the whole sheet, at half height, with the recording as it is.
-    private func raiseVoiceBar() {
-        guard voiceBarOpen else { return }
-        voiceDetent = .medium
-        showVoice = true
     }
 
     /// The words (or a refusal) are read at half height.
@@ -964,23 +897,12 @@ struct DSHSessionRow: View {
 private struct VoiceBar: ViewModifier {
     let shown: Bool
     let lead: Bot?
-    let session: VoiceSession
-    let open: Bool
     let onTap: () -> Void
-    let onCollapse: () -> Void
-    let onRaise: () -> Void
-    let onSettings: () -> Void
 
     @ViewBuilder func body(content: Content) -> some View {
         if shown {
             content.tabViewBottomAccessory {
-                if open {
-                    // The same pill as the sheet's smallest detent, in the accessory's own place.
-                    VoiceMiniBar(lead: lead, session: session, openSettings: onSettings,
-                                 onRaise: onRaise, onCollapse: onCollapse)
-                } else {
-                    HomeVoiceAccessory(lead: lead, onTap: onTap)
-                }
+                HomeVoiceAccessory(lead: lead, onTap: onTap)
             }
         } else {
             content

@@ -1719,3 +1719,15 @@
 - 验证：`xcodebuild build -scheme 'iOS Dev' -configuration DevDebug` 通过；已装到 iPhone 16 Pro（2.36.0 / 166）并启动。按要求未自测、未截图。
 - 限制/待办：附属栏展开高度依赖系统是否允许 76pt（真机确认，不行改 overlay）；相机页取景方向未做旋转适配；`.large` 仍复用半屏布局。
 - 关联：C0166、C0167。
+### C0169 · 2026-11-04 · 撤掉附属栏原地展开，改回原生语音 sheet
+
+- 原因：C0168 的「原地展开成 76pt 胶囊」在真机上不成立——**系统会压低 `.tabViewBottomAccessory` 的高度**，76pt 的胶囊放不进去；附属栏里再加拖动手势也和系统 tab bar / 附属栏自己的手势**冲突**。所以整套撤掉，回到弹原生 sheet 的做法。
+- 变化：
+  - 删除原地展开的整套逻辑：`voiceBarOpen`、`confirmBarDiscard` / `showVoiceSettings` 状态，`expandVoiceBar` / `collapseVoiceBar` / `raiseVoiceBar` 三个动作，展开期间盖在 TabView 内容上的透明点击层，以及那条「丢弃这段语音？」的 confirmationDialog；`VoiceMiniBar.swift` 一并删除。
+  - 附属栏保留 C0168 第 2 条的样式（主 bot 头像 24pt Circle 裁切 +「跟 <主 Bot 名> 说点什么…」17pt `.secondary`，左右 12 / 头像与文字间距 8 / 与 tab bar 对齐，inline 只留头像），点击后**直接弹原生语音 sheet**：`.presentationDetents([.height(76), .medium, .large])` 打开停在 76pt、`.presentationBackgroundInteraction(.enabled(upThrough: .height(76)))`、系统拖动指示条、`interactiveDismissDisabled(voice.hasWords)`，并立刻开始录音。小档 / 半屏 / 全屏的布局、玻璃按钮、一条线波形、v3.4 标题栏与关闭确认，全部与 C0153–C0167 已定的样式一致。
+  - 保留：C0168 第 1 条（二级页 `.toolbar(.hidden, for: .tabBar)` + 附属栏只在 tab 根页面挂载）、+ 菜单的中文翻译、C0168 第 4 条的半屏相机 3D 翻转页。
+  - sheet 盖住 tab bar 属预期行为，未做处理；sheet 关闭后 tab bar 与附属栏照常显示。
+- 文件：`apps/ios/Views/HomeSourcesView.swift`；删除 `apps/ios/Kit/Sources/CodyncUI/Voice/VoiceMiniBar.swift`。
+- 验证：`xcodebuild build -scheme 'iOS Dev' -configuration DevDebug` 通过；已装到 iPhone 16 Pro（2.36.0 / 167）并启动。按要求未自测、未截图。
+- 限制/待办：附属栏不再有原地录音态，录音一律在 sheet 里进行。
+- 关联：C0168、C0167、C0153。
