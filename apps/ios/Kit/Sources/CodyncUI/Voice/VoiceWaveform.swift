@@ -6,11 +6,11 @@ import SwiftUI
 /// follow kept here rather than a SwiftUI animation, which a per-frame timeline would fight).
 struct VoiceWaveform: View {
     let level: Float
-    /// Bars are 3pt wide, 3pt apart, 4…36pt tall.
+    /// Bars are 3pt wide, 3pt apart, 4…28pt tall — 28 being what a 72pt pill can hold.
     private static let barWidth: CGFloat = 3
     private static let gap: CGFloat = 3
     private static let minHeight: CGFloat = 4
-    private static let maxHeight: CGFloat = 36
+    private static let maxHeight: CGFloat = 28
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var follow = Follow()

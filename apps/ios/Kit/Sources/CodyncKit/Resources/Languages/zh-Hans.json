@@ -1577,5 +1577,6 @@
   "Sent to": "已发送给",
   "Microphone and speech recognition are off. Open Settings, turn them on, and try again": "麦克风和语音识别权限被拒绝了：去系统设置里打开，再试一次。",
   "The microphone is not available right now. Try again in a moment": "现在用不了麦克风，等一下再试。",
-  "This device cannot turn speech into text right now": "这台设备暂时没法把语音转成文字。"
+  "This device cannot turn speech into text right now": "这台设备暂时没法把语音转成文字。",
+  "Say something": "说点什么…"
 }

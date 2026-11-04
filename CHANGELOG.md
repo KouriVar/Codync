@@ -1433,3 +1433,20 @@
 - 验证：`xcodebuild build -scheme 'iOS Dev' -configuration DevDebug` 通过；已装到 iPhone 16 Pro（2.36.0 / 148）并启动。按要求未自测交互、未截图。
 - 限制/待办：两行文本的头部省略依赖 `truncationMode(.head)`，真机上若显示为尾部省略需要再换成自己截断；非中文语种词条未补。
 - 关联：C0148、C0149。
+### C0151 · 2026-11-04 · 语音胶囊 v2：玻璃按钮 + 提手 + 上拉半屏看转写
+
+- 原因：C0150 的三个按钮是平面纯色圆，不是玻璃；72 之外先做成了 88pt，头像、波形、按钮之间空隙不均，波形被挤得很短，跟按钮之间还空出一大块。
+- 变化：
+  - 收起态：高度 72（`VoiceCapsule.collapsed`），左右各 16、圆角全圆（半径取高度一半 36）内容左右内边距 14pt、元素垂直居中；从左到右：头像 40、波形（铺满中间，两侧各 12）、三个按钮（设置 40 / 麦克风 48 / 取消 40，间距 8）。
+  - 玻璃：胶囊本体 `.glassEffect(.regular.interactive(), in: 圆角矩形)`；三个按钮同在一个 `GlassEffectContainer` 里，各自 `.glassEffect(.regular.tint(…).interactive(), in: Circle())`——麦克风录音/待发送时 tint 用强调色、图标白色，暂停时去掉 tint；取消用 `Palette.danger.opacity(0.25)` 玻璃 + 红色 ✕。删除 C0150 加的外描边与大阴影。
+  - 兜底：`if #available(iOS 26, *)` 不成立时改用 `.ultraThinMaterial` + 0.5pt 白色描边 + 顶部高光渐变（`VoiceCapsuleGlass` / `VoiceGlass`）。
+  - 提手：胶囊顶部正中 36×5、`.secondary` 0.5、距上沿 6pt，点一下展开/收起；可点区域 96×24。
+  - 上拉：`DragGesture` 让胶囊随手指变高（松手阈值 120pt 或快速上滑吸附），下拉同样阈值收起；吸附时 `Haptics.impact()` 跟随档位；展开/收起统一 spring response 0.4 / damping 0.85。
+  - 展开态：约屏高 45% 的玻璃面板（圆角 32），顶部提手 + 头像 + 「正在听…」/主 Bot 名，中间 20 号转写全文可滚动并自动跟到最新一行（空时显示「说点什么…」占位），底部波形 + 三个按钮（与收起态同一组，`matchedGeometryEffect` 平移过去），编辑态直接在这块面板里改字，1.5 秒倒计时环仍挂在麦克风按钮外。
+  - 底栏只保留收起态的 72pt 高度（`.frame(height: collapsed, alignment: .bottom)`），面板向上溢出盖住列表，列表不会被顶上去。
+  - 展开时首页列表上方加 `Color.black.opacity(0.08)` 遮罩，点遮罩收起；胶囊消失（发送/取消）时面板状态一并复位。
+  - 波形沿用 C0150 的竖条，最高 28pt，条数按可用宽度自动计算铺满。
+- 文件：`apps/ios/Kit/Sources/CodyncUI/Voice/VoiceCapsule.swift`、`VoiceWaveform.swift`、`apps/ios/Views/HomeBottomBar.swift`、`apps/ios/Views/HomeSourcesView.swift`、`apps/ios/Views/BotListView.swift`（旧列表同步底栏签名）、`apps/ios/Kit/Sources/CodyncKit/Resources/Languages/zh-Hans.json`、`zh-Hant.json`（新增「说点什么…」）。
+- 验证：`xcodebuild build -scheme 'iOS Dev' -configuration DevDebug` 通过；已装到 iPhone 16 Pro（2.36.0 / 149）并启动。按要求未自测、未截图。
+- 限制/待办：`SpeechTranscriber`、`VoiceSession` 未改；面板溢出底栏靠父视图不裁剪实现，若真机上溢出区域点不动需要改成把面板挂到首页 overlay。
+- 关联：C0148、C0149、C0150。

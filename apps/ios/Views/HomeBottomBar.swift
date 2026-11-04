@@ -10,6 +10,10 @@ struct HomeBottomBar: View {
     let voice: VoiceSession
     /// Who the voice capsule speaks to, drawn as its avatar.
     let lead: Bot?
+    /// The capsule is pulled up into its half-screen panel.
+    @Binding var voiceExpanded: Bool
+    /// How tall that panel is: about 45% of the screen, from the home.
+    let voicePanelHeight: CGFloat
     let openVoiceSettings: () -> Void
     let openSystemSettings: () -> Void
     /// The voice button's press: the home checks there is a lead bot before opening the mic.
@@ -29,16 +33,15 @@ struct HomeBottomBar: View {
     var body: some View {
         GlassEffectContainer(spacing: 12) {
             if voice.isPresented {
-                VoiceCapsule(lead: lead, session: voice, openSettings: openVoiceSettings,
-                             openSystemSettings: openSystemSettings)
-                    .glassEffect(.regular.interactive(), in: Capsule())
+                VoiceCapsule(lead: lead, session: voice, expanded: $voiceExpanded,
+                             panelHeight: voicePanelHeight,
+                             openSettings: openVoiceSettings, openSystemSettings: openSystemSettings)
                     .glassEffectID("voice", in: glass)
-                    // A hairline of light along the top edge and a soft shadow under it: the pill has
-                    // to read as a pane floating over the list, not a hole in it.
-                    .overlay(Capsule().strokeBorder(.white.opacity(0.15), lineWidth: 1))
-                    .shadow(color: .black.opacity(0.18), radius: 18, y: 8)
                     // It grows out of the mic button it replaced, at the bar's left end.
                     .transition(.scale(scale: 0.72, anchor: .bottomLeading).combined(with: .opacity))
+                    // The bar keeps only its resting height, so a raised panel grows up over the list
+                    // instead of shoving it up.
+                    .frame(height: VoiceCapsule.collapsed, alignment: .bottom)
             } else {
                 controlRow
             }

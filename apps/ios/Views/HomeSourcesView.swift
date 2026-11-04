@@ -26,6 +26,8 @@ struct HomeSourcesView: View {
     /// The voice capsule and what it says to the lead bot.
     @State private var voice = VoiceSession()
     @State private var showVoiceSettings = false
+    /// The capsule is pulled up into its panel.
+    @State private var voiceExpanded = false
     /// The glass pill that says what was just sent.
     @State private var toast: GlassToastItem?
     @State private var openDSHSession: DSHSession?
@@ -89,6 +91,10 @@ struct HomeSourcesView: View {
                     .presentationDragIndicator(.visible)
             }
             .glassToast($toast, topPadding: 6)
+            // Sending or cancelling closes the capsule; the panel goes with it.
+            .onChange(of: voice.isPresented) { _, shown in
+                if !shown { voiceExpanded = false }
+            }
             .onAppear { voice.onSend = { sendToLeadBot($0) } }
             .navigationDestination(item: $openDSHSession) { _ in
                 DSHConversationView(gateway: dsh)
@@ -144,6 +150,8 @@ struct HomeSourcesView: View {
         .background(Palette.background)
         .ignoresSafeArea(edges: .top)
         .overlay(alignment: .top) { ProgressiveTopBlur() }
+        // The raised panel dims the list behind it; below the bar in z-order, so the pill stays lit.
+        .overlay { voiceDim }
         .safeAreaInset(edge: .bottom, spacing: 0) { bottomBar }
     }
 
@@ -158,6 +166,7 @@ struct HomeSourcesView: View {
 
     private var bottomBar: some View {
         HomeBottomBar(searchText: $searchText, voice: voice, lead: leadBot?.bot,
+                      voiceExpanded: $voiceExpanded, voicePanelHeight: voicePanelHeight,
                       openVoiceSettings: { showVoiceSettings = true },
                       openSystemSettings: { openSystemVoiceSettings() },
                       startVoice: beginVoice) {
@@ -191,6 +200,25 @@ struct HomeSourcesView: View {
         toast = GlassToastItem(icon: "check-line", text: L10n.tr("Sent to") + " " + lead.bot.name) {
             accounts.selection = lead.ref
         }
+    }
+
+    /// About 45% of the screen: the half-screen the capsule becomes when it is pulled up.
+    private var voicePanelHeight: CGFloat {
+        let screen = UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .first?.screen.bounds.height ?? 850
+        return (screen * 0.45).rounded()
+    }
+
+    private var voiceDim: some View {
+        Color.black.opacity(voiceExpanded ? 0.08 : 0)
+            .ignoresSafeArea()
+            .allowsHitTesting(voiceExpanded)
+            .onTapGesture {
+                withAnimation(Motion.reduced(.spring(response: 0.4, dampingFraction: 0.85), reduceMotion)) {
+                    voiceExpanded = false
+                }
+            }
     }
 
     private func openSystemVoiceSettings() {
