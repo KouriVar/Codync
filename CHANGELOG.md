@@ -2369,3 +2369,36 @@
     因此 `pause()` 后引擎停止与下一次 `open()` 之间靠队列 FIFO 保序，极端情况下若硬件迟迟不停，
     重新打开的等待会排在后面。
 - 关联：C0198、C0197。
+
+### C0201 · 2026-11-04 · 底部输入栏统一 48pt，会话页顶部资料按钮的头像/昵称放大
+
+- 原因：会话页 composer 与首页搜索栏是两套尺寸（44 输入框 + 36 圆钮），比视觉上该有的小一档；会话页顶部
+  资料玻璃胶囊里的头像（22）和昵称（13pt）也偏小。穗要底部统一 48、图标 24，顶部头像 24、昵称 16pt。
+- 变化（`Kit/Sources/CodyncUI/GlassButton.swift`）：`ControlMetrics.Size` 新增一档 **`bar`：side 48、
+  glyph 24**（`hitTarget` 自动为 48）。原有 icon 44 / compact 36 / large 64 / micro 24 全部保持原值，
+  顶部导航头像与「+」仍是 44/24。枚举注释同步说明 bar 用于底部输入栏。
+- 变化（`Kit/Sources/CodyncUI/Thread/Composer.swift`）：
+  - `buttonSize` → `ControlMetrics.Size.bar.side`（48，原来是 compact 36），`buttonHitSize` →
+    `ControlMetrics.Size.bar.hitTarget`（48，原来 44）——输入框与两侧按钮同高 48。
+  - 「+」`addLabel`：`GlassGlyph(size: .compact, glyphSize: 24)` → `GlassGlyph(size: .bar)`，命中框
+    `compact.hitTarget` → `bar.hitTarget`；图标取 `bar.glyph`(24)。
+  - 发送/停止/打断：原来图标 14/14/20 三个数写死，统一取 `ControlMetrics.Size.bar.glyph`(24)
+    （元组里的第三个元素因此删掉）。
+- 变化（`Kit/Sources/CodyncUI/Thread/ThreadView.swift:156-165`）：顶部资料胶囊里的头像 22 → **24**，
+  昵称 `13pt .semibold` → **`16pt .semibold`**；胶囊自身的 44 高与 14 内边距不变。
+- 变化（`Views/HomeSourcesView.swift`）：底部栏改用同一个 token——搜索框 `minHeight` 44 → `bar.hitTarget`(48)
+  （342 行）、收起态圆钮 44 → **`bar.side`(48)**（361-362 行）、圆钮图标 44→`bar.glyph`(24)（385-387 行）、
+  搜索框宽度扣减从 44 改 48（323 行，行宽仍然「搜索框 + 12 + 圆钮」= 行宽）。左右边距 16、中间间距 12、
+  上 6 / 下 28（键盘 12）全部不变，与会话页保持同一套规则。
+- 未动：语音胶囊展开后的 76 高度、内容（44 行 + 上下 16）以及整个变形动画结构——圆钮收起态从 44 变 48，
+  只是动画起点的 frame 数值跟着变，终点（行宽 × 76）与曲线、时长都不变。
+- 文件：`Kit/Sources/CodyncUI/GlassButton.swift`、`Kit/Sources/CodyncUI/Thread/Composer.swift`、
+  `Kit/Sources/CodyncUI/Thread/ThreadView.swift`、`apps/ios/Views/HomeSourcesView.swift`。
+- 验证：`xcodebuild build -project apps/Codync.xcodeproj -scheme 'iOS Dev' -configuration DevDebug`
+  （真机 destination、ui-preview 覆盖、构建号 188）**编译通过，0 error**，改动文件 0 warning；
+  `xcrun devicectl device install app` 装到 iPhone 16 Pro（`com.suiyikou.codync.uipreview` 2.36.0 / 188）成功。
+  按要求**不自测**：不跑测试、不截图、不用 CDP，尺寸与观感未实测。
+- 限制/待办：语音胶囊**展开后**内部的设置/麦克风圆钮仍是 44（`icon`），因为胶囊内容行高就是 76-16-16=44；
+  本次只按需求改了收起态与底部栏。会话页顶部胶囊宽了一点点（头像 +2、字号 +3），若在窄机型上挤压标题，
+  需要再调内边距——未实测。
+- 关联：C0197、C0198、C0200。

@@ -110,10 +110,10 @@ struct Composer: View {
     }
 
     private var fieldPadding: CGFloat { 6 }
-    /// Send/stop circle inside the 48pt capsule.
-    private var buttonSize: CGFloat { ControlMetrics.Size.compact.side }
-    /// The row height, matching the home bar's 48pt search field and circles.
-    private var buttonHitSize: CGFloat { ControlMetrics.Size.compact.hitTarget }
+    /// Send/stop circle inside the 48pt toolbar row: the bar size, like the home bar's field.
+    private var buttonSize: CGFloat { ControlMetrics.Size.bar.side }
+    /// The row height, and the tap target of the buttons on both sides of the field.
+    private var buttonHitSize: CGFloat { ControlMetrics.Size.bar.hitTarget }
 
     private var field: some View {
         HStack(alignment: .bottom, spacing: 8) {
@@ -174,10 +174,10 @@ struct Composer: View {
     private var trailingButton: some View {
         let state = trailing
         let enabled = state != .send || canSend
-        let (symbol, label, size): (String, String, CGFloat) = switch state {
-        case .interrupt: ("stop-fill", "Interrupt", 14)
-        case .stop: ("stop-fill", "Stop", 14)
-        case .send: ("arrow-up-line", "Send", 20)
+        let (symbol, label): (String, String) = switch state {
+        case .interrupt: ("stop-fill", "Interrupt")
+        case .stop: ("stop-fill", "Stop")
+        case .send: ("arrow-up-line", "Send")
         }
         let fill: Color = switch state {
         case .interrupt: Palette.danger
@@ -196,7 +196,7 @@ struct Composer: View {
             case .send: submit()
             }
         } label: {
-            RemixIcon(symbol, size: size)
+            RemixIcon(symbol, size: ControlMetrics.Size.bar.glyph)
                 .contentTransition(.opacity)
                 .foregroundStyle(ink)
                 .frame(width: buttonSize, height: buttonSize)
@@ -269,8 +269,8 @@ struct Composer: View {
     }
 
     private var addLabel: some View {
-        GlassGlyph(glyph: .remix("add-line"), size: .compact, glyphSize: 24, ink: Palette.text)
-            .frame(width: ControlMetrics.Size.compact.hitTarget, height: ControlMetrics.Size.compact.hitTarget)
+        GlassGlyph(glyph: .remix("add-line"), size: .bar, ink: Palette.text)
+            .frame(width: ControlMetrics.Size.bar.hitTarget, height: ControlMetrics.Size.bar.hitTarget)
             .contentShape(Circle())
     }
 

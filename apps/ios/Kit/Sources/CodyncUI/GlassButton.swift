@@ -4,10 +4,12 @@ import SwiftUI
 /// Every round control's geometry, in one place: four sizes, one shape, three press depths.
 /// Change a number here and every button in the app follows.
 public enum ControlMetrics {
-    /// The four circle sizes. `icon` is the toolbar/list default, `compact` the input-row and
-    /// floating-overlay one, `micro` the little remove badges, `large` only the camera shutters.
+    /// The five circle sizes. `icon` is the toolbar/list default, `compact` the floating overlays and
+    /// the small circles, `bar` the bottom input bars (the conversation's composer and the home's
+    /// search field with its voice button), `micro` the little remove badges, `large` only the camera
+    /// shutters.
     public enum Size: CaseIterable, Sendable {
-        case micro, compact, icon, large
+        case micro, compact, icon, bar, large
 
         /// The circle's diameter.
         public var side: CGFloat {
@@ -15,6 +17,7 @@ public enum ControlMetrics {
             case .micro: 24
             case .compact: 36
             case .icon: 44
+            case .bar: 48
             case .large: 64
             }
         }
@@ -25,6 +28,7 @@ public enum ControlMetrics {
             case .micro: 14
             case .compact: 18
             case .icon: 24
+            case .bar: 24
             case .large: 26
             }
         }

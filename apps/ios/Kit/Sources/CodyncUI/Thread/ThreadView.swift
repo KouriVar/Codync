@@ -158,11 +158,11 @@ public struct ThreadView: View {
     var title: some View {
         HStack(spacing: 7) {
             if let bot {
-                let size: CGFloat = 22
+                let size: CGFloat = 24
                 if bot.isGroup { GroupAvatar(members: model.members(of: bot), size: size) } else { CharacterAvatar(bot: bot, size: size) }
             }
             Text(bot?.name ?? "")
-                .font(.system(size: 13, weight: .semibold))
+                .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(Palette.text)
                 .lineLimit(1)
         }

@@ -320,7 +320,7 @@ struct HomeSourcesView: View {
     /// row has been measured the field keeps its natural, flexible width.
     private var searchWidth: CGFloat? {
         guard barWidth > 0 else { return nil }
-        return voiceOpen ? 0 : max(0, barWidth - ControlMetrics.Size.icon.side - 12)
+        return voiceOpen ? 0 : max(0, barWidth - ControlMetrics.Size.bar.side - 12)
     }
 
     /// The search field in place: `.searchable` used to push a separate page, and this one stays on
@@ -337,9 +337,9 @@ struct HomeSourcesView: View {
                 .focused($searchFocused)
         }
         .font(.body)
-        // The composer's own insets: 14pt inside the capsule, and the row it draws against.
+        // The composer's own insets: 14pt inside the capsule, and the 48pt row it draws against.
         .padding(.horizontal, 14)
-        .frame(minHeight: ControlMetrics.Size.compact.hitTarget)
+        .frame(minHeight: ControlMetrics.Size.bar.hitTarget)
         // The composer's box, corner for corner.
         .glass(in: RoundedRectangle(cornerRadius: 24, style: .continuous), interactive: true)
         .contentShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
@@ -358,8 +358,8 @@ struct HomeSourcesView: View {
                 circleGlyphs
             }
         }
-        .frame(width: voiceOpen ? (barWidth > 0 ? barWidth : nil) : ControlMetrics.Size.icon.side,
-               height: voiceOpen ? VoicePill.height : ControlMetrics.Size.icon.side)
+        .frame(width: voiceOpen ? (barWidth > 0 ? barWidth : nil) : ControlMetrics.Size.bar.side,
+               height: voiceOpen ? VoicePill.height : ControlMetrics.Size.bar.side)
         .clipShape(Capsule())
         .glass(in: Capsule(), interactive: !voiceOpen)
         .contentShape(Capsule())
@@ -377,14 +377,14 @@ struct HomeSourcesView: View {
         .animation(Motion.reduced(Motion.fade, reduceMotion), value: searchFocused)
     }
 
-    /// One 24pt glyph in the circle the slot draws: `GlassButton`'s own composition, with the glass
+    /// One glyph in the 48pt circle the slot draws: `GlassButton`'s own composition, with the glass
     /// lifted to the slot so the shape can grow out of it.
     private func slotGlyph(_ title: String, glyph: String, shown: Bool,
                            action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            RemixIcon(glyph, size: ControlMetrics.Size.icon.glyph)
+            RemixIcon(glyph, size: ControlMetrics.Size.bar.glyph)
                 .foregroundStyle(Palette.text)
-                .frame(width: ControlMetrics.Size.icon.side, height: ControlMetrics.Size.icon.side)
+                .frame(width: ControlMetrics.Size.bar.side, height: ControlMetrics.Size.bar.side)
                 .contentShape(Circle())
         }
         .buttonStyle(PressScale())
