@@ -51,8 +51,9 @@ struct ChatTranscriptList: View {
     var refresh: (() async -> Void)?
 
     var body: some View {
+        // The collection view asks iOS 26 for its own soft top edge effect (`ConversationList`), so
+        // nothing is drawn on top of it.
         ConversationList(rows: rows, following: $following, nearTop: nearTop, refresh: refresh)
-            .overlay(alignment: .top) { ProgressiveTopBlur() }
     }
 }
 
@@ -168,49 +169,5 @@ private struct TurnSummaryRow: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(summary.title)
-    }
-}
-
-/// A gradient-faded material at the top edge: the "progressive blur" the roster had, drawn by us
-/// because the chat list is a UIKit view and the home's list reaches under the bar.
-///
-/// The material follows the colour scheme — a thin material over white washes out, so dark mode gets
-/// a thicker one — and a systemBackground gradient sits on top of it, which is what makes the edge
-/// fade into the bar instead of cutting off at a grey band.
-public struct ProgressiveTopBlur: View {
-    let height: CGFloat
-    @Environment(\.colorScheme) private var colorScheme
-
-    public init(height: CGFloat = 110) {
-        self.height = height
-    }
-
-    private var material: Material {
-        colorScheme == .dark ? .thickMaterial : .ultraThinMaterial
-    }
-
-    /// The page's own colour at the very top, thinning out as the blur takes over. The same 0.85 in
-    /// both schemes: it is what keeps the material from reading as a grey mist rather than the page.
-    private var tint: Color {
-        Color(uiColor: .systemBackground).opacity(0.85)
-    }
-
-    public var body: some View {
-        ZStack(alignment: .top) {
-            Rectangle()
-                .fill(material)
-                .mask {
-                    LinearGradient(stops: [
-                        .init(color: .black, location: 0),
-                        .init(color: .black, location: 0.6),
-                        .init(color: .clear, location: 1),
-                    ], startPoint: .top, endPoint: .bottom)
-                }
-            LinearGradient(colors: [tint, tint.opacity(0)], startPoint: .top, endPoint: .bottom)
-        }
-        .frame(height: height)
-        .frame(maxHeight: .infinity, alignment: .top)
-        .ignoresSafeArea(edges: .top)
-        .allowsHitTesting(false)
     }
 }

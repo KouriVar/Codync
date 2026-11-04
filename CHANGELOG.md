@@ -1578,3 +1578,40 @@
 - 验证：`xcodebuild build -scheme 'iOS Dev' -configuration DevDebug` 通过；已装到 iPhone 16 Pro（2.36.0 / 158）并启动。按要求未自测、未截图。
 - 限制/待办：模糊高度沿用 110pt 常量，换机型如觉得覆盖不够可调 `ProgressiveTopBlur(height:)`。
 - 关联：C0159。
+### C0161 · 2026-11-04 · 首页/聊天页顶部模糊改回系统原生（附排查清单）
+
+- 原因：首页顶部这一块前后补丁叠了十几轮（自绘模糊、隐藏导航栏背景、手算顶部内边距、忽略安全区），互相打架。这次先把所有相关代码列清楚，再统一交还给系统。
+- 排查清单（行号按改动前的 C0160 版本）：
+
+  | 文件:行 | 代码 | 作用 | 处置 |
+  |---|---|---|---|
+  | `HomeSourcesView.swift:156` | `.navigationTitle("")` | 不显示标题文字 | 留 |
+  | `HomeSourcesView.swift:157` | `.navigationBarTitleDisplayMode(.inline)` | 内联标题栏 | 留 |
+  | `HomeSourcesView.swift:158` | `.toolbar(.visible, for: .navigationBar)` | 强行让导航栏可见 | **删**（系统默认） |
+  | `HomeSourcesView.swift:160` | `.toolbarBackground(.hidden, for: .navigationBar)` | 让导航栏背景透明，给自绘模糊让位 | **删** |
+  | `HomeSourcesView.swift:161` | `.toolbar { toolbarContent }` | 头像 + 「+」两个工具栏项 | 留（项本身已是标准 ToolbarItem） |
+  | `HomeSourcesView.swift:178` | `.plainRosterList(topInset:)` | 列表样式集合 | 留，但去掉里面的顶部内边距 |
+  | `HomeSourcesView.swift:702-708` | `plainRosterList` 实现 | `.listStyle(.plain)`、`scrollContentBackground(.hidden)`、`defaultMinListRowHeight`、`scrollDismissesKeyboard` | 留 |
+  | `HomeSourcesView.swift:704` | `.contentMargins(.top, topInset + 12, …)` | 手算顶部内边距，绕过导航栏 | **删** |
+  | `HomeSourcesView.swift:179` | `.background(Palette.background)` | 页面底色 | 留 |
+  | `HomeSourcesView.swift:180` | `.ignoresSafeArea(edges: .top)` | 让列表钻到导航栏下面（为自绘模糊服务） | **删** |
+  | `HomeSourcesView.swift:183` | `.overlay(alignment: .top) { ProgressiveTopBlur() }` | 自绘顶部模糊 | **删**，换成 `.scrollEdgeEffectStyle(.soft, for: .top)` |
+  | `HomeSourcesView.swift:184` | `.safeAreaInset(edge: .bottom) { bottomBar }` | 底部搜索/相机/麦克风栏 | 留 |
+  | `HomeSourcesView.swift:226-231` | `topBarInset` | 状态栏 + 44pt 的手算高度，只为上面的 `contentMargins` 服务 | **删** |
+  | `HomeSourcesView.swift:289-292` | iOS 27 分支 + `.contentMarginsRemoved()` | 去掉头像在工具栏里的默认边距 | **删**（改成一个标准 ToolbarItem） |
+  | `HomeSourcesView.swift:294` | `ToolbarItem(.topBarTrailing) { newBotMenu }` | 「+」 | 留 |
+  | `ChatTranscript.swift:55` | `.overlay(alignment: .top) { ProgressiveTopBlur() }` | 聊天页同样的自绘模糊 | **删**（`ConversationList` 已设 `topEdgeEffect.style = .soft`） |
+  | `ChatTranscript.swift:180` 起 | `ProgressiveTopBlur` 结构体 | 自绘模糊本体（材质 + 渐变蒙版） | **删**（整个结构体） |
+  | `ConversationList.swift:106` | `view.topEdgeEffect.style = .soft` | 聊天页真正的系统软边效果 | 留 |
+  | `CodyncApp.swift` / `AppDelegate` | 无 `UINavigationBarAppearance` | 全局外观没有被改过 | 无需改 |
+  | 全仓 | 无 `TabView(.page)`、无横向分页、无胶囊筛选残留 | C0159/C0160 已清掉 | 无需改 |
+  | `CodyncApp.swift` | `AppearanceWindow(appearance:)`（用户设置的外观） | 全局深浅色 | 留（与本问题无关） |
+
+- 变化：
+  - 首页：删掉自绘模糊、额外材质与渐变、`.ignoresSafeArea(edges: .top)`、手算 `contentMargins(.top)` 与 `topBarInset`，以及强制的 `toolbar(.visible)` / `toolbarBackground(.hidden)`；列表改加 `.scrollEdgeEffectStyle(.soft, for: .top)`，顶部渐隐、深浅色适配全部交给系统；工具栏只留两个标准 ToolbarItem（头像、+），去掉 iOS 27 的 `contentMarginsRemoved()` 分支。
+  - 聊天页：删掉 `ProgressiveTopBlur` 覆盖层（其集合视图本来就设了 `topEdgeEffect.style = .soft`），`ProgressiveTopBlur` 结构体整体删除。
+  - 首页仍是固定单页列表：不恢复分页、不加胶囊筛选，列表内容与顺序不变；设置里的三个来源开关、长按菜单、DSH 二级页、来源角标未动。
+- 文件：`apps/ios/Views/HomeSourcesView.swift`、`apps/ios/Kit/Sources/CodyncUI/Thread/ChatTranscript.swift`。
+- 验证：`xcodebuild build -scheme 'iOS Dev' -configuration DevDebug` 通过；已装到 iPhone 16 Pro（2.36.0 / 159）并启动。按要求未自测、未截图。
+- 限制/待办：顶部效果完全由系统决定，若系统行为不如预期只能调整内容内边距，不再自绘。
+- 关联：C0156、C0159、C0160。

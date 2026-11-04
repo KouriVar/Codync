@@ -155,9 +155,8 @@ struct HomeSourcesView: View {
         baseView
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar(.visible, for: .navigationBar)
-            // Let the list and the top fade reach under the bar.
-            .toolbarBackground(.hidden, for: .navigationBar)
+            // The bar's background, its scroll behaviour and the fade under it are the system's
+            // business now: nothing here overrides them.
             .toolbar { toolbarContent }
     }
 
@@ -175,12 +174,11 @@ struct HomeSourcesView: View {
                 entryRow(entry)
             }
         }
-        .plainRosterList(topInset: topBarInset)
+        .plainRosterList()
+        // iOS 26's own soft fade at the top edge, in both colour schemes: the list, the bar and the
+        // blur under it are all the system's.
+        .scrollEdgeEffectStyle(.soft, for: .top)
         .background(Palette.background)
-        .ignoresSafeArea(edges: .top)
-        // The chat page's fade: what scrolls under the bar is blurred away, while the avatar and the
-        // "+" stay crisp above it.
-        .overlay(alignment: .top) { ProgressiveTopBlur() }
         .safeAreaInset(edge: .bottom, spacing: 0) { bottomBar }
     }
 
@@ -219,15 +217,6 @@ struct HomeSourcesView: View {
             .frame(maxWidth: .infinity)
             .padding(.vertical, 40)
             .rosterRow()
-    }
-
-    /// Status bar + inline navigation bar height: the list scrolls under the bar, but its first
-    /// row still starts below the avatar and the "+".
-    private var topBarInset: CGFloat {
-        let status = UIApplication.shared.connectedScenes
-            .compactMap { $0 as? UIWindowScene }
-            .first?.windows.first(where: \.isKeyWindow)?.safeAreaInsets.top ?? 0
-        return status + 44
     }
 
     private var bottomBar: some View {
@@ -283,14 +272,7 @@ struct HomeSourcesView: View {
     }
 
     @ToolbarContentBuilder private var toolbarContent: some ToolbarContent {
-        // iOS 27 can keep the native glass rim without the default icon-sized inset around a
-        // photo; without this the avatar is stretched inside the bar's capsule.
-        if #available(iOS 27.0, *) {
-            ToolbarItem(placement: .topBarLeading) { AccountSwitcherButton(avatarSize: 36) }
-                .contentMarginsRemoved()
-        } else {
-            ToolbarItem(placement: .topBarLeading) { AccountSwitcherButton(avatarSize: 36) }
-        }
+        ToolbarItem(placement: .topBarLeading) { AccountSwitcherButton(avatarSize: 36) }
         ToolbarItem(placement: .topBarTrailing) { newBotMenu }
     }
 
@@ -699,9 +681,8 @@ private extension View {
     }
 
     /// The shared plain-list styling the roster used.
-    func plainRosterList(topInset: CGFloat) -> some View {
+    func plainRosterList() -> some View {
         listStyle(.plain)
-            .contentMargins(.top, topInset + 12, for: .scrollContent)
             .scrollContentBackground(.hidden)
             .environment(\.defaultMinListRowHeight, 0)
             .scrollDismissesKeyboard(.interactively)
