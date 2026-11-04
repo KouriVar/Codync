@@ -1177,3 +1177,13 @@
 - 限制/待办：ControlGroup 的系统样式在不同 iOS 版本可能略有差异，未截图核对。
 - 关联：C0127。
 
+### C0132 · 2026-11-04 · 首页顶部渐进模糊被导航栏背景盖住
+
+- 原因：首页顶部不是从上往下渐隐，像被裁掉。
+- 根因：`ProgressiveTopBlur` 是 `.overlay(alignment: .top)` 挂在 `chromeView`（`NavigationStack` 的内容层），位于导航栏**下面**。`.ignoresSafeArea(edges: .top)` 只能让绘制伸进安全区，而 iOS 27 的导航栏默认 `.automatic` 背景（整块材质/不透明）画在内容之上，把渐变的上半段盖住，于是在栏底出现一条硬边，看起来像被裁。已排除：`TabView(.page)`（overlay 在它外面，不经过分页容器）、safeArea（已忽略）、`scrollEdgeEffect`（上一版已移除）、toolbarBackground（上一版已移除）。
+- 变化：首页导航栏改为 `.toolbarBackground(.hidden, for: .navigationBar)`，让栏透明：overlay 和列表都能透到栏下，导航栏按钮仍在上层且清晰；`ProgressiveTopBlur` 的方向/高度不变；聊天页的模糊没有动。
+- 文件：`apps/ios/Views/HomeSourcesView.swift`。
+- 验证：按要求本轮只验证编译通过（DevDebug 真机构建）。
+- 限制/待办：未截图；若栏底仍有硬边，下一步把 overlay 提到 `NavigationStack` 外层（覆盖导航栏层）。
+- 关联：C0128。
+

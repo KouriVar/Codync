@@ -107,6 +107,9 @@ struct HomeSourcesView: View {
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar(.visible, for: .navigationBar)
+            // The overlay lives under the bar; an automatic bar background would cover the top of
+            // the gradient. A transparent bar lets the blur (and the list) show through.
+            .toolbarBackground(.hidden, for: .navigationBar)
             .toolbar { toolbarContent }
             // A real progressive blur at the top: the paged container clips the system
             // scrollEdgeEffect, so fade a material in from the top ourselves.
