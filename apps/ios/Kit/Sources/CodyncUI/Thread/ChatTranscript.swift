@@ -52,8 +52,7 @@ struct ChatTranscriptList: View {
 
     var body: some View {
         ConversationList(rows: rows, following: $following, nearTop: nearTop, refresh: refresh)
-            // The original progressive blur at the top edge, like the roster had.
-            .scrollEdgeEffectStyle(.soft, for: .top)
+            .overlay(alignment: .top) { ProgressiveTopBlur() }
     }
 }
 
@@ -169,5 +168,31 @@ private struct TurnSummaryRow: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(summary.title)
+    }
+}
+
+/// A gradient-faded material at the top edge: the "progressive blur" the roster had, drawn by us
+/// because a paged container clips the system scroll-edge effect and the chat list is a UIKit view.
+public struct ProgressiveTopBlur: View {
+    let height: CGFloat
+
+    public init(height: CGFloat = 110) {
+        self.height = height
+    }
+
+    public var body: some View {
+        Rectangle()
+            .fill(.ultraThinMaterial)
+            .mask {
+                LinearGradient(stops: [
+                    .init(color: .black, location: 0),
+                    .init(color: .black, location: 0.6),
+                    .init(color: .clear, location: 1),
+                ], startPoint: .top, endPoint: .bottom)
+            }
+            .frame(height: height)
+            .frame(maxHeight: .infinity, alignment: .top)
+            .ignoresSafeArea(edges: .top)
+            .allowsHitTesting(false)
     }
 }

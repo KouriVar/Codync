@@ -97,6 +97,9 @@ struct HomeSourcesView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar(.visible, for: .navigationBar)
             .toolbar { toolbarContent }
+            // A real progressive blur at the top: the paged container clips the system
+            // scrollEdgeEffect, so fade a material in from the top ourselves.
+            .overlay(alignment: .top) { ProgressiveTopBlur() }
     }
 
     private var baseView: some View {
@@ -106,8 +109,8 @@ struct HomeSourcesView: View {
                 sourcePage(source).tag(index + 1)
             }
         }
-        // Native page control dots, with the pinned page always first.
-        .tabViewStyle(.page(indexDisplayMode: .always))
+        // Swipe between pages; no page control dots.
+        .tabViewStyle(.page(indexDisplayMode: .never))
         .background(Palette.background)
         .safeAreaInset(edge: .bottom, spacing: 0) { bottomBar }
     }
@@ -163,8 +166,6 @@ struct HomeSourcesView: View {
             }
         }
         .plainRosterList()
-        // The original progressive blur at the top edge (not a solid material block).
-        .scrollEdgeEffectStyle(.soft, for: .top)
     }
 
     private func sourcePage(_ source: HomeSource) -> some View {
@@ -186,7 +187,6 @@ struct HomeSourcesView: View {
             }
         }
         .plainRosterList()
-        .scrollEdgeEffectStyle(.soft, for: .top)
     }
 
     private var pinnedEmptyState: some View {

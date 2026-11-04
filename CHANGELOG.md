@@ -1118,3 +1118,16 @@
 - 限制/待办：长按卡片的视觉（34 圆角、卡片宽度）沿用 BotMenuPreview，未截图核对。
 - 关联：C0125。
 
+### C0128 · 2026-11-04 · 去掉分页圆点，恢复顶部渐进模糊
+
+- 原因：页面上方的原生圆点要去掉；`.scrollEdgeEffectStyle(.soft)` 在现在的结构里被裁掉，看不到渐隐。
+- 排查：裁切来自 `TabView(.page)` 的分页容器——每一页被裁剪在自己的 bounds 内，页内 `List` 的滚动边缘效果也被一起裁掉；聊天页底层是 UIKit 集合视图，SwiftUI 的滚动边缘效果对它不生效；`toolbarBackground` 已移除，不是它盖的。
+- 变化：
+  - `TabView` 改为 `.page(indexDisplayMode: .never)`：保留左右滑动，去掉圆点；页序仍是 置顶、Coe、DS Bot、DSH。
+  - 新增 `ProgressiveTopBlur`（`CodyncUI/Thread/ChatTranscript.swift`）：`ultraThinMaterial` 按垂直渐变蒙版，从上往下渐隐，`ignoresSafeArea(.top)` 盖住状态栏/导航栏下方。
+  - 首页 `chromeView` 和聊天页共用的 `ChatTranscriptList` 各叠一层；去掉各 `List` 上的 `scrollEdgeEffectStyle`；sheet 里的 `.softScrollEdges()` 保持不变。
+- 文件：`apps/ios/Views/HomeSourcesView.swift`、`apps/ios/Kit/Sources/CodyncUI/Thread/ChatTranscript.swift`。
+- 验证：按要求本轮只验证编译通过（DevDebug 真机构建）。
+- 限制/待办：模糊高度暂定 110pt，真机可再调。
+- 关联：C0126。
+
