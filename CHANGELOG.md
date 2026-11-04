@@ -1519,3 +1519,13 @@
 - 验证：`xcodebuild build -scheme 'iOS Dev' -configuration DevDebug` 通过；已装到 iPhone 16 Pro（2.36.0 / 153）并启动。按要求未自测、未截图。
 - 限制/待办：`.large` 仍复用半屏布局（二期连续通话）；「丢弃」确认依赖 sheet 内下拉手势 + 系统下拉禁用，若真机上从文字区下拉没弹确认，需要改成按钮触发。
 - 关联：C0151、C0152、C0153、C0154。
+### C0156 · 2026-11-04 · 语音波形两端圆角、半屏标题栏上边距改 16
+
+- 原因：真机看波形线的两端是方的（不是圆头）；半屏 sheet 里头像和名字贴着顶部太紧。
+- 变化：
+  - 波形：`VoiceWaveform` 的轨迹、移动段和波浪都从 2pt（半个线宽）内缩起画——之前起点落在 `x = 0`，圆头的一半被 Canvas 边界裁掉，看上去就成了方角；移动段的活动范围也扣掉这段内缩，两端仍是完整圆头。波浪按 `x` 取值的取样收进一个局部函数，逻辑不变。
+  - 半屏/全屏标题栏：内容顶部内边距 8 → 16，头像与名字往下让出 16pt（系统提手额外占用自己的空间不变）。
+- 文件：`apps/ios/Kit/Sources/CodyncUI/Voice/VoiceWaveform.swift`、`VoiceSheetView.swift`。
+- 验证：`xcodebuild build -scheme 'iOS Dev' -configuration DevDebug` 通过；已装到 iPhone 16 Pro（2.36.0 / 154）并启动。按要求未自测、未截图。
+- 限制/待办：无。
+- 关联：C0154、C0155。

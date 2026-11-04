@@ -47,20 +47,26 @@ struct VoiceWaveform: View {
         let middle = size.height / 2
 
         // The quiet track and its travelling band: they fade as the wave takes over.
+        // The caps are half a line thick, so the ends are pulled in by that much: a round cap drawn
+        // at x = 0 would be cut in half by the canvas edge and read as a square end.
+        let inset = Self.thickness / 2
+        let left = inset
+        let right = size.width - inset
+
         let calm = 1 - voice
         if calm > 0.01 {
             var track = Path()
-            track.move(to: CGPoint(x: 0, y: middle))
-            track.addLine(to: CGPoint(x: size.width, y: middle))
+            track.move(to: CGPoint(x: left, y: middle))
+            track.addLine(to: CGPoint(x: right, y: middle))
             canvas.stroke(track, with: .color(.primary.opacity(0.25 * calm * alpha)),
                           style: StrokeStyle(lineWidth: Self.thickness, lineCap: .round))
 
-            let band = size.width * 0.15
-            let travel = size.width - band
+            let band = min(right - left, size.width * 0.15)
+            let travel = max(0, right - left - band)
             // easeInOut there and back, one crossing every 1.2s.
             let phase = (time.truncatingRemainder(dividingBy: Self.bandTravel * 2)) / Self.bandTravel
             let eased = phase < 1 ? Self.easeInOut(phase) : 1 - Self.easeInOut(phase - 1)
-            let start = travel * CGFloat(eased)
+            let start = left + travel * CGFloat(eased)
             var bandPath = Path()
             bandPath.move(to: CGPoint(x: start, y: middle))
             bandPath.addLine(to: CGPoint(x: start + band, y: middle))
@@ -72,19 +78,20 @@ struct VoiceWaveform: View {
         // through the same shape.
         let swing = Self.amplitude * CGFloat(voice * loudness)
         if voice > 0.01 {
+            // The envelope uses the full width so the ends land at zero, but the line keeps half a
+            // thickness clear of each edge so its round caps are whole.
+            func wave(at x: CGFloat) -> CGFloat {
+                let envelope = sin(.pi * x / size.width)
+                let phase = 2 * .pi * Double(x) / Double(Self.wavelength) - 2 * .pi * time / Self.secondsPerWavelength
+                return middle + swing * envelope * CGFloat(sin(phase))
+            }
             var path = Path()
             let step: CGFloat = 2
-            var x: CGFloat = 0
-            while x <= size.width {
-                let envelope = sin(.pi * x / size.width)
-                let phase = 2 * .pi * (Double(x) / Double(Self.wavelength)) - 2 * .pi * time / Self.secondsPerWavelength
-                let y = middle + swing * envelope * CGFloat(sin(phase))
-                if x == 0 {
-                    path.move(to: CGPoint(x: x, y: y))
-                } else {
-                    path.addLine(to: CGPoint(x: x, y: y))
-                }
-                x += step
+            var x = left
+            path.move(to: CGPoint(x: x, y: wave(at: x)))
+            while x < right {
+                x = min(right, x + step)
+                path.addLine(to: CGPoint(x: x, y: wave(at: x)))
             }
             canvas.stroke(path, with: .color(.primary.opacity(voice * alpha)),
                           style: StrokeStyle(lineWidth: Self.thickness, lineCap: .round, lineJoin: .round))

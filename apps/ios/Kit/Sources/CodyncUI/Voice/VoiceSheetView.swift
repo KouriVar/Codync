@@ -114,7 +114,8 @@ public struct VoiceSheetView: View {
             }
         }
         .padding(.horizontal, 16)
-        .padding(.top, 8)
+        // 16pt of air above the avatar and the bot's name, on top of the grabber's own inset.
+        .padding(.top, 16)
         .padding(.bottom, 16)
     }
 
