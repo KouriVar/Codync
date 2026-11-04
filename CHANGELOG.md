@@ -1162,3 +1162,18 @@
 - 限制/待办：若日志显示为隧道层断开（domain 为 NSURLErrorDomain、code 1006/57 等），需要你在 Cloudflare/网络侧处理；本轮未重启任何服务。
 - 关联：C0124、C0129。
 
+### C0131 · 2026-11-04 · 首页头像内缩 4pt；长按菜单改成系统快捷图标 + 分行
+
+- 原因：头像内图偏大；长按菜单项过少、排版不像系统菜单。
+- 变化：
+  - `AccountSwitcherButton` 增加 `avatarSize` 参数（默认 40）；首页传 36，外层按钮/圆框仍是 44pt，内图继续 `scaledToFill` + `Circle` 居中裁切。
+  - 长按菜单顶部用 `ControlGroup` 放一枚横排的图标快捷键：置顶/取消置顶、标为未读/标为已读、编辑（编辑资料/编辑群统一叫「编辑」）。
+  - 分隔线后按常用度排：钉在首页/从首页移除、新建分组、移到分组、分享为模板、设为主 Bot、复制 ID、更多；「隐藏」「删除」收进「更多」，避免误点。
+  - DSH 行只显示它支持的项：钉在首页/从首页移除、复制 ID（没有快捷图标行，也没有「更多」）。
+  - 预览卡片与 34 圆角保持 C0127 的实现不变。
+  - `MenuItem.swift` 新增 `QuickAction` 与 `contextActions(quick:preview:_:)`。
+- 文件：`apps/ios/Kit/Sources/CodyncUI/MenuItem.swift`、`apps/ios/Views/AccountSwitcherView.swift`、`apps/ios/Views/HomeSourcesView.swift`。
+- 验证：按要求本轮只验证编译通过（DevDebug 真机构建）。
+- 限制/待办：ControlGroup 的系统样式在不同 iOS 版本可能略有差异，未截图核对。
+- 关联：C0127。
+

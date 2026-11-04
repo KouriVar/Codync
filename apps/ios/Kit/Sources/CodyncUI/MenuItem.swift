@@ -162,6 +162,47 @@ public struct DropdownMenu<Label: View>: View {
     }
 }
 
+/// One of the icon-only shortcut buttons a long-press menu shows in a row above its rows
+/// (the system's Cut/Copy/Paste strip).
+public struct QuickAction: Identifiable {
+    public let id = UUID()
+    public let title: String
+    public let icon: String
+    public let action: () -> Void
+
+    public init(_ title: String, icon: String, action: @escaping () -> Void) {
+        self.title = title
+        self.icon = icon
+        self.action = action
+    }
+}
+
+public extension View {
+    /// A context menu with a row of icon-only quick actions on top, a divider, then the rows.
+    func contextActions<Preview: View>(quick: [QuickAction], @ViewBuilder preview: () -> Preview,
+                                       _ items: @escaping () -> [MenuItem]) -> some View {
+        contextMenu {
+            if !quick.isEmpty {
+                ControlGroup {
+                    ForEach(quick) { action in
+                        Button(action: action.action) {
+                            MenuGlyph(symbol: action.icon, destructive: false)
+                        }
+                        .accessibilityLabel(action.title)
+                    }
+                }
+                Divider()
+            }
+            ForEach(items()) { item in
+                if item.divider { Divider() }
+                systemMenuRow(item)
+            }
+        } preview: {
+            preview()
+        }
+    }
+}
+
 /// A menu row's icon: Remix when we have a mapping, otherwise the SF Symbol.
 private struct MenuGlyph: View {
     let symbol: String

@@ -145,10 +145,10 @@ struct HomeSourcesView: View {
         // iOS 27 can keep the native glass rim without the default icon-sized inset around a
         // photo; without this the avatar is stretched inside the bar's capsule.
         if #available(iOS 27.0, *) {
-            ToolbarItem(placement: .topBarLeading) { AccountSwitcherButton() }
+            ToolbarItem(placement: .topBarLeading) { AccountSwitcherButton(avatarSize: 36) }
                 .contentMarginsRemoved()
         } else {
-            ToolbarItem(placement: .topBarLeading) { AccountSwitcherButton() }
+            ToolbarItem(placement: .topBarLeading) { AccountSwitcherButton(avatarSize: 36) }
         }
         ToolbarItem(placement: .topBarTrailing) { newBotMenu }
     }
@@ -335,7 +335,8 @@ struct HomeSourcesView: View {
             .contentShape(Rectangle())
             .onTapGesture { accounts.selection = item.ref }
             .contentShape(.contextMenuPreview, RoundedRectangle(cornerRadius: 34, style: .continuous))
-            .contextActions(preview: { BotMenuPreview(bot: item.bot).environment(store) }) {
+            .contextActions(quick: quickActions(item, store: store),
+                            preview: { BotMenuPreview(bot: item.bot).environment(store) }) {
                 botMenuItems(item, store: store)
             }
             .rosterRow()
@@ -399,73 +400,82 @@ struct HomeSourcesView: View {
         manualUnreadData = marks.data
     }
 
-    /// The long-press menu, restored to the roster's set; copy/pin/edit live in "More".
-    private func botMenuItems(_ item: RosterItem, store: BotStore) -> [MenuItem] {
+    /// The three icon-only shortcuts on top: pin, read/unread, edit.
+    private func quickActions(_ item: RosterItem, store: BotStore) -> [QuickAction] {
         let bot = item.bot
         let unread = bot.unread > 0 || manuallyUnread(item)
-        var items = [MenuItem(unread ? "Mark as read" : "Mark as unread",
-                              icon: unread ? "mail-open-line" : "mail-unread-line") {
-            setManuallyUnread(!unread, item: item)
-            if unread { store.markAllRead(bot.id) }
-        }, MenuItem(bot.pinned ? "Unpin" : "Pin", icon: bot.pinned ? "unpin-line" : "pushpin-2-line") {
-            store.setPinned(bot, !bot.pinned)
-        }]
+        return [
+            QuickAction(bot.pinned ? "取消置顶" : "置顶",
+                        icon: bot.pinned ? "unpin-line" : "pushpin-2-line") {
+                store.setPinned(bot, !bot.pinned)
+            },
+            QuickAction(unread ? "标为已读" : "标为未读",
+                        icon: unread ? "mail-open-line" : "mail-unread-line") {
+                setManuallyUnread(!unread, item: item)
+                if unread { store.markAllRead(bot.id) }
+            },
+            QuickAction("编辑", icon: "edit-line") {
+                if bot.isGroup {
+                    editingGroup = GroupTarget(computerId: item.ref.computerId, group: bot)
+                } else {
+                    editing = EditTarget(computerId: item.ref.computerId, draft: BotDraft(bot))
+                }
+            },
+        ]
+    }
+
+    /// The rest of the menu, by how often it is used. Delete/hide sit under "更多" so they are
+    /// hard to hit by accident.
+    private func botMenuItems(_ item: RosterItem, store: BotStore) -> [MenuItem] {
+        let bot = item.bot
+        var items = [pinMenuItem(HomeSource.of(bot: bot), bot.id)]
         if store.supportsSections {
-            items.append(MenuItem("New section", icon: "folder-add-line") {
-                naming = SectionNaming(title: "New section", name: "") { store.setSection(bot, to: $0) }
+            items.append(MenuItem("新建分组", icon: "folder-add-line") {
+                naming = SectionNaming(title: "新建分组", name: "") { store.setSection(bot, to: $0) }
             })
+            items.append(sectionMenu(bot, store: store))
         }
-        items.append(MenuItem("Share as template", icon: "share-forward-line") {
+        items.append(MenuItem("分享为模板", icon: "share-forward-line") {
             sharingTemplate = EditTarget(computerId: item.ref.computerId, draft: BotDraft(bot))
         })
-
-        var more = [MenuItem("Copy ID", icon: "file-copy-line") { UIPasteboard.general.string = bot.id },
-                    pinMenuItem(HomeSource.of(bot: bot), bot.id)]
-        more.append(bot.isGroup
-            ? MenuItem("Edit group", icon: "group-line") {
-                editingGroup = GroupTarget(computerId: item.ref.computerId, group: bot)
-            }
-            : MenuItem("Edit profile", icon: "edit-line") {
-                editing = EditTarget(computerId: item.ref.computerId, draft: BotDraft(bot))
-            })
-        if store.supportsSections { more.append(sectionMenu(bot, store: store)) }
         if !bot.lead && !bot.isGroup && store.supportsLeadChoice {
-            more.append(MenuItem("Make lead agent", icon: "star-line") { store.setLead(bot) })
+            items.append(MenuItem("设为主 Bot", icon: "star-line") { store.setLead(bot) })
         }
+        items.append(MenuItem("复制 ID", icon: "file-copy-line") { UIPasteboard.general.string = bot.id })
+
+        var more: [MenuItem] = []
         if !bot.lead {
-            more.append(MenuItem("Hide", icon: "eye-off-line", destructive: true) { store.setHidden(bot, true) })
+            more.append(MenuItem("隐藏", icon: "eye-off-line", destructive: true) { store.setHidden(bot, true) })
         }
         if !bot.lead || store.supportsLeadChoice {
-            more.append(MenuItem("Delete", icon: "delete-bin-line", destructive: true, divider: true) {
-                confirmDelete = item
-            })
+            more.append(MenuItem("删除", icon: "delete-bin-line", destructive: true) { confirmDelete = item })
         }
-        items.append(MenuItem("More", icon: "more-line", submenu: more))
+        if !more.isEmpty {
+            items.append(MenuItem("更多", icon: "more-line", submenu: more))
+        }
         return items
     }
 
-    /// "Move to section ▸": the computer's other sections, a new one, and out of its own.
+    /// "移到分组 ▸": the computer's other sections, a new one, and out of its own.
     private func sectionMenu(_ bot: Bot, store: BotStore) -> MenuItem {
         var rows = store.sections.filter { $0 != bot.section }.map { name in
             MenuItem(name, icon: "inbox-line", verbatim: true) { store.setSection(bot, to: name) }
         }
-        rows.append(MenuItem("New section…", icon: "add-line", divider: !rows.isEmpty) {
-            naming = SectionNaming(title: "New section", name: "") { store.setSection(bot, to: $0) }
+        rows.append(MenuItem("新建分组…", icon: "add-line", divider: !rows.isEmpty) {
+            naming = SectionNaming(title: "新建分组", name: "") { store.setSection(bot, to: $0) }
         })
         if bot.section != nil {
-            rows.append(MenuItem("Remove from section", icon: "indeterminate-circle-line") {
+            rows.append(MenuItem("从分组移除", icon: "indeterminate-circle-line") {
                 store.setSection(bot, to: nil)
             })
         }
-        return MenuItem("Move to section", icon: "inbox-line", submenu: rows)
+        return MenuItem("移到分组", icon: "inbox-line", submenu: rows)
     }
 
-    /// A DSH session only supports what the gateway can do: copy its id, or pin it to the home.
+    /// A DSH session only supports what the gateway can do: pin to the home and copy its id.
     private func dshMenuItems(_ session: DSHSession) -> [MenuItem] {
-        [MenuItem("More", icon: "more-line", submenu: [
-            MenuItem("Copy ID", icon: "file-copy-line") { UIPasteboard.general.string = session.id },
-            pinMenuItem(.dsh, session.id),
-        ])]
+        [pinMenuItem(.dsh, session.id),
+         MenuItem("复制 ID", icon: "file-copy-line") { UIPasteboard.general.string = session.id }]
     }
 
     private func dshPreviewText(_ session: DSHSession) -> String {

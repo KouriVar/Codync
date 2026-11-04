@@ -7,7 +7,8 @@ import PhotosUI
 struct AccountSwitcherButton: View {
     @Environment(AccountSession.self) private var account
     @Environment(AppStore.self) private var app
-    private let avatarSize: CGFloat = 40
+    /// The inner image size; the button/circle around it stays 44pt.
+    var avatarSize: CGFloat = 40
     private let buttonSize: CGFloat = 44
 
     var body: some View {
