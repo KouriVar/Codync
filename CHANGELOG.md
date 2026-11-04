@@ -1840,3 +1840,12 @@
 - 验证：`xcodebuild build -scheme 'iOS Dev' -configuration DevDebug` 通过；已装到 iPhone 16 Pro（2.36.0 / 176）并启动。按要求未自测、未截图。
 - 限制/待办：**系统 tab bar 的 .toolbar(.hidden) 是否真的吃 `withAnimation` 我这边无法自测**。若真机上 tab bar 仍是瞬间消失（语音条已有滑动淡出、tab bar 却是硬切），那就是系统的工具栏可见性不参与该事务——按你的要求我先停在这里，请把现象告诉我（是不是只有 tab bar 硬切、语音条正常），我再决定是否改用「保持挂载 + 只淡出附属栏」的方案。
 - 关联：C0172、C0174、C0176。
+### C0179 · 2026-11-05 · 键盘模式：删掉「完成」、按钮钉在键盘上方
+
+- 原因：「完成」是 C0155 为了让键盘能收起加在 sheet 根视图上的键盘工具栏；同时键盘弹起时底部那排按钮会被键盘盖住（附图时更明显）。
+- 「完成」位置：`apps/ios/Kit/Sources/CodyncUI/Voice/VoiceSheetView.swift:88-93`（改动前）——`body` 上的 `.toolbar { ToolbarItemGroup(placement: .keyboard) { Spacer(); Button(L10n.tr("Done")) { typing = false } } }`，整段已删除，没有换成其它按钮；收起键盘仍靠「点空白处」（同文件 `.onTapGesture { if typing { typing = false } }`）。
+- 变化：半屏/全屏的布局从「标题 + 附件行 + 文字区 + 按钮行」改为「标题 + 附件行 + 文字区（可伸缩）」+ **`.safeAreaInset(edge: .bottom)` 包住按钮行**（波形 + 相机/键盘/设置/暂停）。按钮行因此始终贴在安全区底部：键盘弹起时正好钉在键盘正上方（有没有附图都一样），键盘收起后回到屏幕底部；空间不够时只有可滚动的文字区被压缩，标题与附件行的位置不变，按钮不会被遮住。
+- 文件：`apps/ios/Kit/Sources/CodyncUI/Voice/VoiceSheetView.swift`。
+- 验证：`xcodebuild build -scheme 'iOS Dev' -configuration DevDebug` 通过；已装到 iPhone 16 Pro（2.36.0 / 177）并启动。按要求未自测、未截图。
+- 限制/待办：无。
+- 关联：C0155、C0167。

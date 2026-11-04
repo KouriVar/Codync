@@ -83,14 +83,8 @@ public struct VoiceSheetView: View {
             breathing = phase == .recording && !reduceMotion
         }
         .onChange(of: session.editing) { _, editing in typing = editing }
-        // Tapping anywhere that isn't a control puts the keyboard away; so does 完成 above it.
+        // Tapping anywhere that isn't a control puts the keyboard away.
         .onTapGesture { if typing { typing = false } }
-        .toolbar {
-            ToolbarItemGroup(placement: .keyboard) {
-                Spacer()
-                Button(L10n.tr("Done")) { typing = false }
-            }
-        }
         .onAppear { breathing = session.phase == .recording && !reduceMotion }
         .sheet(isPresented: $showSettings) {
             VoiceLanguageSheet()
@@ -124,8 +118,16 @@ public struct VoiceSheetView: View {
             if let photo = session.attachment {
                 attachmentRow(photo)
             }
+            // The only thing that gives way when the keyboard comes up: the words, which scroll.
             transcript
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .padding(.horizontal, 16)
+        // 16pt of air above the avatar and the bot's name, on top of the grabber's own inset.
+        .padding(.top, 16)
+        // The buttons sit in the safe area, so they ride just above the keyboard while it is up and
+        // return to the bottom when it goes. The title and the photo keep their places either way.
+        .safeAreaInset(edge: .bottom, spacing: 0) {
             HStack(spacing: 12) {
                 waveColumn
                 cameraButton
@@ -133,11 +135,10 @@ public struct VoiceSheetView: View {
                 settingsButton
                 micButton
             }
+            .padding(.horizontal, 16)
+            .padding(.top, 8)
+            .padding(.bottom, 16)
         }
-        .padding(.horizontal, 16)
-        // 16pt of air above the avatar and the bot's name, on top of the grabber's own inset.
-        .padding(.top, 16)
-        .padding(.bottom, 16)
     }
 
     /// The line, with the "a little quiet" hint under it — inside the waveform's own space, so the
