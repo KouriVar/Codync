@@ -57,6 +57,8 @@ public final class VoiceSession {
     @ObservationIgnored private let transcriber: SpeechTranscriber
     @ObservationIgnored private var timer: Task<Void, Never>?
     @ObservationIgnored private var typed = ""
+    /// `finish` is waiting on the recognizer: the mic button must not start another one.
+    @ObservationIgnored private var ending = false
     /// Bumped by every start and stop, so a slow permission answer can't revive a cancelled capsule.
     @ObservationIgnored private var generation = 0
 
@@ -98,6 +100,8 @@ public final class VoiceSession {
 
     /// The mic button: pause while hearing, hear again while paused, end and confirm while paused.
     public func toggleMicrophone() {
+        // The words are already on their way out: the button does nothing until they land.
+        guard !ending else { return }
         switch phase {
         case .recording:
             transcriber.pause()
@@ -119,11 +123,13 @@ public final class VoiceSession {
 
     /// The end button (or two seconds of silence): fix the words and start the countdown.
     public func end() async {
-        guard phase == .recording || phase == .paused else { return }
+        guard phase == .recording || phase == .paused, !ending else { return }
+        ending = true
         stopTimer()
         level = 0
         Haptics.impact()
         let words = await transcriber.finish()
+        ending = false
         guard phase != .idle else { return }
         text = words
         if words.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -137,6 +143,7 @@ public final class VoiceSession {
     /// The red button: stop now, keep nothing.
     public func cancel() {
         generation += 1
+        ending = false
         stopTimer()
         transcriber.cancel()
         // A light tap: cancelling is the quiet way out.
@@ -174,6 +181,7 @@ public final class VoiceSession {
     /// A missed `begin` (nothing heard, no permission) waits here instead of hanging.
     private func stop(with notice: VoiceNotice, after: Double? = nil) {
         generation += 1
+        ending = false
         stopTimer()
         transcriber.cancel()
         level = 0

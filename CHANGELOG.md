@@ -1398,3 +1398,21 @@
 - 验证：按要求只验证编译通过（真机构建 DevDebug），并安装到 iPhone 16 Pro；界面观感、动画和真机识别未自测。
 - 限制/待办：ja/ko/fr/de/es 词条本轮未补，回退英文原文；云端转写只留了协议位置，未接 mimo；「结束」并入麦克风按钮（录音中=暂停，暂停后=结束）。
 - 关联：C0145、C0146、C0147。
+### C0149 · 2026-11-04 · 修首页语音按钮一按就闪退（音频线程碰主线程状态）
+
+- 原因：真机点语音按钮立即闪退。崩溃报告（`Sully Coe-2026-11-04-155818.ips`，同一栈共 4 份）：
+  `EXC_BREAKPOINT / SIGTRAP`，终止原因 `Trace/BPT trap: 5`，栈为
+  `_dispatch_assert_queue_fail` ← `dispatch_assert_queue` ← `_swift_task_checkIsolatedSwift` ← `closure #1 in OnDeviceSpeechTranscriber.openMic()` ← `AVAudioNodeTap::TapMessage::RealtimeMessenger_Perform`。
+  即 `installTap` 的 block 被 Swift 推断成 `@MainActor`（它写在 `@MainActor` 类的方法里、同步碰了 `self.request` / `self.report`），而 AVFAudio 在音频实时线程上调它，隔离断言当场 `SIGTRAP`。
+  另外点按钮前就卡顿：`AVAudioEngine` 在 `OnDeviceSpeechTranscriber` 的存储属性里同步构造，而首页每次重绘都会构造一个 `VoiceSession`（`@State` 的初值表达式会被反复求值），等于反复造音频引擎。
+- 变化：
+  - 音频 tap 移到 `nonisolated static func tap(_:onLevel:)` 里构造：block 内只把 buffer 交给识别器（`request.append`），音量通过 `@Sendable` 回调 `Task { @MainActor in … }` 回主线程再改状态，音频线程不再碰任何 actor 隔离状态。
+  - 识别结果回调同样改成 `nonisolated static func results(generation:into:)`（与本仓库 `Dictation` 的写法一致），识别器在自己队列上回调时不会再触发同样的断言。
+  - 音量上报节流：`TapClock` 每 55ms 放行一次（约 18 次/秒），tap 的 buffer 从 1024 提到 2048 帧；波形不再每帧都往主线程丢更新。
+  - `AVAudioEngine` 改成 `lazy`，首页绘制不再构造音频引擎（卡顿的主要来源）。
+  - 收尾顺序改正：先 `removeTap(onBus: 0)` 再 `engine.stop()`，`tapped` 标志保证同一 bus 不会重复 remove/install；暂停、结束、取消都走同一条收尾路径。
+  - `VoiceSession` 增加 `ending` 守卫：`finish()` 等识别器收尾的 1.2 秒里再点麦克风不会再起一次，取消/失败时清零。
+- 文件：`apps/ios/Kit/Sources/CodyncUI/Voice/SpeechTranscriber.swift`、`apps/ios/Kit/Sources/CodyncUI/Voice/VoiceSession.swift`。
+- 验证：`xcodebuild build -scheme 'iOS Dev' -configuration DevDebug` 通过；已装到 iPhone 16 Pro（2.36.0 / 147）并启动。权限说明在安装包 Info.plist 里确认为中文两条。
+- 限制/待办：按要求未自测交互，真机点按结果待你验收；云端转写仍只留协议位置。
+- 关联：C0145、C0148。

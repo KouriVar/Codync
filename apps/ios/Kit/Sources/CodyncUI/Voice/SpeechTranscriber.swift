@@ -59,7 +59,8 @@ public final class OnDeviceSpeechTranscriber: SpeechTranscriber {
     public var locale: Locale
     public private(set) var isRecording = false
 
-    private let engine = AVAudioEngine()
+    /// Built on the first recording: an AVAudioEngine is heavy enough to be felt when the home draws.
+    private lazy var engine = AVAudioEngine()
     private var recognizer: SFSpeechRecognizer?
     private var request: SFSpeechAudioBufferRecognitionRequest?
     private var task: SFSpeechRecognitionTask?
@@ -114,16 +115,7 @@ public final class OnDeviceSpeechTranscriber: SpeechTranscriber {
         // On device when the phone can: nothing said leaves the phone.
         if recognizer.supportsOnDeviceRecognition { request.requiresOnDeviceRecognition = true }
         self.request = request
-        task = recognizer.recognitionTask(with: request) { [weak self] result, error in
-            let text = result?.bestTranscription.formattedString
-            let final = result?.isFinal ?? false
-            let failed = error != nil
-            Task { @MainActor in
-                guard let self, self.generation == generation else { return }
-                if let text { self.recognized(text) }
-                if final || failed { self.settle() }
-            }
-        }
+        task = recognizer.recognitionTask(with: request, resultHandler: Self.results(generation: generation, into: self))
         guard openMic() else {
             cancel()
             throw SpeechUnavailable()
@@ -191,6 +183,23 @@ public final class OnDeviceSpeechTranscriber: SpeechTranscriber {
         report?(.partial(text))
     }
 
+    /// The recognizer calls this on its own queue, so it's built outside the main actor and hops
+    /// back before touching anything (the same trap as the audio tap: an inferred main-actor
+    /// closure called off the main thread traps in `_dispatch_assert_queue_fail`).
+    private nonisolated static func results(generation: Int, into transcriber: OnDeviceSpeechTranscriber)
+        -> @Sendable (SFSpeechRecognitionResult?, (any Error)?) -> Void {
+        { result, error in
+            let text = result?.bestTranscription.formattedString
+            let final = result?.isFinal ?? false
+            let failed = error != nil
+            Task { @MainActor in
+                guard transcriber.generation == generation else { return }
+                if let text { transcriber.recognized(text) }
+                if final || failed { transcriber.settle() }
+            }
+        }
+    }
+
     /// Wakes `finish` once; anything the recognizer says afterwards is dropped.
     private func settle() {
         settling?.resume()
@@ -215,22 +224,22 @@ public final class OnDeviceSpeechTranscriber: SpeechTranscriber {
     private func openMic() -> Bool {
         let audio = AVAudioSession.sharedInstance()
         do {
+            // The session has to be in a record category and active before the tap goes on.
             try audio.setCategory(.playAndRecord, mode: .default,
                                   options: [.defaultToSpeaker, .allowBluetoothHFP, .duckOthers])
             try audio.setActive(true)
             let input = engine.inputNode
+            // The buffer's own format: a tap in any other format is refused or raises.
             let format = try MicTap.format(of: input)
-            input.removeTap(onBus: 0)
-            input.installTap(onBus: 0, bufferSize: 1024, format: format) { [weak self] buffer, _ in
-                guard let self else { return }
-                self.request?.append(buffer)
-                let level = Self.level(of: buffer)
-                Task { @MainActor in
-                    guard self.isRecording else { return }
-                    if level > Self.voiceLevel { self.lastVoice = .now }
-                    self.report?(.level(level))
-                }
+            guard let request else {
+                try? audio.setActive(false, options: .notifyOthersOnDeactivation)
+                return false
             }
+            input.removeTap(onBus: 0)
+            input.installTap(onBus: 0, bufferSize: 2048, format: format,
+                             block: Self.tap(request) { [weak self] level in
+                                 Task { @MainActor in self?.heard(level: level) }
+                             })
             tapped = true
             engine.prepare()
             try engine.start()
@@ -247,12 +256,34 @@ public final class OnDeviceSpeechTranscriber: SpeechTranscriber {
     }
 
     private func closeMic() {
-        if engine.isRunning { engine.stop() }
+        // Off the bus before the engine stops, and only once: a second tap on the same bus raises.
         if tapped {
             engine.inputNode.removeTap(onBus: 0)
             tapped = false
         }
+        if engine.isRunning { engine.stop() }
         try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+    }
+
+    /// The microphone's loudness, on the main actor: it decides both the waveform and the silence.
+    private func heard(level: Float) {
+        guard isRecording else { return }
+        if level > Self.voiceLevel { lastVoice = .now }
+        report?(.level(level))
+    }
+
+    /// The tap itself, built outside the main actor: it runs on the audio thread, where touching
+    /// main-actor state traps (`_dispatch_assert_queue_fail`). It hands the words straight to the
+    /// recognizer and reports the level about 18 times a second — one per audio buffer would be
+    /// nearly 50 main-thread hops a second for a waveform nobody can see move that fast.
+    private nonisolated static func tap(_ request: SFSpeechAudioBufferRecognitionRequest,
+                                        onLevel: @escaping @Sendable (Float) -> Void) -> AVAudioNodeTapBlock {
+        let clock = TapClock()
+        return { buffer, _ in
+            request.append(buffer)
+            guard clock.tick() else { return }
+            onLevel(level(of: buffer))
+        }
     }
 
     private func watchSilence(generation: Int) {
@@ -287,3 +318,19 @@ public final class OnDeviceSpeechTranscriber: SpeechTranscriber {
 }
 
 private struct SpeechUnavailable: Error {}
+
+/// One report per `interval`, read from the audio thread: the level goes to the main actor, so it
+/// has to be thinned before it crosses.
+private final class TapClock: @unchecked Sendable {
+    private var last: CFAbsoluteTime = 0
+    private let lock = NSLock()
+
+    func tick(_ interval: CFAbsoluteTime = 0.055) -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        let now = CFAbsoluteTimeGetCurrent()
+        guard now - last >= interval else { return false }
+        last = now
+        return true
+    }
+}
