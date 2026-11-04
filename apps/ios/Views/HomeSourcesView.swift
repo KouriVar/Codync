@@ -92,7 +92,6 @@ struct HomeSourcesView: View {
                 voiceDetent = VoiceSheetView.small
                 isTransitioning = true
                 tabBarHidden = false
-                withAnimation(Self.barSpring) { barLifted = false }
                 Task { @MainActor in
                     try? await Task.sleep(for: .milliseconds(350))
                     isTransitioning = false
@@ -183,9 +182,6 @@ struct HomeSourcesView: View {
         // Only the two tabs that talk to Coe carry the bar; the others leave the screen to their list.
         .modifier(VoiceBar(shown: (selection == .pinned || selection == .coe) && isTabRoot && !tabBarHidden,
                            lead: leadBot?.bot, onTap: beginVoice))
-        // The bar and its accessory step down and fade as one; the tab bar is part of the same view.
-        .offset(y: barLifted ? Self.barDrop : 0)
-        .opacity(barLifted ? 0 : 1)
         .tint(Palette.text)
         .onChange(of: enabledSources) { _, sources in
             // The tab you were on has just been switched off in Settings: back to 置顶.
@@ -215,13 +211,7 @@ struct HomeSourcesView: View {
 
     /// The open conversation, shared by every tab: opening one from a notification or a link lands in
     /// whichever tab is on screen.
-    /// One spring for the bar going and coming, so it does not jump either way.
-    private static let barSpring = Animation.spring(response: 0.35, dampingFraction: 0.9)
-    /// How far the bar and the accessory drop before the sheet takes over.
-    private static let barDrop: CGFloat = 40
-    /// The bar has stepped aside: it is 40pt down and invisible, and the sheet is taking over.
-    @State private var barLifted = false
-    /// The system bar is really hidden — set only after the drop has played, so it never jumps.
+    /// The system bar is hidden: set as the voice sheet opens, by the system's own slide.
     @State private var tabBarHidden = false
     /// One transition at a time: the bar and the sheet can't be summoned twice.
     @State private var isTransitioning = false
@@ -325,12 +315,11 @@ struct HomeSourcesView: View {
             return
         }
         isTransitioning = true
-        // First the bar goes down and fades, on its own spring; the sheet follows once that is under
-        // way, so the system's own hide never shows as a jump.
-        withAnimation(Self.barSpring) { barLifted = true }
+        // The bar and the accessory are the system's: hiding the bar slides both down together, and
+        // the page below never moves. The sheet follows once that is under way.
+        tabBarHidden = true
         Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(150))
-            tabBarHidden = true
             voiceDetent = VoiceSheetView.small
             showVoice = true
             await voice.begin()

@@ -1797,3 +1797,15 @@
 - 验证：`xcodebuild build -scheme 'iOS Dev' -configuration DevDebug` 通过；已装到 iPhone 16 Pro（2.36.0 / 173）并启动。按要求未自测、未截图。
 - 限制/待办：无。
 - 关联：C0173。
+### C0176 · 2026-11-05 · 打开语音时只让底栏退场，页面内容原地不动
+
+- 原因：C0174 把下移/淡出加在了 `TabView` 这一层，导致首页列表、头像和 + 也跟着往下移并淡出——不该动的动了。
+- 变化：
+  - 撤掉 `TabView` / 页面上所有 `offset`、`opacity` 和补间动画（`barLifted`、`barDrop`、`barSpring` 一并删除）；首页列表、头像和 + 全程保持原位、完全可见。
+  - 打开：点语音条后直接设 `tabBarHidden = true`（`.toolbar(.hidden, for: .tabBar)` 在每个 tab 根视图上），由系统自带的下滑动画把 tab bar 与附属栏一起收走；约 0.15 秒后再弹原生语音 sheet 并停在 76 小档。
+  - 关闭：sheet 先按系统动画降下，`onDismiss` 里恢复 `.visible`，系统把 tab bar 与附属栏一起滑回来。
+  - `isTransitioning` 保留，过渡期间不响应重复点击。
+- 文件：`apps/ios/Views/HomeSourcesView.swift`。
+- 验证：`xcodebuild build -scheme 'iOS Dev' -configuration DevDebug` 通过；已装到 iPhone 16 Pro（2.36.0 / 174）并启动。按要求未自测、未截图。
+- 限制/待办：底栏进出的具体手感完全由系统决定。
+- 关联：C0172、C0174。
