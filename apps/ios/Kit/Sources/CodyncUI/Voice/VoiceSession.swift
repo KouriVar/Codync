@@ -137,7 +137,9 @@ public final class VoiceSession {
         guard allowed != .unavailable else { return stop(with: .unavailable) }
         transcriber.locale = Locale(identifier: VoiceLanguage.stored.localeIdentifier)
         do {
-            try transcriber.start { [weak self] event in self?.apply(event) }
+            // The session and the engine open on the microphone's own queue: the main actor is free
+            // to draw the bar's morph while this waits.
+            try await transcriber.start { [weak self] event in self?.apply(event) }
         } catch {
             stop(with: .microphone)
             return
@@ -147,7 +149,7 @@ public final class VoiceSession {
 
     /// The pause/continue button: pausing settles what was heard (and offers it to send), and
     /// continuing picks the recording up again.
-    public func toggleMicrophone() {
+    public func toggleMicrophone() async {
         guard !ending else { return }
         switch phase {
         case .recording:
@@ -162,7 +164,8 @@ public final class VoiceSession {
             stopTimer()
             countdown = 0
             notHeard = false
-            guard transcriber.resume() else {
+            // Opening the microphone again is off the main actor, so the button never waits on it.
+            guard await transcriber.resume() else {
                 stop(with: .microphone)
                 return
             }

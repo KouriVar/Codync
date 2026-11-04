@@ -38,12 +38,13 @@ public protocol SpeechTranscriber: AnyObject {
     var isRecording: Bool { get }
     func permission() async -> SpeechPermission
     /// Opens the microphone and reports as it goes. Nothing ends it on its own: it records until
-    /// `pause`, `finish` or `cancel`. Throws when the microphone can't be used.
-    func start(_ report: @escaping @MainActor @Sendable (SpeechEvent) -> Void) throws
+    /// `pause`, `finish` or `cancel`. Throws when the microphone can't be used. The audio session and
+    /// the engine are opened off the main actor, so awaiting this never freezes the UI.
+    func start(_ report: @escaping @MainActor @Sendable (SpeechEvent) -> Void) async throws
     /// Stops hearing and keeps the words so far, so `resume` can carry on.
     func pause()
     /// Hears again after `pause`.
-    @discardableResult func resume() -> Bool
+    @discardableResult func resume() async -> Bool
     /// Ends the recording and gives the final words (what was heard so far if the recognizer stalls).
     func finish() async -> String
     /// Drops everything at once.
@@ -75,15 +76,13 @@ public final class OnDeviceSpeechTranscriber: SpeechTranscriber {
     public var locale: Locale
     public private(set) var isRecording = false
 
-    /// Built on the first recording: an AVAudioEngine is heavy enough to be felt when the home draws.
-    private lazy var engine = AVAudioEngine()
+    /// The microphone's hardware, on a queue of its own: the session, the engine and its tap.
+    private let mic = MicStack()
     private var recognizer: SFSpeechRecognizer?
     /// The request hearing the microphone now, and (relay only) the one finishing up.
     private var request: SFSpeechAudioBufferRecognitionRequest?
     private var closing: SFSpeechAudioBufferRecognitionRequest?
     private var task: SFSpeechRecognitionTask?
-    /// The input's format, kept so a tap can be swapped without reopening the session.
-    private var format: AVAudioFormat?
     /// Relay only: both requests read the microphone through this.
     private let sink = BufferSink()
     /// On device unless a first task fails at once: a phone without the language's on-device model
@@ -94,8 +93,6 @@ public final class OnDeviceSpeechTranscriber: SpeechTranscriber {
     private var generation = 0
     /// Which task the results belong to: the closing one in relay mode must not overwrite the new.
     private var taskID = 0
-    /// A tap is installed on the input node; only then may it be taken off.
-    private var tapped = false
     /// Words of tasks that already ended, and of the one running: together they are the text.
     private var committed: [String] = []
     private var partial = ""
@@ -123,8 +120,17 @@ public final class OnDeviceSpeechTranscriber: SpeechTranscriber {
         let allowed = await AVAudioApplication.requestRecordPermission()
         guard allowed else { return .denied }
         guard await Self.authorized() else { return .denied }
-        guard SFSpeechRecognizer(locale: locale) != nil else { return .unavailable }
+        // Made here once and kept for `start`, which used to make a second one of its own.
+        guard let recognizer = recognizer(for: self.locale), recognizer.isAvailable else { return .unavailable }
         return .granted
+    }
+
+    /// The recognizer for this locale: the one already made, or a new one that `start` then reuses.
+    private func recognizer(for locale: Locale) -> SFSpeechRecognizer? {
+        if let recognizer, self.locale == locale { return recognizer }
+        let made = SFSpeechRecognizer(locale: locale) ?? SFSpeechRecognizer()
+        recognizer = made
+        return made
     }
 
     private nonisolated static func authorized() async -> Bool {
@@ -135,13 +141,14 @@ public final class OnDeviceSpeechTranscriber: SpeechTranscriber {
 
     // MARK: recording
 
-    public func start(_ report: @escaping @MainActor @Sendable (SpeechEvent) -> Void) throws {
+    public func start(_ report: @escaping @MainActor @Sendable (SpeechEvent) -> Void) async throws {
         cancel()
         generation += 1
+        let opening = generation
         self.report = report
         committed = []
         let locale = self.locale
-        guard let recognizer = SFSpeechRecognizer(locale: locale) ?? SFSpeechRecognizer(), recognizer.isAvailable else {
+        guard let recognizer = recognizer(for: locale), recognizer.isAvailable else {
             voiceLog.error("no recognizer for \(locale.identifier, privacy: .public)")
             self.report = nil
             throw SpeechUnavailable()
@@ -153,10 +160,18 @@ public final class OnDeviceSpeechTranscriber: SpeechTranscriber {
             relay=\(Self.relayTasks, privacy: .public)
             """)
         startTask()
-        guard let request, openMic(with: request) else {
+        guard let request else {
             cancel()
             throw SpeechUnavailable()
         }
+        // The session and the engine are opened on the microphone's own queue: awaiting here frees
+        // the main actor for the bar's animation instead of freezing it for the hardware.
+        guard await openMic(with: request) else {
+            cancel()
+            throw SpeechUnavailable()
+        }
+        // Cancelled while it was opening: the queue has already been told to close it again.
+        guard generation == opening else { return }
         isRecording = true
         watchRotation(generation: generation)
         watchLevel()
@@ -171,15 +186,23 @@ public final class OnDeviceSpeechTranscriber: SpeechTranscriber {
     }
 
     @discardableResult
-    public func resume() -> Bool {
+    public func resume() async -> Bool {
         guard !isRecording else { return false }
         // Every task may have ended while we were paused: hearing again needs one to write into.
         if request == nil { startTask() }
-        guard let request, openMic(with: request) else {
+        guard let request else {
             cancel()
             report?(.failed(.microphone))
             return false
         }
+        let resuming = generation
+        guard await openMic(with: request) else {
+            cancel()
+            report?(.failed(.microphone))
+            return false
+        }
+        // Paused or cancelled while it was opening: the queue has already been told to close it.
+        guard generation == resuming else { return false }
         isRecording = true
         newestTaskAt = .now
         voiceLog.info("resume with \(Int(self.words.count)) chars so far")
@@ -238,7 +261,7 @@ public final class OnDeviceSpeechTranscriber: SpeechTranscriber {
                                           resultHandler: Self.results(id: id, generation: generation, into: self))
         voiceLog.info("task \(id, privacy: .public) started")
         // The tap was bound to the request it was installed with: a new one needs a new tap.
-        if tapped, !Self.relayTasks { installTap(on: request) }
+        if !Self.relayTasks { retap(on: request) }
     }
 
     /// The next task hears the microphone before the last one stops: whichever buffer a seam falls
@@ -403,41 +426,14 @@ public final class OnDeviceSpeechTranscriber: SpeechTranscriber {
 
     // MARK: the microphone
 
-    private func openMic(with request: SFSpeechAudioBufferRecognitionRequest) -> Bool {
-        let audio = AVAudioSession.sharedInstance()
-        do {
-            // The session has to be in a record category and active before the tap goes on.
-            try audio.setCategory(.playAndRecord, mode: .default,
-                                  options: [.defaultToSpeaker, .allowBluetoothHFP, .duckOthers])
-            try audio.setActive(true)
-            let input = engine.inputNode
-            // The buffer's own format: a tap in any other format is refused or raises.
-            let format = try MicTap.format(of: input)
-            self.format = format
-            input.removeTap(onBus: 0)
-            input.installTap(onBus: 0, bufferSize: 2048, format: format, block: block(for: request))
-            tapped = true
-            engine.prepare()
-            try engine.start()
-            voiceLog.info("microphone open, \(format.sampleRate, privacy: .public) Hz")
-            return true
-        } catch {
-            voiceLog.error("microphone failed: \(error.localizedDescription, privacy: .public)")
-            if tapped {
-                engine.inputNode.removeTap(onBus: 0)
-                tapped = false
-            }
-            if engine.isRunning { engine.stop() }
-            try? audio.setActive(false, options: .notifyOthersOnDeactivation)
-            return false
-        }
+    /// Opens the microphone on its own queue and answers whether it opened. The main actor only waits.
+    private func openMic(with request: SFSpeechAudioBufferRecognitionRequest) async -> Bool {
+        await mic.open(tap: TapBox(block(for: request)))
     }
 
     /// While the engine runs, the tap follows the request it feeds.
-    private func installTap(on request: SFSpeechAudioBufferRecognitionRequest) {
-        guard tapped, let format else { return }
-        engine.inputNode.removeTap(onBus: 0)
-        engine.inputNode.installTap(onBus: 0, bufferSize: 2048, format: format, block: block(for: request))
+    private func retap(on request: SFSpeechAudioBufferRecognitionRequest) {
+        mic.retap(TapBox(block(for: request)))
     }
 
     /// Relay mode feeds both requests through the sink; otherwise the tap writes to the one request
@@ -453,13 +449,9 @@ public final class OnDeviceSpeechTranscriber: SpeechTranscriber {
     }
 
     private func closeMic() {
-        // Off the bus before the engine stops, and only once: a second tap on the same bus raises.
-        if tapped {
-            engine.inputNode.removeTap(onBus: 0)
-            tapped = false
-        }
-        if engine.isRunning { engine.stop() }
-        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        // Taken off the bus before the engine stops, and only once: a second tap on the same bus
+        // raises. The queue keeps that in order with whatever open is still finishing.
+        mic.close()
     }
 
     /// The microphone's loudness, on the main actor: it drives the waveform.
@@ -506,6 +498,101 @@ public final class OnDeviceSpeechTranscriber: SpeechTranscriber {
             sink.append(buffer)
             guard clock.tick() else { return }
             onLevel(level(of: buffer))
+        }
+    }
+}
+
+/// One tap block, carried across to the microphone's queue. `AVAudioNodeTapBlock` is not Sendable on
+/// its own; the block it wraps is written to run on the audio thread and touches no actor state.
+private struct TapBox: @unchecked Sendable {
+    let block: AVAudioNodeTapBlock
+
+    init(_ block: @escaping AVAudioNodeTapBlock) { self.block = block }
+}
+
+/// The microphone's hardware, on a queue of its own: the audio session, the engine and its tap.
+///
+/// Putting a `.playAndRecord` session in place and starting an `AVAudioEngine` take tens of
+/// milliseconds, and they used to be spent on the main actor — exactly where the home's voice capsule
+/// is animating. They happen here instead. One serial queue owns everything that touches these
+/// objects, so nothing is created on one thread and stopped on another; callers only wait for the
+/// answer, and the main actor is free while they do.
+private final class MicStack: @unchecked Sendable {
+    private let queue = DispatchQueue(label: "com.pokai.Codync.voice.mic", qos: .userInitiated)
+    /// Made on this queue the first time a recording opens, so the home never pays for it.
+    private var engine: AVAudioEngine?
+    /// The input's format, kept so a tap can be swapped without reopening the session.
+    private var format: AVAudioFormat?
+    /// A tap is installed on the input node; only then may it be taken off.
+    private var tapped = false
+
+    /// Opens the microphone: record category, active session, the tap, the engine running.
+    func open(tap: TapBox) async -> Bool {
+        await withCheckedContinuation { done in
+            queue.async { done.resume(returning: self.openNow(tap: tap.block)) }
+        }
+    }
+
+    /// A new request needs a new tap; the session and the engine stay where they are.
+    func retap(_ tap: TapBox) {
+        queue.async {
+            guard self.tapped, let format = self.format, let engine = self.engine else { return }
+            engine.inputNode.removeTap(onBus: 0)
+            engine.inputNode.installTap(onBus: 0, bufferSize: 2048, format: format, block: tap.block)
+        }
+    }
+
+    /// Stops the engine and gives the session back. Queued behind any open still finishing, so the two
+    /// never touch the engine at once.
+    func close() {
+        queue.async {
+            if let engine = self.engine {
+                if self.tapped {
+                    engine.inputNode.removeTap(onBus: 0)
+                    self.tapped = false
+                }
+                if engine.isRunning { engine.stop() }
+            }
+            try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        }
+    }
+
+    private func openNow(tap: @escaping AVAudioNodeTapBlock) -> Bool {
+        let audio = AVAudioSession.sharedInstance()
+        do {
+            // The session has to be in a record category and active before the tap goes on.
+            try audio.setCategory(.playAndRecord, mode: .default,
+                                  options: [.defaultToSpeaker, .allowBluetoothHFP, .duckOthers])
+            try audio.setActive(true)
+            let engine: AVAudioEngine
+            if let existing = self.engine {
+                engine = existing
+            } else {
+                // An AVAudioEngine is heavy enough to be felt: it is made here, not while the home draws.
+                let made = AVAudioEngine()
+                self.engine = made
+                engine = made
+            }
+            let input = engine.inputNode
+            // The buffer's own format: a tap in any other format is refused or raises.
+            let format = try MicTap.format(of: input)
+            self.format = format
+            input.removeTap(onBus: 0)
+            input.installTap(onBus: 0, bufferSize: 2048, format: format, block: tap)
+            tapped = true
+            engine.prepare()
+            try engine.start()
+            voiceLog.info("microphone open, \(format.sampleRate, privacy: .public) Hz")
+            return true
+        } catch {
+            voiceLog.error("microphone failed: \(error.localizedDescription, privacy: .public)")
+            if tapped, let engine {
+                engine.inputNode.removeTap(onBus: 0)
+                tapped = false
+            }
+            if let engine, engine.isRunning { engine.stop() }
+            try? audio.setActive(false, options: .notifyOthersOnDeactivation)
+            return false
         }
     }
 }

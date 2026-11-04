@@ -2326,3 +2326,46 @@
     已按约定先停在这里等确认，未实施。
   - 冷启动第一次仍会比后续几次慢（识别服务/音频会话首次初始化），这一点只能在主线程外解决。
 - 关联：C0197。
+
+### C0200 · 2026-11-04 · 语音胶囊开启卡顿（方案 A）：音频会话与引擎挪到后台队列
+
+- 原因：C0198 把录音推迟一帧后，开启前段已顺，但动画末段（右边设置/暂停钮出现那一下）仍卡。原因是
+  `SpeechTranscriber.start()` 里剩下的重活仍在主 actor 上同步跑：`AVAudioSession.setCategory` +
+  `setActive(true)`、`AVAudioEngine` 首次创建、`installTap`、`engine.prepare()/start()`，外加
+  `permission()` 与 `start()` 各自新建一个 `SFSpeechRecognizer`。它们正好压在动画末段那一帧上。
+- 变化（`Kit/Sources/CodyncUI/Voice/SpeechTranscriber.swift`）：
+  - 新增 `MicStack`（私有，`@unchecked Sendable`，约 507-612 行）：一条串行队列独占音频会话 +
+    `AVAudioEngine` + tap + format。`open(tap:) async -> Bool`、`retap(_:)`、`close()` 都在该队列上执行，
+    引擎在同一队列里首次创建；**创建、改 tap、停止因此永远只在这一个线程上**，主线程只等结果。
+  - 新增 `TapBox`（约 507 行）：把 `AVAudioNodeTapBlock` 跨线程传递时包装成 Sendable。
+  - 删掉主 actor 上的 `engine` / `format` / `tapped` 三个属性与原来的 `openMic`、`installTap` 实现；
+    `openMic(with:) async -> Bool` 现在只 `await mic.open(...)`（约 430 行），换 tap 走 `retap(on:)`
+    （约 435 行），`closeMic()` 走 `mic.close()`（约 454 行）。
+  - `SpeechTranscriber` 协议与 `OnDeviceSpeechTranscriber`：`start` 改为 `async throws`（43、144 行），
+    `resume` 改为 `async -> Bool`（47、189 行）；`start()` 在 `await openMic` 之后加了 generation 校验，
+    避免「打开途中被取消/暂停」时把 `isRecording` 设成 true。
+  - `permission()` 建好的 `SFSpeechRecognizer` 现在留着给 `start()` 用（`recognizer(for:)`，约 145 行），
+    一次开启只建一个（原来建两个）。`release()` 仍会清空，所以下次开启还是重新建一个——没有做预热（方案 B）。
+- 变化（`Kit/Sources/CodyncUI/Voice/VoiceSession.swift`）：`begin()` 用 `try await transcriber.start`
+  （录音启动整体异步）；`toggleMicrophone()` 改为 `async`，内部 `await transcriber.resume()`。
+- 变化（`Kit/Sources/CodyncUI/Voice/VoicePill.swift`）：麦克风按钮改成 `Task { await session.toggleMicrophone() }`，
+  继续录音不再阻塞按钮回调。
+- 线程与顺序：会话激活/引擎启动/换 tap/停止全部在 `MicStack` 的串行队列上，FIFO 顺序保证
+  「先关后开」「先开再换 tap」不会交错；tap 回调本身仍在音频线程（原样），只把电平 hop 回主线程。
+- 开头的话不会丢：识别任务仍在麦克风打开之前建好（顺序未变），`engine.start()` 的墙钟时刻与改动前
+  基本一致——同一份工作换到后台线程执行，且主线程不再被占用，实际只会更早而不是更晚。
+- 现在还在主线程上的活：`SFSpeechRecognizer.recognitionTask(...)`（`startTask()`）、结果回调处理、
+  `VoiceSession` 的状态更新与波形电平；未改动。
+- 验证：`xcodebuild build -project apps/Codync.xcodeproj -scheme 'iOS Dev' -configuration DevDebug`
+  先以 `-destination 'generic/platform=iOS'` 检编译，设备重新连上后再按真机 destination 构建，均
+  **编译通过，0 error**（ui-preview 覆盖、构建号 187），改动文件 0 warning；`xcrun devicectl device install app`
+  装到 iPhone 16 Pro（`com.suiyikou.codync.uipreview` 2.36.0 / 187）成功（期间设备曾 `unavailable`、
+  报 `CoreDeviceError 4016`，重新连接后安装完成）。按要求**不自测**：不跑测试、不截图、不用 CDP；
+  改后的顺滑度与录音是否照常均未实测。
+- 限制/待办：
+  - `recognitionTask(...)` 仍在主线程，属于本次未涵盖的范围（约几毫秒到十几毫秒），若末段仍能感觉到，
+    下一步把它也交到 `MicStack` 队列（同样要处理 task 的创建/取消线程归属）。
+  - 线程归属改动未在真机上验证录音是否照常；`MicStack.close()` 采用队列异步执行（不阻塞主线程），
+    因此 `pause()` 后引擎停止与下一次 `open()` 之间靠队列 FIFO 保序，极端情况下若硬件迟迟不停，
+    重新打开的等待会排在后面。
+- 关联：C0198、C0197。

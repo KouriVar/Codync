@@ -134,7 +134,8 @@ struct VoiceMicButton: View {
 
     var body: some View {
         Button {
-            session.toggleMicrophone()
+            // Hearing again reopens the microphone off the main actor, so this returns at once.
+            Task { await session.toggleMicrophone() }
         } label: {
             RemixIcon(recording ? "pause-line" : "play-line",
                       size: ControlMetrics.Size.icon.glyph, weight: .medium)
