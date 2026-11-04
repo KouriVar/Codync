@@ -1204,3 +1204,18 @@
 - 限制/待办：`BotListView.swift` 里还有一处直接 `UIImpactFeedbackGenerator`，它属于工作树里未提交的 20 项，本轮未改；等那批改动落地后再统一。触感「很强」映射到 `.rigid`，可再调。
 - 关联：C0125。
 
+### C0134 · 2026-11-04 · 设置页文案与开关调整
+
+- 原因：设置页文字与实际不符，通知应是开关而不是跳转行。
+- 变化：
+  - 「DSH 连接」右侧只显示「已连接」，不再带电脑/网关名字（连接中/失败/未连接不变）。
+  - 删除「首页来源只决定置顶页后面有哪几页；至少保留一项」的说明文字。
+  - 「通知」改为 `Toggle`：打开时请求通知权限；关闭时跳到系统设置（iOS 不允许 App 自行关闭）。
+  - 「应用语言」改为「语言」（列表行、语言页标题）。
+  - 首页来源名称：Coe → `COE`、DS Bot → `DSHB`、DSH 对话 → `DSHC`。
+  - 「连接应用」改为「连接」。
+- 文件：`apps/ios/Views/SettingsView.swift`、`apps/ios/Views/HomeSource.swift`、`apps/ios/Views/LanguageSettings.swift`、`apps/ios/Views/AccountSwitcherView.swift`。
+- 验证：按要求本轮只验证编译通过（DevDebug 真机构建）。
+- 限制/待办：通知开关关闭时只能跳系统设置，回来后才反映真实状态。
+- 关联：C0133。
+

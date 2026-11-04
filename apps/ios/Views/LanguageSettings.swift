@@ -13,7 +13,7 @@ struct LanguageRow: View {
 
     var body: some View {
         Button(action: open) {
-            SettingsRow("translate-2", title: L10n.tr("App language"),
+            SettingsRow("translate-2", title: "语言",
                         value: AppLanguage.menuTitle(selection.wrappedValue, preference: selection.wrappedValue, systemIsChinese: AppLanguage.systemIsChinese()))
         }
     }
@@ -35,7 +35,7 @@ struct LanguageSettings: View {
         } label: {
             HStack(spacing: 12) {
                 RemixIcon("translate-2", size: 18).frame(width: 22).foregroundStyle(.primary)
-                Text(L10n.tr("App language"))
+                Text("语言")
             }
         }
         .pickerStyle(.navigationLink)

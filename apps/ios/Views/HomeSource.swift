@@ -13,9 +13,9 @@ enum HomeSource: String, CaseIterable, Identifiable, Sendable {
 
     var title: String {
         switch self {
-        case .coe: return "Coe"
-        case .dsBot: return "DS Bot"
-        case .dsh: return "DSH 对话"
+        case .coe: return "COE"
+        case .dsBot: return "DSHB"
+        case .dsh: return "DSHC"
         }
     }
 

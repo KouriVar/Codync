@@ -51,8 +51,6 @@ struct SettingsView: View {
                         Text(source.title)
                     }
                 }
-            } footer: {
-                Text("首页来源只决定置顶页后面有哪几页；至少保留一项。")
             }
             .listRowSeparator(.hidden)
 
@@ -159,17 +157,16 @@ struct SettingsView: View {
     }
 
     private var notificationsRow: some View {
-        Button {
-            if notificationsAllowed != nil {
-                UIApplication.shared.open(URL(string: UIApplication.openNotificationSettingsURLString)!)
-            } else {
+        Toggle(isOn: Binding(get: { notificationsAllowed == true }, set: { on in
+            if on {
                 Task { notificationsAllowed = await PushRegistrar.shared.requestAuthorization(from: .settings) }
+            } else if let url = URL(string: UIApplication.openNotificationSettingsURLString) {
+                // iOS has no API to revoke; send the user to the system switch.
+                UIApplication.shared.open(url)
             }
-        } label: {
-            SettingsRow("notification-3-line", title: L10n.tr("Notifications"),
-                        value: L10n.tr(notificationsAllowed == true ? "On" : notificationsAllowed == false ? "Off in Settings" : "Turn on"))
+        })) {
+            Label { Text(L10n.tr("Notifications")) } icon: { RemixIcon("notification-3-line") }
         }
-        .buttonStyle(.plain)
     }
 
     private var hapticsRow: some View {
@@ -184,7 +181,7 @@ struct SettingsView: View {
         switch dsh.phase {
         case .idle: return "未连接"
         case .connecting: return "连接中…"
-        case .ready: return "已连接（\(dsh.gatewayName)）"
+        case .ready: return "已连接"
         case .failed: return "连接失败"
         }
     }

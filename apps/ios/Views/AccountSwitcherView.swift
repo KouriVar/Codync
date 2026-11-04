@@ -102,7 +102,7 @@ struct AccountSwitcherView: View {
                         .navigationBarTitleDisplayMode(.inline)
                 case .language:
                     LanguagePage()
-                        .navigationTitle(L10n.tr("App language"))
+                        .navigationTitle("语言")
                         .navigationBarTitleDisplayMode(.inline)
                 }
             }
@@ -178,7 +178,7 @@ private struct AccountProfileView: View {
                 .disabled(app.currentStore == nil)
 
                 Button { showExtensions = true } label: {
-                    SettingsRow("plug-line", title: "连接应用")
+                    SettingsRow("plug-line", title: "连接")
                 }
                 .disabled(app.currentStore == nil)
             }
