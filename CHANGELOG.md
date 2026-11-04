@@ -1669,3 +1669,23 @@
 - 验证：`xcodebuild build -scheme 'iOS Dev' -configuration DevDebug` 通过；已装到 iPhone 16 Pro（2.36.0 / 163）并启动。按要求未自测、未截图。
 - 限制/待办：搜索 tab 的标题取自系统本地化（跟随设备/App 语言），不再是 App 自己的文案。
 - 关联：C0163、C0164。
+### C0166 · 2026-11-04 · 加「TabBar 对照」调试页（只查不改首页），并记录视图链
+
+- 环境：真机 **iPhone 16 Pro，iOS 27.3**（对照页顶部用 `UIDevice.current.systemVersion` 实时打印）；编译 SDK **iPhoneOS 27.1**（`xcodebuild -showsdks` → `iphoneos27.1`），Deployment Target 26.0。
+- 原因：搜索 tab 在首页没有单独浮到右侧，需要最小对照定位是哪一层导致的——按要求本轮只查不改首页。
+- 变化：
+  - 新增调试页 `TabBarProbeView`（`apps/ios/Kit/Sources/CodyncUI/Debug/TabBarProbeView.swift`），从设置里「连点版本号 10 次」展开的高级区进入（新增一行「TabBar 对照」），以 `fullScreenCover` 全屏弹出。
+  - 四个变体用分段 Picker 切换：**最小版** = 三个 Tab（A、B、`Tab(role: .search)`），无任何修饰符；**V1** = 最小版 + `.tabBarMinimizeBehavior(.onScrollDown)`；**V2** = 最小版 + `.tabViewBottomAccessory { Text("accessory") }`；**V3** = 两个都加，并照抄首页 TabView 的全部修饰符（`selection`、每个 tab 内 `NavigationStack(path:)` + `navigationTitle("")` + `.inline` + 工具栏头像/＋、`.tint`）。
+  - 顶部显示系统版本、构建号和 SDK。
+- 首页 TabView 外层视图链（文件:行号，TabView 是根，外面没有 NavigationStack）：
+  1. `CodyncApp.swift:37-38` — `WindowGroup { RootView() }`
+  2. `RootView.swift:20-44` — `Group { … home … }` + `.background(Palette.background)` 等
+  3. `RootView.swift:80-85` — `HomeSourcesView()` + `.safeAreaInset(edge: .bottom, spacing: 0) { AccessBanners() }`
+  4. `HomeSourcesView.swift:60-61` — `body` 直接返回 `tabs`，外层再挂 `.task`、`.onChange`×5、`.sheet`(相机/语音/DSH 连接)、`.codyncSheet`×4、`.alert`、`.sectionNameDialog`、`.glassToast`、`.onAppear`
+  5. `HomeSourcesView.swift:150-186` — `TabView(selection:)` + `.tabBarMinimizeBehavior(.onScrollDown)` + `.tabViewBottomAccessory { HomeVoiceAccessory(…) }` + `.tint(Palette.text)` + `.onChange(of: enabledSources)`
+  6. `HomeSourcesView.swift:189-198` — 每个 Tab 内部才是 `NavigationStack(path: path) { … }`
+  结论：TabView 本身是根视图，外层**没有** NavigationStack / ZStack / overlay / ignoresSafeArea / 自定义 frame；首页与最小版的差别只有「每个 tab 里多一层 NavigationStack + 工具栏」以及 V3 里照抄的那些修饰符。
+- 文件：`apps/ios/Kit/Sources/CodyncUI/Debug/TabBarProbeView.swift`（新）、`apps/ios/Views/SettingsView.swift`、`apps/ios/Views/AccountSwitcherView.swift`。
+- 验证：`xcodebuild build -scheme 'iOS Dev' -configuration DevDebug` 通过；已装到 iPhone 16 Pro（2.36.0 / 164）并启动。按要求未自测、未截图。
+- 限制/待办：首页本轮未做任何改动，等对照结果后再定方案。
+- 关联：C0165。
