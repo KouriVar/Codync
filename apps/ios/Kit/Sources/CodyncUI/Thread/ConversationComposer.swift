@@ -18,6 +18,14 @@ public struct ConversationComposer: View {
     /// The row under the field: the page's numbers, so the bar sits where that page puts it.
     var bottomPadding: CGFloat
 
+    /// A page that brings its own field, leading control and trailing control (Coe: attachments,
+    /// quoting, send/stop). The bar's geometry — the 48pt row, the 16pt sides, the corner radius —
+    /// stays here, so both pages line up whatever they put in it.
+    private let accessory: AnyView?
+    private let leadingSlot: AnyView?
+    private let fieldSlot: AnyView?
+    private let trailingSlot: AnyView?
+
     @FocusState private var focused: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -29,26 +37,54 @@ public struct ConversationComposer: View {
         self.canSend = canSend
         self.bottomPadding = bottomPadding
         self.onSend = onSend
+        accessory = nil
+        leadingSlot = nil
+        fieldSlot = nil
+        trailingSlot = nil
+    }
+
+    /// The slot form: whatever the page needs above the row (`accessory`), to the left, in the field
+    /// and to the right of it.
+    public init(accessory: AnyView? = nil, leading: AnyView? = nil, field: AnyView, trailing: AnyView,
+                bottomPadding: CGFloat = 12) {
+        _text = .constant("")
+        self.placeholder = ""
+        self.leading = nil
+        canSend = true
+        self.bottomPadding = bottomPadding
+        onSend = {}
+        self.accessory = accessory
+        leadingSlot = leading
+        fieldSlot = field
+        trailingSlot = trailing
     }
 
     public var body: some View {
-        HStack(alignment: .bottom, spacing: 12) {
-            if let leading {
-                GlassButton(placeholder, glyph: .remix(leading.glyph), size: .bar) {
-                    leading.action()
+        VStack(spacing: 6) {
+            if let accessory { accessory }
+            HStack(alignment: .bottom, spacing: 12) {
+                if let leadingSlot {
+                    leadingSlot
+                } else if let leading {
+                    GlassButton(placeholder, glyph: .remix(leading.glyph), size: .bar) {
+                        leading.action()
+                    }
+                }
+                if let fieldSlot {
+                    fieldSlot
+                } else {
+                    field
+                }
+                if let trailingSlot {
+                    trailingSlot
+                } else {
+                    sendButton
                 }
             }
-            field
-            GlassButton("Send", glyph: .remix("arrow-up-line"), size: .bar,
-                        style: .filled(canSend ? Palette.accentFill : Palette.accentDim,
-                                       ink: canSend ? Palette.onAccent : Palette.secondary)) {
-                guard canSend else { return }
-                onSend()
-            }
+            .padding(.horizontal, 16)
+            .padding(.top, 6)
+            .padding(.bottom, bottomPadding)
         }
-        .padding(.horizontal, 16)
-        .padding(.top, 6)
-        .padding(.bottom, bottomPadding)
         .animation(Motion.reduced(Motion.layout, reduceMotion), value: canSend)
     }
 
@@ -62,5 +98,14 @@ public struct ConversationComposer: View {
             .frame(minHeight: ControlMetrics.Size.bar.hitTarget)
             .glass(in: RoundedRectangle(cornerRadius: 24, style: .continuous), interactive: true)
             .contentShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+    }
+
+    private var sendButton: some View {
+        GlassButton("Send", glyph: .remix("arrow-up-line"), size: .bar,
+                    style: .filled(canSend ? Palette.accentFill : Palette.accentDim,
+                                   ink: canSend ? Palette.onAccent : Palette.secondary)) {
+            guard canSend else { return }
+            onSend()
+        }
     }
 }

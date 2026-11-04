@@ -299,6 +299,20 @@ extension ThreadView {
 
     private var working: Bool { bot?.isWorking(in: botId) == true && !model.isOffline }
 
+    /// What counts as "this row changed": its text, the entry's own revision and when it last moved.
+    /// A reply that grows re-renders alone; the rest of the transcript is left as it is.
+    private func revision(of item: ChatItem) -> Int {
+        guard case .entry(let entry, _) = item.kind else { return 0 }
+        return (entry.data.text ?? "").hashValue
+            &* 31 &+ Int(truncatingIfNeeded: entry.rev)
+            &* 31 &+ Int(truncatingIfNeeded: entry.updatedAt)
+    }
+
+    /// The working row changes as steps come in.
+    private var workingRevision: Int {
+        Int(truncatingIfNeeded: bot?.startedAt ?? 0) &+ Entry.workingSteps(model.chat(botId)).count
+    }
+
     /// iPhone's messages: all this device has, earlier ones from the computer as the reader
     /// scrolls up; the chat follows the newest message until they scroll away, and a reply is
     /// revealed steadily as it's written.
@@ -321,10 +335,14 @@ extension ThreadView {
                 if bot.isGroup { GroupIntroCard(group: bot).padding(.top, 40) } else { IntroCard(bot: bot).padding(.top, 40) }
             })
         }
-        rows += items.map { item in ConversationRow(item.id, isUserMessage: item.isUserMessage) { row(item) } }
+        rows += items.map { item in
+            ConversationRow(item.id, isUserMessage: item.isUserMessage, revision: revision(of: item)) {
+                row(item)
+            }
+        }
         // Offline, "working" is only what the computer last said; don't show it as live.
         if let bot, working {
-            rows.append(ConversationRow("working") {
+            rows.append(ConversationRow("working", revision: workingRevision) {
                 // Each turn starts folded.
                 WorkingIndicator(bot: bot, steps: Entry.workingSteps(model.chat(botId)))
                     .id(bot.startedAt)

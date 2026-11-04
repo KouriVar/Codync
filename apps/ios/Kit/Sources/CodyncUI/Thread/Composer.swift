@@ -115,22 +115,18 @@ struct Composer: View {
     /// The row height, and the tap target of the buttons on both sides of the field.
     private var buttonHitSize: CGFloat { ControlMetrics.Size.bar.hitTarget }
 
+    /// The bar, in the page's one composer shape: the quote and the attachments sit above the row,
+    /// the "+" opens the attachments menu on the left, send/stop/interrupt on the right.
     private var field: some View {
-        HStack(alignment: .bottom, spacing: 8) {
-            if canAttach { addButton }
-            VStack(alignment: .leading, spacing: 0) {
-                if let replyingTo {
-                    quoteBar(replyingTo).transition(.move(edge: .bottom).combined(with: .opacity))
-                }
-                if !files.isEmpty {
-                    fileChips.transition(.move(edge: .bottom).combined(with: .opacity))
-                }
-                box
-            }
-            .glass(in: RoundedRectangle(cornerRadius: 24, style: .continuous))
-            // Lines, not the text: an animated transaction on every keystroke breaks IME composition.
-            .animation(Motion.layout, value: draft.count(where: \.isNewline))
-        }
+        ConversationComposer(
+            accessory: accessoryBar,
+            leading: canAttach ? AnyView(addButton) : nil,
+            field: AnyView(box),
+            trailing: AnyView(trailingButton),
+            bottomPadding: keyboardUp ? 12 : 28
+        )
+        // Lines, not the text: an animated transaction on every keystroke breaks IME composition.
+        .animation(Motion.layout, value: draft.count(where: \.isNewline))
         .animation(Motion.layout, value: files.map(\.id))
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
             keyboardUp = true
@@ -154,10 +150,20 @@ struct Composer: View {
                 photoItems = []
                 Task { await addPhotos(items) }
             }
-        .padding(.horizontal, 16)
-        .padding(.top, 6)
-        .padding(.bottom, keyboardUp ? 12 : 28)
         .ignoresSafeArea(.container, edges: keyboardUp ? [] : .bottom)
+    }
+
+    /// What sits above the bar: the quoted message and the attachments going out with it.
+    private var accessoryBar: AnyView? {
+        guard replyingTo != nil || !files.isEmpty else { return nil }
+        return AnyView(
+            VStack(alignment: .leading, spacing: 6) {
+                if let replyingTo { quoteBar(replyingTo) }
+                if !files.isEmpty { fileChips }
+            }
+            .padding(.horizontal, 16)
+            .animation(Motion.reduced(Motion.layout, reduceMotion), value: replyingTo?.id)
+        )
     }
 
     private enum Trailing: Equatable {
@@ -214,21 +220,18 @@ struct Composer: View {
     }
 
     private var box: some View {
-        HStack(alignment: .bottom, spacing: 8) {
-            TextField(placeholder, text: $input.text, selection: $input.selection, axis: .vertical)
-                .lineLimit(1...8)
-                .font(.body)
-                .textFieldStyle(.plain)
-                .focused($focused)
-                // A hardware keyboard's Return (⌘↩ too) submits the field and ends editing.
-                .onSubmit(newline)
-                .padding(.vertical, fieldPadding)
-                .frame(minHeight: buttonHitSize)
-            trailingButton
-                .animation(Motion.layout, value: isEmpty)
-        }
-        .padding(.leading, 14)
-        .frame(minHeight: buttonHitSize)
+        TextField(placeholder, text: $input.text, selection: $input.selection, axis: .vertical)
+            .lineLimit(1...8)
+            .font(.body)
+            .textFieldStyle(.plain)
+            .focused($focused)
+            // A hardware keyboard's Return (⌘↩ too) submits the field and ends editing.
+            .onSubmit(newline)
+            .padding(.vertical, fieldPadding)
+            .padding(.horizontal, 14)
+            .frame(minHeight: buttonHitSize)
+            .glass(in: RoundedRectangle(cornerRadius: 24, style: .continuous), interactive: true)
+            .contentShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
         .onChange(of: draftKey, initial: true) {
             draft = model.composerDraft(for: draftKey)
         }

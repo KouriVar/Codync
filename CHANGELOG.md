@@ -2715,3 +2715,40 @@
   ui-preview 覆盖、构建号 196）**编译通过，0 error**，改动文件 0 warning；`xcrun devicectl device install app`
   装到 iPhone 16 Pro（`com.suiyikou.codync.uipreview` 2.36.0 / 196）成功。按要求**不自测**。
 - 关联：C0207（Markdown）、备份 tag `backup/before-chat-port-c0208`（`99a6937b`）、盘点报告 `/tmp/codync-audit/dsh-mobile-inventory.md`。
+
+### C0209 · 2026-11-05 · 会话页搬迁第 2 步：Coe 的 ThreadView 接上共用输入框，流式只重绘变化行
+
+- 背景：C0208 落下共用件与 DSH 页；本条把 Coe 的 `ThreadView` 接上同一套输入框形态，并保留 Coe 现有的全部能力。
+  dsh-mobile 旧的 composer 里没有、我们也没有的东西（消息队列、滚动折叠胶囊）一律不新增。
+- 能力对照表（原能力 → 现在挂在哪）：
+  | 原能力（`Composer.swift`） | 现在 | 状态 |
+  |---|---|---|
+  | 「+」菜单（照片或视频 / 拍照 / 选择文件） | `ConversationComposer(leading:)` 槽位，`DropdownMenu` 原样 | 挂上 |
+  | 照片选择 / 文件导入 / 拖拽文件 / 相机 | 仍挂在 `Composer.field` 的修饰链（`photosPicker`/`fileImporter`/`dropDestination`/`capturePhoto`） | 保留 |
+  | 附件 chips、附件预览与移除 | 移到输入框上方的 `accessoryBar` | 保留（从卡片内改为上方） |
+  | 引用回复（`quoteBar` + 取消引用） | 同一 `accessoryBar`（在 chips 之上） | 保留 |
+  | 发送 / 停止 / 打断（通话中） | `ConversationComposer(trailing:)` 槽位，`trailingButton` 原样 | 挂上 |
+  | 输入框（`ComposerText`：selection + IME 修复） | 作为 `field:` 槽位传入，**没有换成普通 Binding**，IME 行为不变 | 保留 |
+  | slash 命令列表（`CommandList`）、@ 提及（`SuggestionChip`） | 仍在 `Composer.body` 的 VStack 里（输入框上方） | 保留 |
+  | 键盘避让（收起 28 / 弹起 12、`ignoresSafeArea`） | `ConversationComposer(bottomPadding:)` + 外层 `ignoresSafeArea` | 保留 |
+  | 消息长按菜单（复制、重发、钉住、编辑、删除、分组…） | 未动，仍在 `ChatRows` 的 `contextActions` | 保留 |
+  | 语音入口 | **原本就没有**（Coe 的 composer 从来没有麦克风按钮；语音在本 App 是首页底部胶囊） | 无处可挂，需要确认是否新增 |
+- 变化：
+  - `Kit/Sources/CodyncUI/Thread/ConversationComposer.swift`：新增**槽位形态**初始化
+    `init(accessory:leading:field:trailing:bottomPadding:)`；行几何（48 高、16 边距、12 间距、上 6）仍由组件给；
+    DSH 继续用简式初始化，外观不变。
+  - `Kit/Sources/CodyncUI/Thread/Composer.swift`：`field` 从「HStack（+ 号｜圆角卡片里塞引用/chips/输入框｜发送）」改为
+    `ConversationComposer(accessory:leading:field:trailing:)`；引用与附件 chips 提升到输入框上方；输入框自身承担 48pt 高、
+    14pt 内边距与 24 圆角玻璃；`ComposerText`（selection/IME）原样保留。
+  - `Kit/Sources/CodyncUI/Thread/ThreadView.swift`：消息行与「working」行开始带 `revision`（文本 hash、`entry.rev`、`updatedAt`、
+    步骤数），配合 C0208 的列表改动，**流式输出只重绘变化的那一行**。
+- 未做 / 需要确认：
+  - **语音入口不存在**：Coe 的输入框历史上就没有麦克风按钮，本条没有新增（新增=新功能）。
+  - 气泡与消息行：Coe 的 `ChatRows` 本来就用 `Palette.bubbleUser/bubbleAgent` + 18 圆角 + 16 内边距，与 C0208 的 DSH 行同构，
+    因此没有拆掉重写 `ChatRows`（拆了只会丢能力）；两条路径的差异只在输入框与 revision。
+  - 引用与 chips 从输入框内部移到输入框上方（新布局的统一形态），这是可见的位置变化。
+- 文件：`apps/ios/Kit/Sources/CodyncUI/Thread/ConversationComposer.swift`、`…/Thread/Composer.swift`、`…/Thread/ThreadView.swift`。
+- 验证：`xcodebuild build -project apps/Codync.xcodeproj -scheme 'iOS Dev' -configuration DevDebug`（真机 destination、
+  ui-preview 覆盖、构建号 197）**编译通过，0 error**，改动文件 0 warning；`xcrun devicectl device install app`
+  装到 iPhone 16 Pro（`com.suiyikou.codync.uipreview` 2.36.0 / 197）成功。按要求**不自测**。
+- 关联：C0208（共用件）、C0207（Markdown）、备份 tag `backup/before-chat-port-c0209`（`2fb92685`）。
