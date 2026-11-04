@@ -12,6 +12,7 @@ struct HomeSourcesView: View {
     @Environment(AccountStore.self) private var accounts
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.openURL) private var openURL
 
     @ObservedObject private var dsh = DSHGateway.shared
 
@@ -22,6 +23,11 @@ struct HomeSourcesView: View {
     @State private var creating: NewTarget?
     @State private var confirmDelete: RosterItem?
     @State private var showCameraSheet = false
+    /// The voice capsule and what it says to the lead bot.
+    @State private var voice = VoiceSession()
+    @State private var showVoiceSettings = false
+    /// The glass pill that says what was just sent.
+    @State private var toast: GlassToastItem?
     @State private var openDSHSession: DSHSession?
     @State private var showDSHConnect = false
     @State private var naming: SectionNaming?
@@ -66,12 +72,24 @@ struct HomeSourcesView: View {
             // DSH pauses in the background and reconnects when the app comes back.
             .onChange(of: scenePhase) { _, phase in
                 switch phase {
-                case .background: dsh.disconnect()
+                case .background:
+                    dsh.disconnect()
+                    // iOS stops the microphone when the app leaves: no capsule may stay up.
+                    voice.cancel()
                 case .active: syncDSHConnection()
                 default: break
                 }
             }
             .sheet(isPresented: $showCameraSheet, content: cameraSheet)
+            // The capsule's own settings, at the root: a row-level anchor is rebuilt and would take
+            // the sheet (and the home) down with it (C0035).
+            .sheet(isPresented: $showVoiceSettings) {
+                VoiceLanguageSheet()
+                    .presentationDetents([.medium])
+                    .presentationDragIndicator(.visible)
+            }
+            .glassToast($toast, topPadding: 6)
+            .onAppear { voice.onSend = { sendToLeadBot($0) } }
             .navigationDestination(item: $openDSHSession) { _ in
                 DSHConversationView(gateway: dsh)
             }
@@ -139,13 +157,45 @@ struct HomeSourcesView: View {
     }
 
     private var bottomBar: some View {
-        HomeBottomBar(searchText: $searchText, openCamera: { showCameraSheet = true }) {
-            if let store = app.currentStore {
-                app.marketplace = store.computer.id
-            } else {
-                app.showComputers = true
-            }
+        HomeBottomBar(searchText: $searchText, voice: voice, lead: leadBot?.bot,
+                      openVoiceSettings: { showVoiceSettings = true },
+                      openSystemSettings: { openSystemVoiceSettings() },
+                      startVoice: beginVoice) {
+            showCameraSheet = true
         }
+    }
+
+    // MARK: - The voice capsule
+
+    /// The bot the capsule speaks to: the one the long-press menu made lead, and the store it lives on.
+    private var leadBot: RosterItem? {
+        accounts.roster.first { $0.bot.lead && !$0.bot.isGroup }
+    }
+
+    /// No lead bot is a setup problem, not a recording one: say where to fix it instead of opening the mic.
+    private func beginVoice() {
+        guard leadBot != nil else {
+            toast = GlassToastItem(icon: "error-warning-line",
+                                   text: L10n.tr("Pick a main bot in Settings first"))
+            return
+        }
+        Task { await voice.begin() }
+    }
+
+    /// The same send a typed message uses, so the bot answers exactly as it would in the chat.
+    private func sendToLeadBot(_ words: String) {
+        guard let lead = leadBot, let store = accounts.store(for: lead.ref.computerId) else { return }
+        store.send(words, to: lead.bot.id)
+        Haptics.notification()
+        // Stay on the home: the pill says where it went and opens it if tapped.
+        toast = GlassToastItem(icon: "check-line", text: L10n.tr("Sent to") + " " + lead.bot.name) {
+            accounts.selection = lead.ref
+        }
+    }
+
+    private func openSystemVoiceSettings() {
+        guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
+        openURL(url)
     }
 
     @ToolbarContentBuilder private var toolbarContent: some ToolbarContent {

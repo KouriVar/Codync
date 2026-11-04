@@ -4,61 +4,41 @@ import CodyncUI
 import SwiftUI
 
 /// Floating home controls, scoped to the roster so a pushed conversation has no bottom bar.
+/// Speaking to the lead bot takes this bar's place: one glass capsule, the same size and place.
 struct HomeBottomBar: View {
     @Binding var searchText: String
+    let voice: VoiceSession
+    /// Who the voice capsule speaks to, drawn as its avatar.
+    let lead: Bot?
+    let openVoiceSettings: () -> Void
+    let openSystemSettings: () -> Void
+    /// The voice button's press: the home checks there is a lead bot before opening the mic.
+    let startVoice: () -> Void
     /// Keyboard up: sit just above it; down: keep the 28pt gap to the screen edge.
     @State private var keyboardUp = false
-    /// The search field is active: hide the extensions button and turn the camera into Close.
+    /// The search field is active: hide the voice button and turn the camera into Close.
     @State private var searching = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// Identities so the glass container can morph elements instead of re-laying them out.
     @Namespace private var glass
     let openCamera: () -> Void
-    let openPlugins: () -> Void
     /// One 48pt row for the search capsule and both circles.
     private let iconSize: CGFloat = 24
     private let iconLineWidth: CGFloat = 1.8
 
     var body: some View {
         GlassEffectContainer(spacing: 12) {
-            HStack(spacing: 12) {
-                if !searching {
-                    Button(action: openPlugins) {
-                        RemixIcon("apps-2-line", size: iconSize)
-                            .foregroundStyle(Palette.text)
-                            .frame(width: 48, height: 48)
-                            .glassEffect(.regular.interactive(), in: Circle())
-                            // iOS 26's own transition: the circle's glass dissolves with the
-                            // container morph instead of a plain removal that stutters.
-                            .glassEffectID("extensions", in: glass)
-                            .glassEffectTransition(.materialize)
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("插件")
-                    .help("插件")
-                    .transition(.opacity)
-                }
-
-                SearchField("搜索", text: $searchText, opaqueBackground: false, active: $searching)
-                    .frame(height: 48)
+            if voice.isPresented {
+                VoiceCapsule(lead: lead, session: voice, openSettings: openVoiceSettings,
+                             openSystemSettings: openSystemSettings)
                     .glassEffect(.regular.interactive(), in: Capsule())
-                    .glassEffectID("search", in: glass)
-                    .submitLabel(.search)
-                    .accessibilityLabel("搜索聊天")
-
-                Button(action: searching ? closeSearch : openCamera) {
-                    RemixIcon(searching ? "close-line" : "camera-fill", size: iconSize)
-                        .foregroundStyle(Palette.text)
-                        .frame(width: 48, height: 48)
-                        .glassEffect(.regular.interactive(), in: Circle())
-                        .glassEffectID("camera", in: glass)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(searching ? "关闭搜索" : "拍照")
-                .help(searching ? "关闭搜索" : "拍照")
+                    .glassEffectID("voice", in: glass)
+                    .transition(.scale(scale: 0.94, anchor: .bottom).combined(with: .opacity))
+            } else {
+                controlRow
             }
-            .animation(Motion.reduced(.snappy(duration: 0.26), reduceMotion), value: searching)
         }
+        .animation(Motion.reduced(.snappy(duration: 0.28), reduceMotion), value: voice.isPresented)
         // One 16pt margin with the toolbar and the list rows.
         .padding(.horizontal, 16)
         .padding(.top, 10)
@@ -71,6 +51,44 @@ struct HomeBottomBar: View {
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
             keyboardUp = false
         }
+    }
+
+    /// The bar as it was: the voice button, the search field, the camera.
+    private var controlRow: some View {
+        HStack(spacing: 12) {
+            if !searching {
+                Button(action: startVoice) {
+                    RemixIcon("mic-line", size: iconSize)
+                        .foregroundStyle(Palette.text)
+                        .frame(width: 48, height: 48)
+                        .glassEffect(.regular.interactive(), in: Circle())
+                        .glassEffectID("voiceButton", in: glass)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(Text(L10n.tr("Voice")))
+                .help(L10n.tr("Voice"))
+                .transition(.opacity)
+            }
+
+            SearchField("搜索", text: $searchText, opaqueBackground: false, active: $searching)
+                .frame(height: 48)
+                .glassEffect(.regular.interactive(), in: Capsule())
+                .glassEffectID("search", in: glass)
+                .submitLabel(.search)
+                .accessibilityLabel("搜索聊天")
+
+            Button(action: searching ? closeSearch : openCamera) {
+                RemixIcon(searching ? "close-line" : "camera-fill", size: iconSize)
+                    .foregroundStyle(Palette.text)
+                    .frame(width: 48, height: 48)
+                    .glassEffect(.regular.interactive(), in: Circle())
+                    .glassEffectID("camera", in: glass)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(searching ? "关闭搜索" : "拍照")
+            .help(searching ? "关闭搜索" : "拍照")
+        }
+        .animation(Motion.reduced(.snappy(duration: 0.26), reduceMotion), value: searching)
     }
 
     /// The Close button while searching: clear the field and drop the keyboard.

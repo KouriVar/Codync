@@ -1379,3 +1379,22 @@
 - 限制/待办：垂直位置由调用方的 overlay 与 `topPadding` 决定，本轮只在首页顶部使用。
 - 关联：C0148。
 
+### C0148 · 2026-11-04 · 首页语音胶囊：录音、转写、确认并发送给主 Bot
+
+- 原因：首页左下角原来是扩展入口，而扩展在设置里已经有入口；把它换成对主 Bot 说话。
+- 变化：
+  - 入口：底部左下角改为 Remix `mic-line` 语音按钮（同为 48pt 玻璃圆、同一套渲染），移除原来的扩展按钮。
+  - 胶囊：点击后整排（左下按钮、搜索栏、拍照）在同一个 `GlassEffectContainer` 里动画换成一条玻璃胶囊（`.glassEffect(.regular.interactive(), in: Capsule())`，48pt 高、16pt 边距，与底栏同尺寸同位置）；结束、发送或取消后动画还原。
+  - 胶囊内容（左→右）：主 Bot 头像（录音时呼吸缩放）、`LevelDots` 随音量起伏的波形、设置按钮、麦克风按钮、红色取消按钮（`Palette.danger`）。
+  - 结束录音：录音中点麦克风为暂停，暂停后同一个按钮变成结束并转写；另外连续 2 秒无声自动结束。取消立刻停麦克风、丢掉结果、什么都不发。
+  - 确认：结束后胶囊里显示转写文字，1.5 秒倒计时环到点自动发送；倒计时内可点红色取消，点文字进入编辑（停止倒计时），改完点发送。识别为空不发，提示「没听清」。
+  - 发给主 Bot（`lead == true` 的那个），走 `store.send(_:to:)`，与会话里打字发送同一条路径；还没有主 Bot 时点语音只弹吐司提示先去设置里选。
+  - 发送后留在首页，顶部弹玻璃吐司「已发送给 XX」，2 秒消失，点一下进入该会话。
+  - 胶囊里的设置按钮：`presentationDetents([.medium])` 半屏 sheet，先只有识别语言（中文 / English，默认中文，`@AppStorage("voiceRecognitionLanguage")`）；sheet 挂在首页根视图上，不会一打开就跳回首页。
+  - 触感：开始、结束、发送成功各一次，取消一次，全部走现有 `Haptics`，跟随设置里的档位。
+  - 文案：新增 19 条简体/繁体词条，代码统一 `L10n.tr`，不硬编码。
+  - 退到后台自动取消录音（系统的麦克风会被收走）。
+- 文件：`apps/ios/Kit/Sources/CodyncUI/Voice/VoiceSession.swift`（新）、`VoiceCapsule.swift`（新）、`VoiceRecognitionSettings.swift`（新）、`apps/ios/Views/HomeBottomBar.swift`、`apps/ios/Views/HomeSourcesView.swift`、`apps/ios/Views/BotListView.swift`（旧列表同步底栏签名）、`apps/ios/Kit/Sources/CodyncKit/Resources/Languages/zh-Hans.json`、`zh-Hant.json`。
+- 验证：按要求只验证编译通过（真机构建 DevDebug），并安装到 iPhone 16 Pro；界面观感、动画和真机识别未自测。
+- 限制/待办：ja/ko/fr/de/es 词条本轮未补，回退英文原文；云端转写只留了协议位置，未接 mimo；「结束」并入麦克风按钮（录音中=暂停，暂停后=结束）。
+- 关联：C0145、C0146、C0147。

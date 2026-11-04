@@ -211,12 +211,11 @@ struct BotListView: View {
         .background(Palette.background)
         .scrollDismissesKeyboard(.interactively)
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            HomeBottomBar(searchText: $searchText, openCamera: { showCameraSheet = true }) {
-                if let store = app.currentStore {
-                    app.marketplace = store.computer.id
-                } else {
-                    app.showComputers = true
-                }
+            // This older roster is no longer reachable; the voice capsule lives on the home.
+            HomeBottomBar(searchText: $searchText, voice: VoiceSession(),
+                          lead: accounts.roster.first { $0.bot.lead }?.bot,
+                          openVoiceSettings: {}, openSystemSettings: {}, startVoice: {}) {
+                showCameraSheet = true
             }
         }
         .sheet(isPresented: $showCameraSheet) {
