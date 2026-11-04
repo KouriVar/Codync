@@ -60,6 +60,9 @@ struct SourceSwitcher: View {
     /// its card can never disagree about their proportions.
     @State private var window = CGSize.zero
     @State private var insets = EdgeInsets()
+    /// The card being grown back into the page, and how far it has grown (0 = card, 1 = the window).
+    @State private var growing: HomeFace?
+    @State private var growProgress: CGFloat = 0
 
     /// A card is this much of the screen's width — about 34% of the screen is left for the two
     /// neighbours, so each shows its edge clearly.
@@ -78,18 +81,24 @@ struct SourceSwitcher: View {
             let width = window.width * Self.cardScale
             // The screen's own aspect: the card is the whole page, so nothing is cropped.
             let height = width * (window.height / max(window.width, 1))
-            VStack(spacing: 14) {
-                Spacer(minLength: 0)
-                Text(centered.title)
-                    .font(.title3.weight(.semibold))
-                    .foregroundStyle(Palette.text)
-                    .contentTransition(.opacity)
-                    .animation(Motion.reduced(Motion.fade, reduceMotion), value: centered)
-                pager(window: window, cardWidth: width, cardHeight: height)
-                dots
-                Spacer(minLength: 16)
+            ZStack {
+                VStack(spacing: 14) {
+                    Spacer(minLength: 0)
+                    Text(centered.title)
+                        .font(.title3.weight(.semibold))
+                        .foregroundStyle(Palette.text)
+                        .contentTransition(.opacity)
+                        .animation(Motion.reduced(Motion.fade, reduceMotion), value: centered)
+                    pager(window: window, cardWidth: width, cardHeight: height)
+                    dots
+                    Spacer(minLength: 16)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .opacity(growing == nil ? 1 : 0)
+                if let face = growing {
+                    growingCard(face, window: window, cardWidth: width, cardHeight: height)
+                }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .background(Palette.background)
         .onAppear {
@@ -103,11 +112,42 @@ struct SourceSwitcher: View {
             MagnifyGesture(minimumScaleDelta: 0.06)
                 .onEnded { value in
                     guard value.magnification > 1.08 else { return }
-                    commit(centered)
+                    pick(centered)
                 }
         )
         .accessibilityElement(children: .contain)
     }
+
+    /// The tapped card growing back into the page: the same card view, the same geometry, from its
+    /// rectangle to the window's — so it is the card itself that fills the screen while the home's
+    /// real bars stay out of the way until it has arrived.
+    private func growingCard(_ face: HomeFace, window: CGSize, cardWidth: CGFloat, cardHeight: CGFloat) -> some View {
+        let t = growProgress
+        let width = cardWidth + (window.width - cardWidth) * t
+        let height = cardHeight + (window.height - cardHeight) * t
+        // A card picked at the side slides to the middle as it grows, rather than jumping there.
+        let step = CGFloat((faces.firstIndex(of: face) ?? 0) - (faces.firstIndex(of: centered) ?? 0))
+        let slide = step * (cardWidth + Self.gap) * (1 - t)
+        return mini(face, window: window, cardWidth: width, cardHeight: height)
+            .offset(x: slide)
+    }
+
+    /// A card was tapped, or the fingers spread: it grows into the page here, and the picker only
+    /// hands over to the real navigation and bottom bars once it has reached the screen's bounds.
+    private func pick(_ face: HomeFace) {
+        guard growing == nil else { return }
+        growing = face
+        withAnimation(Motion.reduced(Self.growSpring, reduceMotion) ?? Motion.fade) {
+            growProgress = 1
+        }
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(380))
+            guard growing == face else { return }
+            commit(face)
+        }
+    }
+
+    private static let growSpring = Animation.spring(response: 0.36, dampingFraction: 0.9)
 
     // MARK: the pages
 
@@ -117,7 +157,7 @@ struct SourceSwitcher: View {
                 ForEach(faces) { face in
                     mini(face, window: window, cardWidth: cardWidth, cardHeight: cardHeight)
                         .id(face)
-                        .onTapGesture { commit(face) }
+                        .onTapGesture { pick(face) }
                 }
             }
             .scrollTargetLayout()

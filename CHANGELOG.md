@@ -2560,3 +2560,38 @@
 - 限制/待办：窗口几何改为读 key window，多窗口/外接屏场景未考虑（本 App 单窗口）；`screenCorner = 55` 仍是
   当前 iPhone 屏幕圆角的常数；卡片里依旧是 N 个真实 `List`。
 - 关联：C0203、C0202。
+
+### C0205 · 2026-11-05 · 捏合卡片：放大不再「闪一下」，卡片背景一色到底
+
+- 原因（真机录屏）：
+  1. **放大时闪一下**：`pick(_:)` 一开始就把 `switcherShown = false`，切换态被撤掉、真实的系统导航栏和底部栏
+     立刻回到全屏位置，而中间页面还在用 `pinchScale` 从 0.66 放到 1 —— 两者不同步，第一帧就闪。
+     缩小方向没问题，因为缩小时切换态是**新盖上去**的，页面和 chrome 一起缩在卡片里。
+  2. **两截底色**：卡片里的列表用的是真实 `List`，`List` 自带一层背景（`scrollContentBackground(.hidden)`
+     在卡片这种被缩放、脱离列表容器的上下文里没有完全生效），于是列表区域露出一块深灰底，且只覆盖到列表
+     自己的框、到不了底部搜索栏，形成「上面灰下面黑」。
+- 变化（`apps/ios/Views/HomeSourceSwitcher.swift`）：
+  - 新增 `growing` / `growProgress` 两个状态与 `growingCard(_:window:cardWidth:cardHeight:)`：点卡片（或双指张开）
+    时**不再立刻关闭切换态**，而是让这张卡片自己从「卡宽 × 卡高」长到「窗口宽 × 窗口高」——同一个 `mini` 视图、
+    同一份几何，圆角随比例从屏幕圆角×0.66 变回屏幕圆角，被点的侧卡会一边长大一边滑到中间（`slide`）。
+    分页器、来源名、分页点用 `.opacity(growing == nil ? 1 : 0)` 同步淡出。
+  - `pick(_:)`（切换态内）：`withAnimation(.spring(0.36, 0.9))` 把 `growProgress` 推到 1，约 380ms 后才调用
+    `commit(face)` 把控制权交回首页。
+- 变化（`Views/HomeSourcesView.swift`）：
+  - `pick(_:)`（首页侧）：不再做任何缩放动画，只把 `pinchScale` 置 1、`homeFace` 写入，并用 0.12s 的
+    `easeOut` 让切换态淡出。因为卡片此刻已经长到整屏、内容与真实页面同尺寸同位置，交接时导航栏与底部栏
+    「换回来」看不出跳变。
+  - 卡片里的列表换成 `miniList(_:)`：不再挂 `List`，直接用 `VStack` 渲染同一批 `entryRow`（真实行视图），
+    背景只有卡片页面自己的 `Palette.background`，从上到下一个颜色；因为没有 List，`rosterRow()` 的
+    `listRowInsets` 会失效，补了 `miniRowInsets()`（左右各 16）保持与全屏一致；空态与 DSH 提示行同样处理。
+  - 新增 `entries(for:)`：按面取行数据（置顶 / 某来源 / DSH）。
+- 保持不变：4 张卡片、捏合进入、左右滑与吸附、翻页轻触感、点卡片进入、向外张开退出、记住上次选择、
+  `UIPageControl` 分页点、卡片比例 0.66、间距 10、1.5pt 玻璃边。
+- 文件：`apps/ios/Views/HomeSourceSwitcher.swift`、`apps/ios/Views/HomeSourcesView.swift`。
+- 验证：`xcodebuild build -project apps/Codync.xcodeproj -scheme 'iOS Dev' -configuration DevDebug`
+  （真机 destination、ui-preview 覆盖、构建号 193）**编译通过，0 error**，改动文件 0 warning；
+  `xcrun devicectl device install app` 装到 iPhone 16 Pro（`com.suiyikou.codync.uipreview` 2.36.0 / 193）成功。
+  按要求**不自测**：不跑测试、不截图、不用 CDP，放大过渡与背景色是否一致未在真机确认。
+- 限制/待办：卡片里的行不再是 `List`，因此卡片内的滚动、下拉刷新、行高自动测量都不生效（卡片本来也不需要）；
+  卡片长到整屏的最后几帧仍带 1.5pt 玻璃边，随即被交接盖掉。
+- 关联：C0204、C0203、C0202。

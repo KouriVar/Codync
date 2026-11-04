@@ -326,7 +326,7 @@ struct HomeSourcesView: View {
             // The status bar's strip: the page's own background, not a colour of its own.
             Palette.background.frame(height: insets.top)
             miniNavRow
-            faceList(face)
+            miniList(face)
             miniBar
             // Below the bar, exactly the 28pt the real page keeps to the screen's edge.
             Palette.background.frame(height: 28)
@@ -334,6 +334,40 @@ struct HomeSourcesView: View {
         .frame(width: window.width, height: window.height)
         .background(Palette.background)
         .allowsHitTesting(false)
+    }
+
+    /// The card's list: the face's own rows, drawn straight on the page's background. There is no
+    /// `List` here — a list brings a background of its own, which would leave the card with two
+    /// shades and a panel that stops short of the bar.
+    private func miniList(_ face: HomeFace) -> some View {
+        let entries = entries(for: face)
+        return VStack(spacing: 0) {
+            if case .source(.dsh) = face, let hint = dshHint {
+                dshHintRow(hint).miniRowInsets()
+            }
+            if entries.isEmpty {
+                if case .pinned = face {
+                    pinnedEmptyState.miniRowInsets()
+                } else {
+                    emptyRow.miniRowInsets()
+                }
+            }
+            ForEach(entries) { entry in
+                entryRow(entry).miniRowInsets()
+            }
+            Spacer(minLength: 0)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .clipped()
+    }
+
+    /// The rows of one face, without any of the list's own chrome.
+    private func entries(for face: HomeFace) -> [HomeEntry] {
+        switch face {
+        case .pinned: return pinnedEntries
+        case .source(.dsh): return dshEntries
+        case .source(let source): return botEntries(for: source)
+        }
     }
 
     /// The card's navigation row: the avatar and the "+" where the real bar puts them.
@@ -428,14 +462,15 @@ struct HomeSourcesView: View {
         }
     }
 
-    /// A card was picked: the home shows it, and the card grows back into the page.
+    /// A card was picked: the switcher has already grown it to the screen's own bounds, so the page
+    /// underneath only has to be the same face and the picker gets out of its way. Nothing scales
+    /// here — the real bars come back exactly where the card ended.
     private func pick(_ face: HomeFace) {
         faceRaw = face.stored
         switcherFace = face
-        pinchScale = SourceSwitcher.cardScale
-        withAnimation(switchAnimation) {
+        pinchScale = 1
+        withAnimation(Motion.reduced(.easeOut(duration: 0.12), reduceMotion)) {
             switcherShown = false
-            pinchScale = 1
         }
     }
 
@@ -1090,6 +1125,16 @@ struct HomeSourcesView: View {
         let computerId: ComputerID
         var source: HomeSource = .coe
         var id: String { "\(kind)-\(computerId)-\(source.rawValue)" }
+    }
+}
+
+// MARK: - Card row styling
+
+private extension View {
+    /// What `rosterRow()`'s `listRowInsets` gives a row inside a list: the card has no list under it,
+    /// so the same 16pt on both sides is added here.
+    func miniRowInsets() -> some View {
+        padding(.horizontal, 16)
     }
 }
 
