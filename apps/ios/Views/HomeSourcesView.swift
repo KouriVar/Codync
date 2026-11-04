@@ -25,9 +25,10 @@ struct HomeSourcesView: View {
     @State private var showCameraSheet = false
     /// The voice capsule and what it says to the lead bot.
     @State private var voice = VoiceSession()
-    @State private var showVoiceSettings = false
-    /// The capsule is pulled up into its panel.
-    @State private var voiceExpanded = false
+    /// The voice sheet is up (it opens on the microphone button).
+    @State private var showVoice = false
+    /// Which height it rests at: the 76pt pill, half, or full.
+    @State private var voiceDetent: PresentationDetent = VoiceSheetView.small
     /// The glass pill that says what was just sent.
     @State private var toast: GlassToastItem?
     @State private var openDSHSession: DSHSession?
@@ -83,18 +84,33 @@ struct HomeSourcesView: View {
                 }
             }
             .sheet(isPresented: $showCameraSheet, content: cameraSheet)
-            // The capsule's own settings, at the root: a row-level anchor is rebuilt and would take
-            // the sheet (and the home) down with it (C0035).
-            .sheet(isPresented: $showVoiceSettings) {
-                VoiceLanguageSheet()
-                    .presentationDetents([.medium])
+            // The voice sheet: on the home's root view, never from a list row — a rebuilt anchor
+            // there takes the sheet, and the home with it (C0035, C0136).
+            .sheet(isPresented: $showVoice, onDismiss: { voiceDetent = VoiceSheetView.small }) {
+                VoiceSheetView(lead: leadBot?.bot, session: voice, detent: $voiceDetent,
+                               openSystemSettings: { openSystemVoiceSettings() })
+                    .presentationDetents([VoiceSheetView.small, .medium, .large], selection: $voiceDetent)
+                    // The system's grabber and glass are the whole point: no hand-drawn handle.
                     .presentationDragIndicator(.visible)
+                    // At the pill the home stays live; halfway and up it dims and locks itself.
+                    .presentationBackgroundInteraction(.enabled(upThrough: VoiceSheetView.small))
+                    .interactiveDismissDisabled()
             }
             .glassToast($toast, topPadding: 6)
-            // Sending or cancelling closes the capsule; the panel goes with it.
-            .onChange(of: voice.isPresented) { _, shown in
-                if !shown { voiceExpanded = false }
+            .onChange(of: voice.phase) { _, phase in
+                switch phase {
+                // The words are read at half height: come up if the pill is where it still sits.
+                case .confirming, .notice:
+                    if showVoice, voiceDetent == VoiceSheetView.small {
+                        withAnimation(Motion.reduced(Motion.layout, reduceMotion)) { voiceDetent = .medium }
+                    }
+                // Sent or cancelled: the sheet has done its work.
+                case .idle:
+                    if showVoice { showVoice = false }
+                default: break
+                }
             }
+            .onChange(of: voiceDetent) { _, _ in Haptics.selection() }
             .onAppear { voice.onSend = { sendToLeadBot($0) } }
             .navigationDestination(item: $openDSHSession) { _ in
                 DSHConversationView(gateway: dsh)
@@ -150,8 +166,6 @@ struct HomeSourcesView: View {
         .background(Palette.background)
         .ignoresSafeArea(edges: .top)
         .overlay(alignment: .top) { ProgressiveTopBlur() }
-        // The raised panel dims the list behind it; below the bar in z-order, so the pill stays lit.
-        .overlay { voiceDim }
         .safeAreaInset(edge: .bottom, spacing: 0) { bottomBar }
     }
 
@@ -165,11 +179,7 @@ struct HomeSourcesView: View {
     }
 
     private var bottomBar: some View {
-        HomeBottomBar(searchText: $searchText, voice: voice, lead: leadBot?.bot,
-                      voiceExpanded: $voiceExpanded, voicePanelHeight: voicePanelHeight,
-                      openVoiceSettings: { showVoiceSettings = true },
-                      openSystemSettings: { openSystemVoiceSettings() },
-                      startVoice: beginVoice) {
+        HomeBottomBar(searchText: $searchText, startVoice: beginVoice) {
             showCameraSheet = true
         }
     }
@@ -188,6 +198,8 @@ struct HomeSourcesView: View {
                                    text: L10n.tr("Pick a main bot in Settings first"))
             return
         }
+        voiceDetent = VoiceSheetView.small
+        showVoice = true
         Task { await voice.begin() }
     }
 
@@ -200,25 +212,6 @@ struct HomeSourcesView: View {
         toast = GlassToastItem(icon: "check-line", text: L10n.tr("Sent to") + " " + lead.bot.name) {
             accounts.selection = lead.ref
         }
-    }
-
-    /// About 45% of the screen: the half-screen the capsule becomes when it is pulled up.
-    private var voicePanelHeight: CGFloat {
-        let screen = UIApplication.shared.connectedScenes
-            .compactMap { $0 as? UIWindowScene }
-            .first?.screen.bounds.height ?? 850
-        return (screen * 0.45).rounded()
-    }
-
-    private var voiceDim: some View {
-        Color.black.opacity(voiceExpanded ? 0.08 : 0)
-            .ignoresSafeArea()
-            .allowsHitTesting(voiceExpanded)
-            .onTapGesture {
-                withAnimation(Motion.reduced(.spring(response: 0.4, dampingFraction: 0.85), reduceMotion)) {
-                    voiceExpanded = false
-                }
-            }
     }
 
     private func openSystemVoiceSettings() {

@@ -4,19 +4,9 @@ import CodyncUI
 import SwiftUI
 
 /// Floating home controls, scoped to the roster so a pushed conversation has no bottom bar.
-/// Speaking to the lead bot takes this bar's place: one glass capsule, the same size and place.
 struct HomeBottomBar: View {
     @Binding var searchText: String
-    let voice: VoiceSession
-    /// Who the voice capsule speaks to, drawn as its avatar.
-    let lead: Bot?
-    /// The capsule is pulled up into its half-screen panel.
-    @Binding var voiceExpanded: Bool
-    /// How tall that panel is: about 45% of the screen, from the home.
-    let voicePanelHeight: CGFloat
-    let openVoiceSettings: () -> Void
-    let openSystemSettings: () -> Void
-    /// The voice button's press: the home checks there is a lead bot before opening the mic.
+    /// The voice button's press: the home checks there is a lead bot, then opens the voice sheet.
     let startVoice: () -> Void
     /// Keyboard up: sit just above it; down: keep the 28pt gap to the screen edge.
     @State private var keyboardUp = false
@@ -32,22 +22,8 @@ struct HomeBottomBar: View {
 
     var body: some View {
         GlassEffectContainer(spacing: 12) {
-            if voice.isPresented {
-                VoiceCapsule(lead: lead, session: voice, expanded: $voiceExpanded,
-                             panelHeight: voicePanelHeight,
-                             openSettings: openVoiceSettings, openSystemSettings: openSystemSettings)
-                    .glassEffectID("voice", in: glass)
-                    // It grows out of the mic button it replaced, at the bar's left end.
-                    .transition(.scale(scale: 0.72, anchor: .bottomLeading).combined(with: .opacity))
-                    // The bar keeps only its resting height, so a raised panel grows up over the list
-                    // instead of shoving it up.
-                    .frame(height: VoiceCapsule.collapsed, alignment: .bottom)
-            } else {
-                controlRow
-            }
+            controlRow
         }
-        .animation(Motion.reduced(.spring(response: 0.35, dampingFraction: 0.85), reduceMotion),
-                   value: voice.isPresented)
         // One 16pt margin with the toolbar and the list rows.
         .padding(.horizontal, 16)
         .padding(.top, 10)

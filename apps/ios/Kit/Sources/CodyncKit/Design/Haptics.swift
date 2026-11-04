@@ -51,6 +51,12 @@ public enum Haptics {
         play(level)
     }
 
+    /// A detent tick (a sheet moving between heights): the system's lightest, silent when off.
+    public static func selection() {
+        guard level != .off else { return }
+        UISelectionFeedbackGenerator().selectionChanged()
+    }
+
     /// Previewing a level in Settings plays it immediately.
     public static func preview(_ level: HapticsLevel) {
         play(level)

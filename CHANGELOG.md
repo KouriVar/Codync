@@ -1450,3 +1450,20 @@
 - 验证：`xcodebuild build -scheme 'iOS Dev' -configuration DevDebug` 通过；已装到 iPhone 16 Pro（2.36.0 / 149）并启动。按要求未自测、未截图。
 - 限制/待办：`SpeechTranscriber`、`VoiceSession` 未改；面板溢出底栏靠父视图不裁剪实现，若真机上溢出区域点不动需要改成把面板挂到首页 overlay。
 - 关联：C0148、C0149、C0150。
+### C0152 · 2026-11-04 · 语音胶囊 v3：改用原生 sheet（76 / 半屏 / 全屏），替代 C0151 的手写拖拽面板
+
+- 原因：C0151 用 DragGesture + 自绘提手 + 溢出布局自己搭了一个半屏面板，提手、圆角、遮罩、命中测试都得自己维护。按 Figma 量的 iOS 26 官方 sheet：76pt 高时 44pt 圆按钮四边各 16pt、提手在顶部正中，正好可以直接借原生 sheet 承载。
+- 变化：
+  - 点首页麦克风后弹出一个原生 sheet，内容就是语音胶囊；sheet 挂在首页根视图上（不挂列表/Form 行，避免 C0035/C0136 那种被重建后跳回首页）。
+  - `.presentationDetents([.height(76), .medium, .large], selection:)`，打开时固定在 `.height(76)`；`.presentationDragIndicator(.visible)` 用系统提手（删掉 C0151 自绘的）；`.presentationBackgroundInteraction(.enabled(upThrough: .height(76)))`——小档时首页还能滑动点击，半屏以上系统自己变暗并挡住；`.interactiveDismissDisabled()` 不允许下拉关闭，只能点 ✕ 或发送完自动关。背景、圆角、描边全部用系统默认，不设 `presentationBackground`。
+  - 删掉 C0151 的 DragGesture、自绘提手、手写面板、溢出布局与 0.08 遮罩；`HomeBottomBar` 回到原来的单排底栏（只有麦克风按钮触发 sheet）。
+  - 小档 76pt：✕ 取消 44、主 Bot 头像 36（呼吸动画保留）、波形（铺满中间，最高 24pt）、设置 44、麦克风 44；按钮都在 `GlassEffectContainer` 里、各自 `.glassEffect(.regular.tint(…).interactive(), in: Circle())`，麦克风录音时 tint 强调色 + 白图标，暂停去掉 tint；取消是浅红 tint 玻璃 + 红 ✕；iOS 26 以下仍走 `.ultraThinMaterial` + 0.5pt 描边的兜底。
+  - 半屏：顶部一行 — 左 ✕、中间标题（录音中「正在听…」，结束后「发给 XX」）、右麦克风/发送；中间 20 号转写全文可滚动、自动跟到最新一行，空时「说点什么…」；底部波形 + 设置；编辑态在本页直接改字，1.5 秒倒计时环挂在麦克风/发送按钮上。
+  - 识别结束（或权限提示）时如果还停在小档，自动切到 `.medium` 显示文字，倒计时结束照常发送。
+  - 三档共用同一个视图，靠 detent 切换内容；按钮用 `matchedGeometryEffect` 从小档一行平移到半屏的标题栏。全屏 `.large` 暂时复用半屏那套布局，代码里留了 TODO（二期做连续通话）。
+  - 语音设置（识别语言）改成从语音 sheet 内再弹一层 `.medium` sheet（一个 presenter 同时只能一个 sheet），不再从首页弹。
+  - detent 变化时 `Haptics.selection()`（新增，跟随触感档位、关就静音）；发送或取消后关闭 sheet 并把 detent 复位到 `.height(76)`；发完仍在首页弹玻璃吐司「已发送给 XX」。
+- 文件：`apps/ios/Kit/Sources/CodyncUI/Voice/VoiceSheetView.swift`（新，替代删除的 `VoiceCapsule.swift`）、`VoiceWaveform.swift`、`apps/ios/Views/HomeBottomBar.swift`、`HomeSourcesView.swift`、`BotListView.swift`（旧列表同步底栏签名）、`apps/ios/Kit/Sources/CodyncKit/Design/Haptics.swift`、`Resources/Languages/zh-Hans.json`、`zh-Hant.json`（新增「发给」）。
+- 验证：`xcodebuild build -scheme 'iOS Dev' -configuration DevDebug` 通过；已装到 iPhone 16 Pro（2.36.0 / 150）并启动。按要求未自测、未截图。
+- 限制/待办：`.large` 一档暂无独立内容；`SpeechTranscriber`、`VoiceSession` 未改。
+- 关联：C0148、C0149、C0150、C0151。

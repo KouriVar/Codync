@@ -212,10 +212,7 @@ struct BotListView: View {
         .scrollDismissesKeyboard(.interactively)
         .safeAreaInset(edge: .bottom, spacing: 0) {
             // This older roster is no longer reachable; the voice capsule lives on the home.
-            HomeBottomBar(searchText: $searchText, voice: VoiceSession(),
-                          lead: accounts.roster.first { $0.bot.lead }?.bot,
-                          voiceExpanded: .constant(false), voicePanelHeight: 380,
-                          openVoiceSettings: {}, openSystemSettings: {}, startVoice: {}) {
+            HomeBottomBar(searchText: $searchText, startVoice: {}) {
                 showCameraSheet = true
             }
         }
