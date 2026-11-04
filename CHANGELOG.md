@@ -1760,3 +1760,17 @@
 - 验证：`xcodebuild build -scheme 'iOS Dev' -configuration DevDebug` 通过；已装到 iPhone 16 Pro（2.36.0 / 170）并启动。按要求未自测、未截图。
 - 限制/待办：无。
 - 关联：C0170。
+### C0173 · 2026-11-04 · 相机页按设计稿重做布局（替换此前相机页的所有补充修复）
+
+- 原因：前几版相机页是「顶部两个按钮 + 底部三个按钮」的临时排法，和设计稿不一致。
+- 变化：
+  - 镜像：保留 C0171 的做法——相机面在 sheet 的翻转之外再加一层 `.rotation3DEffect(.degrees(180), axis: (0,1,0))`，翻过来方向正常。
+  - 取景：实时预览铺满整个相机页（`ignoresSafeArea`），四角用 `RoundedRectangle(cornerRadius: 32)` 裁切，跟着 sheet 的圆角走。
+  - 顶部：**不放任何按钮**，只有系统自带的拖动指示条。
+  - 底部：一排三个按钮，垂直居中对齐、离底边 16pt、离左右各 16pt——左「返回」44 圆形深色玻璃钮（黑 35% tint）+ 白色 `arrow-left-s-line` 24pt，点了反向翻转回语音输入页（录音与文字保留）；中「快门」72pt 玻璃环内嵌 60pt 实心白圆，按下缩到 0.9 并有触感；右「更多」44 圆形深色玻璃钮 + 白色 `more-line` 24pt，先只占位、点了无操作。
+  - 去掉相册按钮与切换前后摄像头按钮（`PhotosPicker` 相关代码一并删除，后续放进「更多」）。
+  - 取景页其余逻辑（拍照后自动翻回、缩略图、权限请求）未改。
+- 文件：`apps/ios/Kit/Sources/CodyncUI/Voice/VoiceCamera.swift`（`VoiceSheetView.swift` 的镜像层沿用 C0171）。
+- 验证：`xcodebuild build -scheme 'iOS Dev' -configuration DevDebug` 通过；已装到 iPhone 16 Pro（2.36.0 / 171）并启动。按要求未自测、未截图。
+- 限制/待办：「更多」暂未接任何功能（相册、前后摄后续放这里）。
+- 关联：C0168、C0169、C0171。

@@ -1,6 +1,5 @@
 import AVFoundation
 import CodyncKit
-import PhotosUI
 import SwiftUI
 import UIKit
 
@@ -137,16 +136,12 @@ struct VoiceCameraPreview: UIViewRepresentable {
     }
 }
 
-/// The camera page of the voice sheet: back on the left, shutter in the middle, flip and album at the
-/// bottom corners. Picking or shooting a photo hands it back and the sheet flips back to the words.
+/// The camera page of the voice sheet: the viewfinder edge to edge, and three controls along the
+/// bottom — back, shutter, more. Nothing at the top but the sheet's own grabber.
 public struct VoiceCameraPage: View {
     let camera: VoiceCamera
     let onBack: () -> Void
     let onCapture: (UIImage) -> Void
-
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var picked: PhotosPickerItem?
-    @State private var picking = false
 
     public init(camera: VoiceCamera, onBack: @escaping () -> Void, onCapture: @escaping (UIImage) -> Void) {
         self.camera = camera
@@ -156,10 +151,10 @@ public struct VoiceCameraPage: View {
 
     public var body: some View {
         ZStack {
-            Color.black.ignoresSafeArea()
+            Color.black
             switch camera.access {
             case .granted:
-                VoiceCameraPreview(session: camera.session).ignoresSafeArea()
+                VoiceCameraPreview(session: camera.session)
                 controls
             case .denied:
                 Text(L10n.tr("The camera needs permission in Settings"))
@@ -171,83 +166,57 @@ public struct VoiceCameraPage: View {
                 ProgressView().tint(.white)
             }
         }
+        // The viewfinder takes the whole page; its corners are the sheet's.
+        .ignoresSafeArea()
+        .clipShape(RoundedRectangle(cornerRadius: 32, style: .continuous))
         .task {
             await camera.requestAccess()
             if camera.access == .granted { camera.start() }
         }
         .onDisappear { camera.stop() }
-        .onChange(of: picked) { _, item in
-            guard let item else { return }
-            Task {
-                if let data = try? await item.loadTransferable(type: Data.self), let image = UIImage(data: data) {
-                    Haptics.impact()
-                    onCapture(image)
-                }
-                picked = nil
-            }
-        }
     }
 
+    /// Back on the left, the shutter in the middle, more on the right: 44pt circles 16pt from the
+    /// edges, sitting 16pt above the bottom, all three centred on one line.
     private var controls: some View {
         VStack {
-            // Two buttons and nothing else: back on the left, more on the right, 16pt in.
-            HStack {
-                glassButton("arrow-left-line", label: "Back") { onBack() }
-                Spacer(minLength: 0)
-                moreButton
-            }
-            .padding(.horizontal, 16)
             Spacer(minLength: 0)
-            // Shutter in the middle, album at the left corner, flip at the right, all the same glass.
             HStack {
-                glassButton("image-line", label: "Choose a photo") { picking = true }
-                    .photosPicker(isPresented: $picking, selection: $picked, matching: .images)
+                glassCircle("arrow-left-s-line", label: "Back") { onBack() }
                 Spacer(minLength: 0)
-                Button {
-                    Task {
-                        if let image = await camera.capture() {
-                            Haptics.impact()
-                            onCapture(image)
-                        }
-                    }
-                } label: {
-                    RemixIcon("record-circle-line", size: 24, weight: .medium)
-                        .foregroundStyle(.white)
-                        .frame(width: 44, height: 44)
-                        .contentShape(Circle())
-                }
-                .buttonStyle(CameraPress())
-                .modifier(VoiceGlass(tint: .white.opacity(0.25), shape: AnyShape(Circle())))
-                .disabled(camera.capturing)
-                .accessibilityLabel(Text(L10n.tr("Take a photo")))
+                shutter
                 Spacer(minLength: 0)
-                glassButton("camera-switch-line", label: "Flip the camera") { camera.flip() }
+                // A placeholder for later: the album and the camera flip move in here.
+                glassCircle("more-line", label: "More") {}
             }
             .padding(.horizontal, 16)
             .padding(.bottom, 16)
         }
     }
 
-    /// The ⋯ the page asks for: the one thing worth offering here is where the permission lives.
-    private var moreButton: some View {
-        Menu {
-            if let url = URL(string: UIApplication.openSettingsURLString) {
-                Link(destination: url) {
-                    Label { Text(L10n.tr("Open Settings")) } icon: { RemixIcon("settings-3-line") }
-                }
+    /// A glass ring with a white disc inside it; pressing squeezes the whole thing.
+    private var shutter: some View {
+        Button {
+            Haptics.impact()
+            Task {
+                if let image = await camera.capture() { onCapture(image) }
             }
         } label: {
-            RemixIcon("more-line", size: 24, weight: .medium)
-                .foregroundStyle(.white)
-                .frame(width: 44, height: 44)
-                .contentShape(Circle())
+            ZStack {
+                Circle().fill(.clear)
+                Circle().fill(.white).frame(width: 60, height: 60)
+            }
+            .frame(width: 72, height: 72)
+            .contentShape(Circle())
         }
-        .modifier(VoiceGlass(tint: nil, shape: AnyShape(Circle())))
-        .accessibilityLabel(Text(L10n.tr("More")))
+        .buttonStyle(ShutterPress())
+        .modifier(VoiceGlass(tint: .white.opacity(0.18), shape: AnyShape(Circle())))
+        .disabled(camera.capturing)
+        .accessibilityLabel(Text(L10n.tr("Take a photo")))
     }
 
-    /// One 44pt glass circle, the same one the voice sheet uses.
-    private func glassButton(_ icon: String, label: String, action: @escaping () -> Void) -> some View {
+    /// A 44pt circle of dark glass with one white glyph in it.
+    private func glassCircle(_ icon: String, label: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             RemixIcon(icon, size: 24, weight: .medium)
                 .foregroundStyle(.white)
@@ -255,15 +224,23 @@ public struct VoiceCameraPage: View {
                 .contentShape(Circle())
         }
         .buttonStyle(CameraPress())
-        .modifier(VoiceGlass(tint: nil, shape: AnyShape(Circle())))
+        .modifier(VoiceGlass(tint: .black.opacity(0.35), shape: AnyShape(Circle())))
         .accessibilityLabel(Text(L10n.tr(label)))
     }
 
     private struct CameraPress: ButtonStyle {
         func makeBody(configuration: Configuration) -> some View {
             configuration.label
-                .opacity(configuration.isPressed ? 0.6 : 1)
+                .opacity(configuration.isPressed ? 0.7 : 1)
                 .scaleEffect(configuration.isPressed ? 0.94 : 1)
+                .animation(Motion.press, value: configuration.isPressed)
+        }
+    }
+
+    private struct ShutterPress: ButtonStyle {
+        func makeBody(configuration: Configuration) -> some View {
+            configuration.label
+                .scaleEffect(configuration.isPressed ? 0.9 : 1)
                 .animation(Motion.press, value: configuration.isPressed)
         }
     }
