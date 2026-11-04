@@ -91,9 +91,16 @@ struct HomeSourcesView: View {
                 voice.discard()
                 voiceDetent = VoiceSheetView.small
                 isTransitioning = true
-                tabBarHidden = false
+                // Back in the state it left in, then home on the same animation it went out with.
+                accessoryMounted = true
+                accessoryLeaving = true
                 Task { @MainActor in
-                    try? await Task.sleep(for: .milliseconds(350))
+                    try? await Task.sleep(for: .milliseconds(20))
+                    withAnimation(Self.barFade) {
+                        accessoryLeaving = false
+                        tabBarHidden = false
+                    }
+                    try? await Task.sleep(for: .milliseconds(320))
                     isTransitioning = false
                 }
             }) {
@@ -180,7 +187,8 @@ struct HomeSourcesView: View {
         // Scrolling down shrinks the bar to the tab you are on and folds the accessory into it.
         .tabBarMinimizeBehavior(.onScrollDown)
         // Only the two tabs that talk to Coe carry the bar; the others leave the screen to their list.
-        .modifier(VoiceBar(shown: (selection == .pinned || selection == .coe) && isTabRoot && !tabBarHidden,
+        .modifier(VoiceBar(shown: (selection == .pinned || selection == .coe) && isTabRoot && accessoryMounted,
+                           leaving: accessoryLeaving,
                            lead: leadBot?.bot, onTap: beginVoice))
         .tint(Palette.text)
         .onChange(of: enabledSources) { _, sources in
@@ -211,10 +219,16 @@ struct HomeSourcesView: View {
 
     /// The open conversation, shared by every tab: opening one from a notification or a link lands in
     /// whichever tab is on screen.
-    /// The system bar is hidden: set as the voice sheet opens, by the system's own slide.
+    /// The system bar is hidden while the voice sheet is up.
     @State private var tabBarHidden = false
+    /// The accessory is mounted; it stays mounted through its exit animation, then goes.
+    @State private var accessoryMounted = true
+    /// The accessory has slid down and faded — it is on its way out, or waiting to come back.
+    @State private var accessoryLeaving = false
     /// One transition at a time: the bar and the sheet can't be summoned twice.
     @State private var isTransitioning = false
+    /// The bar's exit and entrance: one ease, both ways.
+    private static let barFade = Animation.easeInOut(duration: 0.3)
 
     /// Nothing is pushed on the tab in front, so its root is what the user is looking at.
     private var isTabRoot: Bool { accounts.selection == nil && openDSHSession == nil }
@@ -315,11 +329,15 @@ struct HomeSourcesView: View {
             return
         }
         isTransitioning = true
-        // The bar and the accessory are the system's: hiding the bar slides both down together, and
-        // the page below never moves. The sheet follows once that is under way.
-        tabBarHidden = true
+        // The accessory slides down and fades while the tab bar hides, on one animation; the page
+        // underneath does not move at all. The accessory stays mounted until that has played out.
+        withAnimation(Self.barFade) {
+            accessoryLeaving = true
+            tabBarHidden = true
+        }
         Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(150))
+            try? await Task.sleep(for: .milliseconds(300))
+            accessoryMounted = false
             voiceDetent = VoiceSheetView.small
             showVoice = true
             await voice.begin()
@@ -919,6 +937,8 @@ struct DSHSessionRow: View {
 /// Mounts the bottom accessory only on the tabs that carry it, and only at their root.
 private struct VoiceBar: ViewModifier {
     let shown: Bool
+    /// Down 40pt and invisible: on the way out, or waiting to slide back in.
+    let leaving: Bool
     let lead: Bot?
     let onTap: () -> Void
 
@@ -926,6 +946,8 @@ private struct VoiceBar: ViewModifier {
         if shown {
             content.tabViewBottomAccessory {
                 HomeVoiceAccessory(lead: lead, onTap: onTap)
+                    .offset(y: leaving ? 40 : 0)
+                    .opacity(leaving ? 0 : 1)
             }
         } else {
             content

@@ -1827,3 +1827,16 @@
 - 验证：`xcodebuild build -scheme 'iOS Dev' -configuration DevDebug` 通过；已装到 iPhone 16 Pro（2.36.0 / 175）并启动。按要求未自测、未截图。
 - 限制/待办：如果真机上顶部拖动条区域仍露出一点背景，说明是 sheet 自身的安全区不可越过，只能接受那条窄边。
 - 关联：C0173、C0175。
+### C0178 · 2026-11-05 · 语音条与 tab bar 的进出动画（不再瞬移）
+
+- 原因：C0176 直接切换 `.toolbar(.hidden)` 与附属栏挂载，二者都是瞬时变化，tab bar 和语音条「啪」地消失/出现。
+- 变化：
+  - 新增 `accessoryLeaving`（下移 40pt + 透明度 0）与 `accessoryMounted`（是否挂载）两个状态：**退出时先动画、后卸载**，不再一上来就把附属栏从视图树里拿掉。
+  - 进入：点语音条后 `withAnimation(.easeInOut(duration: 0.3))` 同时置 `accessoryLeaving = true` 与 `tabBarHidden = true`，语音条下滑淡出；动画放完约 0.3s 后才卸载附属栏、弹原生语音 sheet 并停在 76 小档。
+  - 退出：`onDismiss` 里先把附属栏按「offset 40 / opacity 0」挂回，再用同一个 `withAnimation(.easeInOut(duration: 0.3))` 回到原位、透明度 1，tab bar 同步显示。
+  - 首页内容（列表、头像、+）没有任何位移或透明度变化，只有 tab bar 与语音条两样在动。
+  - `isTransitioning` 仍然挡住重复点击。
+- 文件：`apps/ios/Views/HomeSourcesView.swift`。
+- 验证：`xcodebuild build -scheme 'iOS Dev' -configuration DevDebug` 通过；已装到 iPhone 16 Pro（2.36.0 / 176）并启动。按要求未自测、未截图。
+- 限制/待办：**系统 tab bar 的 .toolbar(.hidden) 是否真的吃 `withAnimation` 我这边无法自测**。若真机上 tab bar 仍是瞬间消失（语音条已有滑动淡出、tab bar 却是硬切），那就是系统的工具栏可见性不参与该事务——按你的要求我先停在这里，请把现象告诉我（是不是只有 tab bar 硬切、语音条正常），我再决定是否改用「保持挂载 + 只淡出附属栏」的方案。
+- 关联：C0172、C0174、C0176。
