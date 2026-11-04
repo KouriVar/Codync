@@ -53,6 +53,8 @@ public struct VoiceSheetView: View {
                 // The sheet turns over to get here, so this face starts upside down: turn it back.
                 .rotation3DEffect(.degrees(180), axis: (x: 0, y: 1, z: 0))
                 .rotation3DEffect(.degrees(flip), axis: (x: 0, y: 1, z: 0))
+                // Nothing between the camera and the sheet's bottom edge: no safe-area inset to stop it.
+                .ignoresSafeArea(edges: .bottom)
             } else if isSmall {
                 pill
                     .rotation3DEffect(.degrees(flip), axis: (x: 0, y: 1, z: 0))
@@ -62,6 +64,9 @@ public struct VoiceSheetView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: isSmall ? .center : .top)
+        // The camera page is the only face that runs to the bottom edge; the voice faces keep their
+        // safe-area insets, so their buttons stay above the Home indicator.
+        .ignoresSafeArea(edges: showingCamera ? .bottom : [])
         // One spring for the change between detents: nothing else animates the layout.
         .animation(Motion.reduced(Self.settle, reduceMotion), value: isSmall)
         .animation(Motion.reduced(Self.settle, reduceMotion), value: session.sendFailed)

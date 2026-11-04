@@ -1809,3 +1809,21 @@
 - 验证：`xcodebuild build -scheme 'iOS Dev' -configuration DevDebug` 通过；已装到 iPhone 16 Pro（2.36.0 / 174）并启动。按要求未自测、未截图。
 - 限制/待办：底栏进出的具体手感完全由系统决定。
 - 关联：C0172、C0174。
+### C0177 · 2026-11-05 · 相机画面铺满整个 sheet（附逐层排查）
+
+- 原因：相机页画面没铺满，底部/顶部露出 sheet 自己的背景（看起来像灰条）。
+- 逐层排查（改动前的状态）：
+  1. `HomeSourcesView.swift:89-110` —— `.sheet(isPresented: $showVoice, …)` 只挂了 `presentationDetents` / `presentationDragIndicator` / `presentationBackgroundInteraction` / `interactiveDismissDisabled`，**没有** `presentationBackground`。所以那层灰不是我们画的，而是 **sheet 的系统默认背景**，凡是内容没铺到的地方就露它。
+  2. `VoiceSheetView.swift` 的 `body` 根 `Group` —— 有 `.frame(maxWidth: .infinity, maxHeight: .infinity)`，**没有 padding / safeAreaPadding**；但它**没有** `ignoresSafeArea`，因此内容被 sheet 的上下安全区内缩，相机页顶部（拖动条区域）与底部（Home 指示条区域）都会露出第 1 条的背景。
+  3. 翻转容器 —— `VoiceCameraPage(...).rotation3DEffect(180).rotation3DEffect(flip)`，同样没有 `ignoresSafeArea`，继续沿用第 2 条的内缩。
+  4. `VoiceCameraPage`（`VoiceCamera.swift`）—— 之前是 `ZStack { viewfinder.ignoresSafeArea(edges: .bottom).clipShape(32); controls }`：取景只忽略底部、且被 `clipShape` 裁在自己的矩形里，顶部仍内缩；`Color.black` 也在同一个 ZStack 里，所以边缘露出的就是第 1 条的 sheet 背景。
+  5. `controls` —— `VStack` + `padding(.horizontal, 16)` + `padding(.bottom, 16)`，无 frame 限制；之前因为整层 ignore 安全区而贴到 Home 指示条上。
+- 变化：
+  - 相机预览改为**相机页最底层**：`.background { ZStack { Color.black; VoiceCameraPreview } .ignoresSafeArea() }`，由外到内都铺满，圆角 `RoundedRectangle(32)` 跟随 sheet。
+  - `VoiceCameraPage` 的翻转容器与 `VoiceSheetView` 内容根视图都加上 `.ignoresSafeArea(edges: .bottom)`（根视图按 `showingCamera ? .bottom : []` 条件加，**语音页布局不受影响**）。
+  - 按钮仍按安全区布局：`padding(.bottom, 16)`，离 Home 指示条 16pt，位置不变。
+  - 权限提示（拒绝 / 询问中）仍画在取景之上，其余逻辑未动。
+- 文件：`apps/ios/Kit/Sources/CodyncUI/Voice/VoiceCamera.swift`、`VoiceSheetView.swift`。
+- 验证：`xcodebuild build -scheme 'iOS Dev' -configuration DevDebug` 通过；已装到 iPhone 16 Pro（2.36.0 / 175）并启动。按要求未自测、未截图。
+- 限制/待办：如果真机上顶部拖动条区域仍露出一点背景，说明是 sheet 自身的安全区不可越过，只能接受那条窄边。
+- 关联：C0173、C0175。

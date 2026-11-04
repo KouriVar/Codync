@@ -150,15 +150,23 @@ public struct VoiceCameraPage: View {
     }
 
     public var body: some View {
+        // The buttons sit in the safe area; everything under them is the viewfinder, all the way to
+        // the sheet's bottom corners, so no sheet background shows through.
         ZStack {
-            // The viewfinder reaches the very bottom of the sheet, corners and all, so no page
-            // background shows under it near the Home indicator.
-            viewfinder
-                .ignoresSafeArea(edges: .bottom)
-                .clipShape(RoundedRectangle(cornerRadius: 32, style: .continuous))
-            // The controls stay inside the safe area, 16pt clear of the Home indicator.
             controls
+            if camera.access != .granted { status }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background {
+            ZStack {
+                Color.black
+                if camera.access == .granted {
+                    VoiceCameraPreview(session: camera.session)
+                }
+            }
+            .ignoresSafeArea()
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 32, style: .continuous))
         .task {
             await camera.requestAccess()
             if camera.access == .granted { camera.start() }
@@ -166,21 +174,18 @@ public struct VoiceCameraPage: View {
         .onDisappear { camera.stop() }
     }
 
-    @ViewBuilder private var viewfinder: some View {
-        ZStack {
-            Color.black
-            switch camera.access {
-            case .granted:
-                VoiceCameraPreview(session: camera.session)
-            case .denied:
-                Text(L10n.tr("The camera needs permission in Settings"))
-                    .font(.system(size: 17))
-                    .foregroundStyle(.white)
-                    .multilineTextAlignment(.center)
-                    .padding(32)
-            case .unknown:
-                ProgressView().tint(.white)
-            }
+    @ViewBuilder private var status: some View {
+        switch camera.access {
+        case .denied:
+            Text(L10n.tr("The camera needs permission in Settings"))
+                .font(.system(size: 17))
+                .foregroundStyle(.white)
+                .multilineTextAlignment(.center)
+                .padding(32)
+        case .unknown:
+            ProgressView().tint(.white)
+        case .granted:
+            EmptyView()
         }
     }
 
