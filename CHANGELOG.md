@@ -1063,3 +1063,46 @@
 - 验证：DevDebug 真机构建、安装通过；新页能打开，但当前会话历史为空（`session-snapshot` 未到达/未解析，正在排查），所以默认仍走旧页；Coe 页未做人工点按回归（`ThreadView` 只换了滚动容器，参数一致）。
 - 限制/待办：新 DSH 页历史为空待修；修好后把默认切到新页并补 Coe/DSH 回归截图。
 - 关联：C0118、C0122。
+
+### C0124 · 2026-11-04 · 修 DSH 对话页历史为空，默认改用新对话页
+
+- 原因：新 DSH 对话页打开后历史为空。
+- 排查（对照网关源码，不猜）：
+  - `dsh-plugin-mobile-gateway/lib/session-follower.mjs` 的 `createFollowDecoder` 首个帧是 `{ type: 'snapshot', history: readSessionSnapshot(...) }`，其中 `history.events` 是 `{ event }` 包装。
+  - `lib/index.mjs` 的 `onFrame` 用 `historyPage(frame.history, …)` 把它变成 `kind: 'session-snapshot'`，`events` 是 host 原始事件 `{ type, time, data }`（`assistant/message` 的正文在 `data.message.content`，思考在 `content` 的 `reasoning` 块）。
+  - 客户端之前把 snapshot 事件当成 wire 结构 `{ type, text }` 取文本，取错了层；而且只依赖 subscribe 的 snapshot，snapshot 没到/为空就是空白。`subscribe` 的请求方式（`sessionId` + `assistantStream`）和字段名本身是对的。
+- 变化：
+  - `open(sessionId:)` 时同步只发**一条**该会话的 `history`（`maxMessages: 60`、`view: "conversation"`、`requestId: "open-history-<id>"`），不按行批量发。
+  - `session-snapshot` 与 `history` 共用 `decodeHistory`：按 `{type, time, data}` 解码 `user/message`、`assistant/message`（text + reasoning 块）、`tool/call`、`tool/result`，按 turn 边界折叠。
+  - 首页 DSH 会话默认打开 `DSHConversationView`，去掉 `CODYNC_DSH_CHAT_PAGE` 开关；旧 `DSHChatScreen` 文件保留但不再作为入口。
+- 文件：`apps/ios/DSHKit/Sources/DSHKit/DSHGateway.swift`、`apps/ios/Views/HomeSourcesView.swift`。
+- 验证：按要求本轮只验证编译通过（DevDebug 真机构建），未做运行/截图验证。
+- 限制/待办：工具归属按同一 turn 内的 `tool/call` 顺序聚合；跨轮复用同一 callId 的情况未遇到。
+- 关联：C0123。
+
+### C0125 · 2026-11-04 · 首页改版：置顶页 + 来源分页
+
+- 原因：首页要先把钉住的会话放第一页，其余按来源分页；来源多选移到设置。
+- 变化：
+  - 第一页改为「置顶页」：只显示钉过的会话，Coe / DS Bot / DSH 都能钉，按钉的先后排序；没有钉任何会话时显示「长按会话，选『钉在首页』」。
+  - 钉选入口在会话长按菜单的 More 子菜单：`钉在首页` / `从首页移除`（SF Symbol `pin` / `pin.slash`）。`@AppStorage("homePinned")` 存 `source|id`，换行分隔。
+  - 置顶页后用 `TabView(.page)` + 原生 page control 圆点，按勾选来源各一页，顺序固定 Coe、DS Bot、DSH；置顶页永远第 0 页。
+  - 去掉右上角漏斗菜单，右上只留「+」。来源多选移到设置新增的「首页来源」（默认只勾 Coe，至少保留一项），只决定置顶页后面有哪几页。
+  - 删掉设置调试区的「混排/分页」开关与旧混排列表代码；DSH 连接条件改为「DSH 页已勾选或钉了 DSH 会话」。
+- 文件：`apps/ios/Views/HomeSourcesView.swift`（重写）、`apps/ios/Views/HomeSource.swift`、`apps/ios/Views/SettingsView.swift`。
+- 验证：按要求本轮只验证编译通过（DevDebug 真机构建）。
+- 限制/待办：钉住的会话只在当前在线列表可见（未保存标题做离线占位）；长按菜单仍是自绘菜单，不是系统 contextMenu 的 More。
+- 关联：C0118、C0122。
+
+### C0126 · 2026-11-04 · 首页与会话页恢复顶部渐进模糊
+
+- 原因：上一版首页用了整块 `.toolbarBackground(.ultraThinMaterial)`，不是原来的从上往下渐隐效果。
+- 变化：
+  - 用 `git log -S "scrollEdgeEffectStyle"` 找到原实现：`BotListView` 用过 `.scrollEdgeEffectStyle(.soft, for: .top)`（iOS 26 的渐进模糊）。
+  - 首页置顶页/各来源页的 `List` 恢复该修饰；聊天页共用的 `ChatTranscriptList` 也加上，Coe 与 DSH 对话页同时生效。
+  - 去掉首页的 `.toolbarBackground(.visible)` + `.toolbarBackground(.ultraThinMaterial)`；头像的修法保留；sheet 里的 `.softScrollEdges()` 不变。
+- 文件：`apps/ios/Views/HomeSourcesView.swift`、`apps/ios/Kit/Sources/CodyncUI/Thread/ChatTranscript.swift`。
+- 验证：按要求本轮只验证编译通过（DevDebug 真机构建）。
+- 限制/待办：聊天页底层是 UIKit 集合视图，`.scrollEdgeEffectStyle` 在聊天页是否生效需要真机确认（未截图）。
+- 关联：C0122、C0125。
+

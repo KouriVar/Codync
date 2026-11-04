@@ -53,20 +53,11 @@ enum HomeBadge {
     case symbol(String)
 }
 
-/// The home's two list layouts, switched in Settings → 调试.
-enum HomeLayout: String, CaseIterable, Identifiable {
-    case mixed
-    case paged
-
-    var id: String { rawValue }
-    var title: String { self == .mixed ? "混排" : "分页" }
-}
-
 /// `@AppStorage` keys and the default source selection. Stored as a comma-joined raw-value string;
 /// the default is Coe only.
 enum HomeSourcePrefs {
     static let sourcesKey = "homeEnabledSources"
-    static let layoutKey = "homeLayout"
+    static let pinnedKey = "homePinned"
     static let defaultRaw = HomeSource.coe.rawValue
 
     static func enabled(from raw: String) -> Set<HomeSource> {

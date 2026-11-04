@@ -4,11 +4,8 @@ import DSHKit
 import SwiftUI
 import UIKit
 
-/// The home: the conversations of every enabled source (Coe, DS Bot, DSH 对话) in one list, or one
-/// swipeable page per enabled source. The source switch sits left of the "+" in the top-right.
-///
-/// The DSH gateway is the shared singleton so Settings shows the same pairing status; the home is
-/// the only place that decides whether it connects (an unchecked DSH source keeps the WebSocket off).
+/// The home: a pinned page first, then one page per selected source (Coe, DS Bot, DSH 对话) in a
+/// fixed order. The source selection lives in Settings; the top-right keeps only the "+".
 @MainActor
 struct HomeSourcesView: View {
     @Environment(AppStore.self) private var app
@@ -18,7 +15,7 @@ struct HomeSourcesView: View {
     @ObservedObject private var dsh = DSHGateway.shared
 
     @AppStorage(HomeSourcePrefs.sourcesKey) private var sourcesRaw = HomeSourcePrefs.defaultRaw
-    @AppStorage(HomeSourcePrefs.layoutKey) private var layoutRaw = HomeLayout.mixed.rawValue
+    @AppStorage(HomeSourcePrefs.pinnedKey) private var pinnedRaw = ""
 
     @State private var searchText = ""
     @State private var creating: NewTarget?
@@ -26,12 +23,11 @@ struct HomeSourcesView: View {
     @State private var showCameraSheet = false
     @State private var showDSHChat = false
     @State private var showDSHConnect = false
-    @State private var page: HomeSource = .coe
+    @State private var page = 0
     @AppStorage("manualUnreadConversations") private var manualUnreadData = Data()
 
     private var enabledSources: Set<HomeSource> {
         #if DEBUG
-        // Screenshots: SIMCTL_CHILD_CODYNC_HOME_SOURCES=coe,dsBot,dsh / devicectl -e …
         if let raw = ProcessInfo.processInfo.environment["CODYNC_HOME_SOURCES"] {
             return HomeSourcePrefs.enabled(from: raw)
         }
@@ -39,16 +35,9 @@ struct HomeSourcesView: View {
         return HomeSourcePrefs.enabled(from: sourcesRaw)
     }
 
-    private var layout: HomeLayout {
-        #if DEBUG
-        // Screenshots: CODYNC_HOME_LAYOUT=paged overrides the Settings switch.
-        if let raw = ProcessInfo.processInfo.environment["CODYNC_HOME_LAYOUT"], let value = HomeLayout(rawValue: raw) {
-            return value
-        }
-        #endif
-        return HomeLayout(rawValue: layoutRaw) ?? .mixed
-    }
     private var enabledOrdered: [HomeSource] { HomeSource.allCases.filter { enabledSources.contains($0) } }
+    /// The pinned page is always page 0.
+    private var pageCount: Int { 1 + enabledOrdered.count }
 
     private var searchQuery: String { searchText.trimmingCharacters(in: .whitespacesAndNewlines) }
     private var isSearching: Bool { !searchQuery.isEmpty }
@@ -59,31 +48,24 @@ struct HomeSourcesView: View {
         chromeView
             .refreshable { await refreshAll() }
             .task {
-            syncDSHConnection()
-            #if DEBUG
-            // Screenshots: CODYNC_OPEN_DSH_SESSION=1 opens the newest DSH conversation.
-            if ProcessInfo.processInfo.environment["CODYNC_OPEN_DSH_SESSION"] != nil {
-                for _ in 0..<40 {
-                    if let session = dsh.sessions.first { openDSH(session); break }
-                    try? await Task.sleep(for: .milliseconds(250))
+                syncDSHConnection()
+                #if DEBUG
+                // Screenshots: CODYNC_OPEN_DSH_SESSION=1 opens the newest DSH conversation.
+                if ProcessInfo.processInfo.environment["CODYNC_OPEN_DSH_SESSION"] != nil {
+                    for _ in 0..<40 {
+                        if let session = dsh.sessions.first { openDSH(session); break }
+                        try? await Task.sleep(for: .milliseconds(250))
+                    }
                 }
+                #endif
             }
-            #endif
-        }
-            .onChange(of: sourcesRaw) { _, _ in sourceSelectionChanged() }
+            .onChange(of: sourcesRaw) { _, _ in
+                syncDSHConnection()
+                if page >= pageCount { page = max(0, pageCount - 1) }
+            }
             .onChange(of: availableStores.map(\.selection)) { handleStoreSelections() }
             .sheet(isPresented: $showCameraSheet, content: cameraSheet)
-            .sheet(isPresented: $showDSHChat) {
-            #if DEBUG
-            if ProcessInfo.processInfo.environment["CODYNC_DSH_CHAT_PAGE"] == "1" {
-                DSHConversationView(gateway: dsh)
-            } else {
-                DSHChatScreen(gateway: dsh)
-            }
-            #else
-            DSHChatScreen(gateway: dsh)
-            #endif
-        }
+            .sheet(isPresented: $showDSHChat) { DSHConversationView(gateway: dsh) }
             .sheet(isPresented: $showDSHConnect, content: dshConnectSheet)
             .codyncSheet(item: $creating) { target in creatingSheet(target) }
             .alert(deleteTitle, isPresented: deleteShown, presenting: confirmDelete) { item in
@@ -93,25 +75,30 @@ struct HomeSourcesView: View {
             }
     }
 
-    /// The list plus its bottom bar and top chrome. Kept apart from the sheets so each expression
-    /// stays small enough for the type checker.
     private var chromeView: some View {
         baseView
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar(.visible, for: .navigationBar)
-            // A blurred bar so rows passing under the top edge don't read through it.
-            .toolbarBackground(.visible, for: .navigationBar)
-            .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
             .toolbar { toolbarContent }
     }
 
     private var baseView: some View {
-        Group {
-            if layout == .paged { pagedView } else { mixedView }
+        TabView(selection: pageBinding) {
+            pinnedPage.tag(0)
+            ForEach(Array(enabledOrdered.enumerated()), id: \.element) { index, source in
+                sourcePage(source).tag(index + 1)
+            }
         }
+        // Native page control dots, with the pinned page always first.
+        .tabViewStyle(.page(indexDisplayMode: .always))
         .background(Palette.background)
         .safeAreaInset(edge: .bottom, spacing: 0) { bottomBar }
+    }
+
+    private var pageBinding: Binding<Int> {
+        Binding(get: { min(max(page, 0), pageCount - 1) },
+                set: { page = min(max($0, 0), pageCount - 1) })
     }
 
     private var bottomBar: some View {
@@ -133,29 +120,7 @@ struct HomeSourcesView: View {
         } else {
             ToolbarItem(placement: .topBarLeading) { AccountSwitcherButton() }
         }
-        // The source switch, left of the "+": same native menu as the "+".
-        ToolbarItem(placement: .topBarTrailing) { sourceMenu }
         ToolbarItem(placement: .topBarTrailing) { newBotMenu }
-    }
-
-    // MARK: - Source menu
-
-    private var sourceMenu: some View {
-        Menu {
-            ForEach(HomeSource.allCases) { source in
-                Toggle(isOn: Binding(get: { enabledSources.contains(source) },
-                                    set: { setSource(source, on: $0) })) {
-                    Text(source.title)
-                }
-            }
-            Divider()
-            Button { sourcesRaw = HomeSourcePrefs.raw(Set(HomeSource.allCases)) } label: { Text("全部显示") }
-            Button { sourcesRaw = HomeSourcePrefs.defaultRaw } label: { Text("恢复默认") }
-        } label: {
-            Image(systemName: "line.3.horizontal.decrease.circle")
-                .font(.system(size: 20, weight: .regular))
-        }
-        .accessibilityLabel(Text("会话来源"))
     }
 
     private var newBotMenu: some View {
@@ -170,25 +135,209 @@ struct HomeSourcesView: View {
         .disabled(availableStores.isEmpty)
     }
 
-    /// Toggles one source, never letting the last one turn off.
-    private func setSource(_ source: HomeSource, on: Bool) {
-        var set = enabledSources
-        if on {
-            set.insert(source)
-        } else {
-            guard set.count > 1 else { return }
-            set.remove(source)
+    // MARK: - Pages
+
+    private var pinnedPage: some View {
+        List {
+            if pinnedEntries.isEmpty {
+                pinnedEmptyState
+            }
+            ForEach(pinnedEntries) { entry in
+                entryRow(entry)
+            }
         }
-        sourcesRaw = HomeSourcePrefs.raw(set)
+        .plainRosterList()
+        // The original progressive blur at the top edge (not a solid material block).
+        .scrollEdgeEffectStyle(.soft, for: .top)
     }
 
-    private func sourceSelectionChanged() {
-        syncDSHConnection()
-        if !enabledOrdered.contains(page), let first = enabledOrdered.first { page = first }
+    private func sourcePage(_ source: HomeSource) -> some View {
+        List {
+            if source == .dsh, let hint = dshHint {
+                dshHintRow(hint)
+            }
+            let items = source == .dsh ? dshEntries : botEntries(for: source)
+            if items.isEmpty && !(source == .dsh && dshHint != nil) {
+                Text(source == .dsh ? "还没有 DSH 会话" : "没有会话")
+                    .font(.footnote)
+                    .foregroundStyle(Palette.secondary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 40)
+                    .rosterRow()
+            }
+            ForEach(items) { entry in
+                entryRow(entry)
+            }
+        }
+        .plainRosterList()
+        .scrollEdgeEffectStyle(.soft, for: .top)
     }
 
+    private var pinnedEmptyState: some View {
+        VStack(spacing: 10) {
+            Image(systemName: "pin").font(.title2)
+            Text("长按会话，选『钉在首页』")
+                .font(.footnote)
+        }
+        .foregroundStyle(Palette.secondary)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 64)
+        .rosterRow()
+    }
+
+    // MARK: - Pins
+
+    private struct PinnedKey {
+        let source: HomeSource
+        let id: String
+    }
+
+    private var pinnedKeys: [PinnedKey] {
+        pinnedRaw.split(separator: "\n").compactMap { line in
+            let parts = line.split(separator: "|", maxSplits: 1)
+            guard parts.count == 2, let source = HomeSource(rawValue: String(parts[0])) else { return nil }
+            return PinnedKey(source: source, id: String(parts[1]))
+        }
+    }
+
+    private var pinnedEntries: [HomeEntry] {
+        pinnedKeys.compactMap { key -> HomeEntry? in
+            switch key.source {
+            case .dsh:
+                guard let session = dsh.sessions.first(where: { $0.id == key.id }),
+                      !isSearching || session.title.localizedStandardContains(searchQuery) else { return nil }
+                return HomeEntry(kind: .dsh(session))
+            case .coe, .dsBot:
+                guard let item = accounts.roster.first(where: {
+                    $0.bot.id == key.id && HomeSource.of(bot: $0.bot) == key.source
+                }), matchesSearch(item) else { return nil }
+                return HomeEntry(kind: .bot(item))
+            }
+        }
+    }
+
+    private func isPinned(_ source: HomeSource, _ id: String) -> Bool {
+        pinnedKeys.contains { $0.source == source && $0.id == id }
+    }
+
+    private func togglePin(_ source: HomeSource, _ id: String) {
+        var keys = pinnedKeys
+        if let index = keys.firstIndex(where: { $0.source == source && $0.id == id }) {
+            keys.remove(at: index)
+        } else {
+            keys.append(PinnedKey(source: source, id: id))
+        }
+        pinnedRaw = keys.map { "\($0.source.rawValue)|\($0.id)" }.joined(separator: "\n")
+    }
+
+    private func pinMenuItem(_ source: HomeSource, _ id: String) -> MenuItem {
+        let pinned = isPinned(source, id)
+        return MenuItem(pinned ? "从首页移除" : "钉在首页", icon: pinned ? "pin.slash" : "pin") {
+            togglePin(source, id)
+        }
+    }
+
+    // MARK: - Entries
+
+    private struct HomeEntry: Identifiable {
+        enum Kind { case bot(RosterItem); case dsh(DSHSession) }
+        let kind: Kind
+
+        var id: String {
+            switch kind {
+            case .bot(let item): return "b-\(item.ref.computerId)-\(item.ref.botId)"
+            case .dsh(let session): return "d-\(session.id)"
+            }
+        }
+    }
+
+    private func botEntries(for source: HomeSource) -> [HomeEntry] {
+        accounts.roster
+            .filter { HomeSource.of(bot: $0.bot) == source }
+            .filter { !HomeSessionVisibility.isHidden(title: $0.bot.name, isDSH: false) }
+            .filter { matchesSearch($0) }
+            .map { HomeEntry(kind: .bot($0)) }
+    }
+
+    private var dshEntries: [HomeEntry] {
+        guard enabledSources.contains(.dsh) || pinnedKeys.contains(where: { $0.source == .dsh }) else { return [] }
+        return dsh.sessions
+            .filter { !HomeSessionVisibility.isHidden(title: $0.title, isDSH: true) }
+            .filter { !isSearching || $0.title.localizedStandardContains(searchQuery) }
+            .sorted { ($0.updatedAt ?? 0) > ($1.updatedAt ?? 0) }
+            .map { HomeEntry(kind: .dsh($0)) }
+    }
+
+    private func matchesSearch(_ item: RosterItem) -> Bool {
+        !isSearching || item.bot.name.localizedStandardContains(searchQuery)
+            || (item.bot.lastMessage?.localizedStandardContains(searchQuery) ?? false)
+    }
+
+    @ViewBuilder private func entryRow(_ entry: HomeEntry) -> some View {
+        switch entry.kind {
+        case .bot(let item):
+            if let store = accounts.store(for: item.ref.computerId) {
+                botRow(item, store: store)
+            }
+        case .dsh(let session):
+            DSHSessionRow(session: session, preview: dsh.previews[session.id],
+                          sourceBadge: AnyView(SourceBadge(source: .dsh)))
+                .contentShape(Rectangle())
+                .onTapGesture { openDSH(session) }
+                .contextActions {
+                    [MenuItem("More", icon: "more-line", submenu: [pinMenuItem(.dsh, session.id)])]
+                }
+                .rosterRow()
+        }
+    }
+
+    private func botRow(_ item: RosterItem, store: BotStore) -> some View {
+        let source = HomeSource.of(bot: item.bot)
+        return BotRow(bot: item.bot, manuallyUnread: manuallyUnread(item))
+            .environment(store)
+            // Only DS Bot carries a badge; the source badge sits where the lead agent's star
+            // does (avatar is 48pt with 16pt vertical row padding).
+            .overlay(alignment: .topLeading) {
+                if source.badge != nil {
+                    SourceBadge(source: source)
+                        .offset(x: 31, y: 47)
+                        .allowsHitTesting(false)
+                }
+            }
+            .contentShape(Rectangle())
+            .onTapGesture { accounts.selection = item.ref }
+            .contextActions { botMenuItems(item, store: store) }
+            .rosterRow()
+    }
+
+    private var dshHint: String? {
+        guard enabledSources.contains(.dsh) || pinnedKeys.contains(where: { $0.source == .dsh }) else { return nil }
+        if case .failed = dsh.phase { return "DSH 未连接，可在设置里重新配对" }
+        return nil
+    }
+
+    private func dshHintRow(_ text: String) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: "exclamationmark.triangle").font(.caption2)
+            Text(text).font(.footnote).lineLimit(2)
+            Spacer(minLength: 0)
+        }
+        .foregroundStyle(Palette.secondary)
+        .padding(.vertical, 8)
+        .rosterRow()
+    }
+
+    // MARK: - Actions
+
+    private func openDSH(_ session: DSHSession) {
+        dsh.open(sessionId: session.id)
+        showDSHChat = true
+    }
+
+    /// DSH connects when its page is on, or when a pinned DSH conversation needs it.
     private func syncDSHConnection() {
-        if enabledSources.contains(.dsh) {
+        let needed = enabledSources.contains(.dsh) || pinnedKeys.contains { $0.source == .dsh }
+        if needed {
             dsh.connectLastPaired()
         } else {
             dsh.disconnect()
@@ -206,6 +355,80 @@ struct HomeSourcesView: View {
             store.selection = nil
             accounts.selection = BotReference(accountId: accounts.accountId, computerId: store.computer.id, botId: botId)
         }
+    }
+
+    private func manuallyUnread(_ item: RosterItem) -> Bool {
+        ManualUnreadMarks(data: manualUnreadData)
+            .contains(account: accounts.accountId, computer: item.ref.computerId, bot: item.bot.id)
+    }
+
+    private func setManuallyUnread(_ unread: Bool, item: RosterItem) {
+        var marks = ManualUnreadMarks(data: manualUnreadData)
+        marks.set(unread, account: accounts.accountId, computer: item.ref.computerId, bot: item.bot.id)
+        manualUnreadData = marks.data
+    }
+
+    /// The long-press menu; the pinned switch lives in its "More" submenu.
+    private func botMenuItems(_ item: RosterItem, store: BotStore) -> [MenuItem] {
+        let bot = item.bot
+        let unread = bot.unread > 0 || manuallyUnread(item)
+        var items = [MenuItem(unread ? "Mark as read" : "Mark as unread",
+                              icon: unread ? "mail-open-line" : "mail-unread-line") {
+            setManuallyUnread(!unread, item: item)
+            if unread { store.markAllRead(bot.id) }
+        }, MenuItem(bot.pinned ? "Unpin" : "Pin", icon: bot.pinned ? "unpin-line" : "pushpin-2-line") {
+            store.setPinned(bot, !bot.pinned)
+        }]
+        items.append(MenuItem("Copy ID", icon: "file-copy-line") { UIPasteboard.general.string = bot.id })
+        if !bot.lead {
+            items.append(MenuItem("Hide", icon: "eye-off-line", destructive: true) { store.setHidden(bot, true) })
+        }
+        var more = [pinMenuItem(HomeSource.of(bot: bot), bot.id)]
+        if !bot.lead || store.supportsLeadChoice {
+            more.append(MenuItem("Delete", icon: "delete-bin-line", destructive: true, divider: true) { confirmDelete = item })
+        }
+        items.append(MenuItem("More", icon: "more-line", submenu: more))
+        return items
+    }
+
+    private var onlineStores: [BotStore] {
+        availableStores.filter { $0.connection == .online }
+    }
+
+    private var availableStores: [BotStore] {
+        accounts.computers.compactMap { accounts.store(for: $0.id) }
+            .filter { $0.mismatch == nil && !accounts.isStale($0.computer.id) }
+    }
+
+    /// The computers a new bot can go to, labelled "(offline)" when it can't take one now.
+    private var computerOptions: [(id: ComputerID, label: String)] {
+        availableStores.map { store -> (id: ComputerID, label: String) in
+            let label = store.connection == .online ? store.hostName : "\(store.hostName) (offline)"
+            return (store.computer.id, label)
+        }
+    }
+
+    private func newBot() {
+        guard let store = onlineStores.first ?? availableStores.first else { return }
+        creating = NewTarget(kind: .bot, computerId: store.computer.id)
+    }
+
+    private func newGroup() {
+        guard let store = onlineStores.first else { return }
+        Task {
+            try? await Task.sleep(for: .milliseconds(200))
+            creating = NewTarget(kind: .group, computerId: store.computer.id)
+        }
+    }
+
+    private func attachCapturedPhoto(_ image: UIImage) {
+        showCameraSheet = false
+        guard let store = app.currentStore, let jpeg = image.jpegData(compressionQuality: 0.85) else { return }
+        let candidates = accounts.roster.filter { $0.ref.computerId == store.computer.id && !$0.bot.isGroup }
+        guard let target = candidates.first(where: { $0.bot.lead }) ?? candidates.first else { return }
+        store.attachPendingFile(OutgoingFile(name: "photo-\(Int(Date.now.timeIntervalSince1970)).jpg", data: jpeg),
+                                to: target.bot.id)
+        accounts.selection = target.ref
     }
 
     // MARK: - Sheets
@@ -255,285 +478,6 @@ struct HomeSourcesView: View {
 
     private func deleteMessage(_ item: RosterItem) -> Text {
         Text(L10n.tr(item.bot.isGroup ? "Its bots and their own chats stay." : "Files it changed on your computer stay as they are."))
-    }
-
-    // MARK: - Mixed list
-
-    private var mixedView: some View {
-        List {
-            ForEach(mixedEntries) { entry in
-                entryRow(entry)
-            }
-            if let hint = dshHint {
-                dshHintRow(hint)
-            }
-            if mixedEntries.isEmpty && dshHint == nil {
-                emptyState
-            }
-        }
-        .plainRosterList()
-    }
-
-    // MARK: - Paged list
-
-    private var pagedView: some View {
-        VStack(spacing: 0) {
-            pageIndicator
-            TabView(selection: pageBinding) {
-                ForEach(enabledOrdered) { source in
-                    sourcePage(source).tag(source)
-                }
-            }
-            .tabViewStyle(.page(indexDisplayMode: .never))
-        }
-    }
-
-    private var pageBinding: Binding<HomeSource> {
-        Binding(get: { enabledOrdered.contains(page) ? page : (enabledOrdered.first ?? .coe) },
-                set: { page = $0 })
-    }
-
-    private var pageIndicator: some View {
-        HStack(spacing: 6) {
-            ForEach(enabledOrdered) { source in
-                Circle()
-                    .fill(source == pageBinding.wrappedValue ? Palette.text : Palette.tertiary.opacity(0.35))
-                    .frame(width: 6, height: 6)
-            }
-            Text(pageBinding.wrappedValue.title)
-                .font(.caption2)
-                .foregroundStyle(Palette.secondary)
-                .padding(.leading, 4)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.top, 8)
-    }
-
-    private func sourcePage(_ source: HomeSource) -> some View {
-        List {
-            if source == .dsh, let hint = dshHint {
-                dshHintRow(hint)
-            }
-            let items = entries(for: source)
-            if items.isEmpty && !(source == .dsh && dshHint != nil) {
-                Text(source == .dsh ? "还没有 DSH 会话" : "没有会话")
-                    .font(.footnote)
-                    .foregroundStyle(Palette.secondary)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 40)
-                    .listRowSeparator(.hidden)
-                    .listRowBackground(Color.clear)
-            }
-            ForEach(items) { entry in
-                entryRow(entry)
-            }
-        }
-        .plainRosterList()
-    }
-
-    // MARK: - Entries
-
-    private struct HomeEntry: Identifiable {
-        enum Kind { case bot(RosterItem); case dsh(DSHSession) }
-        let kind: Kind
-
-        var id: String {
-            switch kind {
-            case .bot(let item): return "b-\(item.ref.computerId)-\(item.ref.botId)"
-            case .dsh(let session): return "d-\(session.id)"
-            }
-        }
-
-        var timestamp: Date {
-            switch kind {
-            case .bot(let item): return Date(timeIntervalSince1970: Double(item.bot.lastAt) / 1000)
-            case .dsh(let session):
-                guard let value = session.updatedAt else { return .distantPast }
-                let ms = value > 1_000_000_000_000 ? value : value * 1000
-                return Date(timeIntervalSince1970: ms / 1000)
-            }
-        }
-    }
-
-    private func entries(for source: HomeSource) -> [HomeEntry] {
-        if source == .dsh { return dshEntries }
-        return botEntries(for: source)
-    }
-
-    private var mixedEntries: [HomeEntry] {
-        var entries: [HomeEntry] = []
-        for source in HomeSource.allCases where source != .dsh && enabledSources.contains(source) {
-            entries.append(contentsOf: botEntries(for: source))
-        }
-        entries.append(contentsOf: dshEntries)
-        return entries.sorted { $0.timestamp > $1.timestamp }
-    }
-
-    private func botEntries(for source: HomeSource) -> [HomeEntry] {
-        accounts.roster
-            .filter { HomeSource.of(bot: $0.bot) == source }
-            .filter { !HomeSessionVisibility.isHidden(title: $0.bot.name, isDSH: false) }
-            .filter { matchesSearch($0) }
-            .map { HomeEntry(kind: .bot($0)) }
-    }
-
-    private var dshEntries: [HomeEntry] {
-        guard enabledSources.contains(.dsh) else { return [] }
-        return dsh.sessions
-            .filter { !HomeSessionVisibility.isHidden(title: $0.title, isDSH: true) }
-            .filter { !isSearching || $0.title.localizedStandardContains(searchQuery) }
-            .sorted { ($0.updatedAt ?? 0) > ($1.updatedAt ?? 0) }
-            .map { HomeEntry(kind: .dsh($0)) }
-    }
-
-    private func matchesSearch(_ item: RosterItem) -> Bool {
-        !isSearching || item.bot.name.localizedStandardContains(searchQuery)
-            || (item.bot.lastMessage?.localizedStandardContains(searchQuery) ?? false)
-    }
-
-    @ViewBuilder private func entryRow(_ entry: HomeEntry) -> some View {
-        switch entry.kind {
-        case .bot(let item):
-            if let store = accounts.store(for: item.ref.computerId) {
-                botRow(item, store: store)
-            }
-        case .dsh(let session):
-            DSHSessionRow(session: session, preview: dsh.previews[session.id],
-                          sourceBadge: layout == .mixed ? AnyView(SourceBadge(source: .dsh)) : nil)
-                .contentShape(Rectangle())
-                .onTapGesture { openDSH(session) }
-                .contextActions {
-                    [MenuItem("Copy session ID", icon: "file-copy-line") { UIPasteboard.general.string = session.id }]
-                }
-                .rosterRow()
-        }
-    }
-
-    private func botRow(_ item: RosterItem, store: BotStore) -> some View {
-        let source = HomeSource.of(bot: item.bot)
-        return BotRow(bot: item.bot, manuallyUnread: manuallyUnread(item))
-            .environment(store)
-            // Only DS Bot carries a badge; the source badge sits where the lead agent's star
-            // does (avatar is 48pt with 16pt vertical row padding).
-            .overlay(alignment: .topLeading) {
-                if layout == .mixed, source.badge != nil {
-                    SourceBadge(source: source)
-                        .offset(x: 31, y: 47)
-                        .allowsHitTesting(false)
-                }
-            }
-            .contentShape(Rectangle())
-            .onTapGesture { accounts.selection = item.ref }
-            .contextActions { botMenuItems(item, store: store) }
-            .rosterRow()
-    }
-
-    private var dshHint: String? {
-        guard enabledSources.contains(.dsh) else { return nil }
-        if case .failed = dsh.phase { return "DSH 未连接，可在设置里重新配对" }
-        return nil
-    }
-
-    private func dshHintRow(_ text: String) -> some View {
-        HStack(spacing: 6) {
-            Image(systemName: "exclamationmark.triangle").font(.caption2)
-            Text(text).font(.footnote).lineLimit(2)
-            Spacer(minLength: 0)
-        }
-        .foregroundStyle(Palette.secondary)
-        .padding(.vertical, 8)
-        .rosterRow()
-    }
-
-    private var emptyState: some View {
-        VStack(spacing: 12) {
-            RemixIcon("search-line").font(.title)
-            Text("没有匹配的会话").font(.body)
-        }
-        .foregroundStyle(Palette.secondary)
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 40)
-        .rosterRow()
-    }
-
-    // MARK: - Actions
-
-    private func openDSH(_ session: DSHSession) {
-        dsh.open(sessionId: session.id)
-        showDSHChat = true
-    }
-
-    private func manuallyUnread(_ item: RosterItem) -> Bool {
-        ManualUnreadMarks(data: manualUnreadData)
-            .contains(account: accounts.accountId, computer: item.ref.computerId, bot: item.bot.id)
-    }
-
-    private func setManuallyUnread(_ unread: Bool, item: RosterItem) {
-        var marks = ManualUnreadMarks(data: manualUnreadData)
-        marks.set(unread, account: accounts.accountId, computer: item.ref.computerId, bot: item.bot.id)
-        manualUnreadData = marks.data
-    }
-
-    /// The long-press menu, kept to the essentials the home needs; the full editor lives in the
-    /// bot detail flow.
-    private func botMenuItems(_ item: RosterItem, store: BotStore) -> [MenuItem] {
-        let bot = item.bot
-        let unread = bot.unread > 0 || manuallyUnread(item)
-        var items = [MenuItem(unread ? "Mark as read" : "Mark as unread",
-                              icon: unread ? "mail-open-line" : "mail-unread-line") {
-            setManuallyUnread(!unread, item: item)
-            if unread { store.markAllRead(bot.id) }
-        }, MenuItem(bot.pinned ? "Unpin" : "Pin", icon: bot.pinned ? "unpin-line" : "pushpin-2-line") {
-            store.setPinned(bot, !bot.pinned)
-        }]
-        items.append(MenuItem("Copy ID", icon: "file-copy-line") { UIPasteboard.general.string = bot.id })
-        if !bot.lead {
-            items.append(MenuItem("Hide", icon: "eye-off-line", destructive: true) { store.setHidden(bot, true) })
-        }
-        if !bot.lead || store.supportsLeadChoice {
-            items.append(MenuItem("Delete", icon: "delete-bin-line", destructive: true, divider: true) { confirmDelete = item })
-        }
-        return items
-    }
-
-    private var onlineStores: [BotStore] {
-        availableStores.filter { $0.connection == .online }
-    }
-
-    private var availableStores: [BotStore] {
-        accounts.computers.compactMap { accounts.store(for: $0.id) }
-            .filter { $0.mismatch == nil && !accounts.isStale($0.computer.id) }
-    }
-
-    /// The computers a new bot can go to, labelled "(offline)" when it can't take one now.
-    private var computerOptions: [(id: ComputerID, label: String)] {
-        availableStores.map { store -> (id: ComputerID, label: String) in
-            let label = store.connection == .online ? store.hostName : "\(store.hostName) (offline)"
-            return (store.computer.id, label)
-        }
-    }
-
-    private func newBot() {
-        guard let store = onlineStores.first ?? availableStores.first else { return }
-        creating = NewTarget(kind: .bot, computerId: store.computer.id)
-    }
-
-    private func newGroup() {
-        guard let store = onlineStores.first else { return }
-        Task {
-            try? await Task.sleep(for: .milliseconds(200))
-            creating = NewTarget(kind: .group, computerId: store.computer.id)
-        }
-    }
-
-    private func attachCapturedPhoto(_ image: UIImage) {
-        showCameraSheet = false
-        guard let store = app.currentStore, let jpeg = image.jpegData(compressionQuality: 0.85) else { return }
-        let candidates = accounts.roster.filter { $0.ref.computerId == store.computer.id && !$0.bot.isGroup }
-        guard let target = candidates.first(where: { $0.bot.lead }) ?? candidates.first else { return }
-        store.attachPendingFile(OutgoingFile(name: "photo-\(Int(Date.now.timeIntervalSince1970)).jpg", data: jpeg),
-                                to: target.bot.id)
-        accounts.selection = target.ref
     }
 
     private struct NewTarget: Identifiable {

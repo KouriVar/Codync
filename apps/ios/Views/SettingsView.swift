@@ -18,8 +18,6 @@ struct SettingsView: View {
     @State private var versionTaps = 0
     @State private var lastVersionTap = Date.distantPast
     @State private var showStartOver = false
-    /// 首页布局：混排 / 分页（先放在调试区）。
-    @AppStorage(HomeSourcePrefs.layoutKey) private var layoutRaw = HomeLayout.mixed.rawValue
 
     var body: some View {
         Group {
@@ -34,17 +32,8 @@ struct SettingsView: View {
 
             ShortcutLeadSettings()
 
-            // 调试：首页布局先放在这里，方便对比混排和分页。
-            Section {
-                Picker(L10n.tr("首页布局"), selection: $layoutRaw) {
-                    Text("混排").tag(HomeLayout.mixed.rawValue)
-                    Text("分页").tag(HomeLayout.paged.rawValue)
-                }
-                .pickerStyle(.segmented)
-            } header: {
-                Text("调试")
-            }
-            .listRowSeparator(.hidden)
+            // 首页来源：决定置顶页后面有哪几页。
+            HomeSourceSettingsSection()
 
             // DSH 配对状态搬到这里：首页不再显示状态区。
             DSHSettingsSection()
@@ -160,5 +149,40 @@ private struct DSHSettingsSection: View {
         case .ready: return "已连接（\(gateway.gatewayName)）"
         case .failed: return "连接失败"
         }
+    }
+}
+
+/// 首页来源：置顶页永远存在；这里只决定后面按 Coe、DS Bot、DSH 顺序排哪几页。
+@MainActor
+private struct HomeSourceSettingsSection: View {
+    @AppStorage(HomeSourcePrefs.sourcesKey) private var sourcesRaw = HomeSourcePrefs.defaultRaw
+
+    private var enabled: Set<HomeSource> { HomeSourcePrefs.enabled(from: sourcesRaw) }
+
+    var body: some View {
+        Section {
+            ForEach(HomeSource.allCases) { source in
+                Toggle(isOn: Binding(get: { enabled.contains(source) },
+                                    set: { setSource(source, on: $0) })) {
+                    Text(source.title)
+                }
+            }
+        } header: {
+            Text("首页来源")
+        } footer: {
+            Text("只决定置顶页后面有哪几页；至少保留一项。")
+        }
+        .listRowSeparator(.hidden)
+    }
+
+    private func setSource(_ source: HomeSource, on: Bool) {
+        var set = enabled
+        if on {
+            set.insert(source)
+        } else {
+            guard set.count > 1 else { return }
+            set.remove(source)
+        }
+        sourcesRaw = HomeSourcePrefs.raw(set)
     }
 }

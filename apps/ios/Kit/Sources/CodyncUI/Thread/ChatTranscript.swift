@@ -52,6 +52,8 @@ struct ChatTranscriptList: View {
 
     var body: some View {
         ConversationList(rows: rows, following: $following, nearTop: nearTop, refresh: refresh)
+            // The original progressive blur at the top edge, like the roster had.
+            .scrollEdgeEffectStyle(.soft, for: .top)
     }
 }
 

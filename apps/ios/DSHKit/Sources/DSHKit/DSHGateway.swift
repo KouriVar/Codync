@@ -31,6 +31,8 @@ public final class DSHGateway: ObservableObject {
     private var shouldReconnect = false
     /// assistant-stream attempts being written, so a stale chunk from an earlier attempt is ignored.
     private var streamingAttempts = Set<String>()
+    /// The requestId of the one history page an open conversation asks for.
+    private var openHistoryRequestId: String?
     /// The open turn's start, number and tools, folded into the assistant message it produces.
     private var turnStartedAt: Date?
     private var turnNumber: Int?
@@ -206,6 +208,8 @@ public final class DSHGateway: ObservableObject {
         case "sessions":
             sessions = Self.decodeSessions(frame)
             if phase != .ready { phase = .ready }
+        case "history":
+            handleHistory(frame)
         case "projection-baseline":
             handleProjectionBaseline(frame)
         case "turn-outline-updated":
@@ -319,31 +323,84 @@ public final class DSHGateway: ObservableObject {
         }
     }
 
-    /// The opening baseline after `subscribe`: a window of recent events. P1 shows the last user and
-    /// assistant messages so a conversation is not empty on open.
+    /// The opening baseline after `subscribe`: a window of recent events. Decoded exactly like a
+    /// `history` page so both paths produce the same messages (thinking + tools included).
     private func handleSnapshot(_ frame: DSHFrame) {
         guard let sid = frame.string("sessionId"), sid == openSessionId else { return }
         let events = frame.array("events") ?? []
-        var seeded: [DSHMessage] = []
+        let decoded = Self.decodeHistory(events)
+        if !decoded.isEmpty, messages.isEmpty { messages = decoded }
+    }
+
+    /// One history page for the session just opened. Ignored if another session is open by now.
+    private func handleHistory(_ frame: DSHFrame) {
+        guard let sid = frame.string("sessionId"), sid == openSessionId else { return }
+        if let requestId = frame.string("requestId"), let expected = openHistoryRequestId, requestId != expected {
+            return
+        }
+        let events = frame.array("events") ?? []
+        messages = Self.decodeHistory(events)
+    }
+
+    /// Raw host events (`{type, time, data}`) to the messages the chat page shows. `assistant/message`
+    /// carries the text, the reasoning and (in history records) the tool calls; `tool/call` and
+    /// `tool/result` fill in the tools and their previews.
+    static func decodeHistory(_ events: [[String: Any]]) -> [DSHMessage] {
+        var out: [DSHMessage] = []
+        var tools: [DSHTool] = []
+        var turn = 0
+        var turnStartedAt: Int64?
         for event in events {
-            guard let type = event["type"] as? String else { continue }
-            // Snapshot events are the host's raw records: `{type, time, data}`.
+            let type = event["type"] as? String ?? ""
             let data = event["data"] as? [String: Any] ?? event
-            let time = (event["time"] as? NSNumber)?.int64Value ?? Int64(Date().timeIntervalSince1970 * 1000)
-            if type == "user/message" {
+            let time = (event["time"] as? NSNumber)?.int64Value ?? 0
+            switch type {
+            case "turn/start":
+                turn = (data["turn"] as? NSNumber)?.intValue ?? turn
+                turnStartedAt = time
+                tools = []
+            case "tool/call":
+                let callId = data["callId"] as? String ?? UUID().uuidString
+                if !tools.contains(where: { $0.id == callId }) {
+                    tools.append(DSHTool(id: callId,
+                                         name: data["name"] as? String ?? "tool",
+                                         arguments: data["arguments"] as? String ?? ""))
+                }
+            case "tool/result":
+                guard let callId = data["callId"] as? String,
+                      let index = tools.firstIndex(where: { $0.id == callId }) else { continue }
+                tools[index].output = data["preview"] as? String
+                tools[index].isError = data["isError"] as? Bool ?? false
+            case "user/message":
                 let text = Self.text(of: data)
                 if !text.isEmpty, !DSHSystemMessageFilter.isInjected(text) {
-                    seeded.append(DSHMessage(role: .user, text: text, createdAt: time))
+                    out.append(DSHMessage(role: .user, text: text, createdAt: time))
                 }
-            } else if type == "assistant/message" {
+            case "assistant/message":
                 let message = data["message"] as? [String: Any]
-                let text = message.map { Self.text(of: $0) } ?? Self.text(of: data)
-                if !text.isEmpty {
-                    seeded.append(DSHMessage(role: .assistant, text: text, createdAt: time))
+                var text = ""
+                var reasoning = ""
+                for block in (message?["content"] as? [[String: Any]] ?? []) {
+                    switch block["type"] as? String {
+                    case "text": text += block["text"] as? String ?? ""
+                    case "reasoning": reasoning += block["text"] as? String ?? ""
+                    default: break
+                    }
                 }
+                if text.isEmpty, reasoning.isEmpty, tools.isEmpty { continue }
+                let duration = turnStartedAt.map { max(1, Int((time - $0) / 1000)) }
+                out.append(DSHMessage(role: .assistant, text: text, reasoning: reasoning,
+                                      tools: tools, turn: turn, durationSeconds: duration,
+                                      createdAt: time))
+                tools = []
+            case "turn/end":
+                tools = []
+                turnStartedAt = nil
+            default:
+                break
             }
         }
-        if !seeded.isEmpty || messages.isEmpty { messages = seeded }
+        return out
     }
 
     private func handleStream(_ frame: DSHFrame) {
@@ -378,11 +435,18 @@ public final class DSHGateway: ObservableObject {
         isStreaming = false
         streamingAttempts.removeAll()
         send(["type": "subscribe", "sessionId": sessionId, "assistantStream": true])
+        // One page of history for this session, so the transcript is not empty when it opens
+        // (the live snapshot only covers what happens after subscribing).
+        let requestId = "open-history-\(sessionId)"
+        openHistoryRequestId = requestId
+        send(["type": "history", "sessionId": sessionId, "maxMessages": 60,
+              "view": "conversation", "requestId": requestId])
     }
 
     public func closeConversation() {
         if let openSessionId { send(["type": "unsubscribe"]) }
         openSessionId = nil
+        openHistoryRequestId = nil
         messages = []
         isStreaming = false
     }
