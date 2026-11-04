@@ -1529,3 +1529,16 @@
 - 验证：`xcodebuild build -scheme 'iOS Dev' -configuration DevDebug` 通过；已装到 iPhone 16 Pro（2.36.0 / 154）并启动。按要求未自测、未截图。
 - 限制/待办：无。
 - 关联：C0154、C0155。
+### C0157 · 2026-11-04 · 修语音识别不出字：任务链在初始化时自我重启成死循环，退回单任务识别
+
+- 原因：C0153 引入的任务链（每个任务结束就立刻开下一个）在真机上变成了自我重启：第一个任务一创建就回 `isFinal` 或报错，`taskEnded` 无条件 `startTask()`，于是每几毫秒换一次 request，麦克风的 buffer 落在永远刚创建的任务上，识别器没机会出结果——表现就是「一直转不出文字」，暂停时文字为空，于是走到「没听清」。C0152 不做重启，所以那一版能识别。
+- 变化：
+  - **默认退回 C0152 的单任务识别**：`OnDeviceSpeechTranscriber.relayTasks = false`，麦克风 tap 直接把 buffer 写进当前 `SFSpeechAudioBufferRecognitionRequest`（不再经过 BufferSink 间接层）；`startTask()` 在换 request 时会重装 tap（这次也补上了这条：之前换 request 后 tap 仍指向旧的）。
+  - 任务链保留但改为可选（`relayTasks` 打开时走原来的重叠续接 + `BufferSink` + 去重），默认关，等真机验证后再开。
+  - 防死循环：任务结束（final 或报错）时**只有活得超过 1.5 秒**才续一个任务；短命任务不再重启（记一条日志），避免"刚建就结束"的循环。
+  - 本机识别兜底：首个任务若在 1.5 秒内报错、且当时要求了 `requiresOnDeviceRecognition`，就关掉本机要求重试一次（机型缺少该语言本机模型时会出现这种立即报错）。
+  - 诊断日志（os_log，subsystem `com.pokai.Codync`，category `voice`）：启动时的语言/是否支持本机识别/relay 开关；每秒一条 `buffers N/s, feeding request|nothing|sink, chars M`；每个任务的开始、最终/报错（NSError 的 domain 与 code、存活时长、累计字数）；暂停时结算的字数与是否为空；发送时的字数。均为长度与状态，不记录识别内容。
+- 文件：`apps/ios/Kit/Sources/CodyncUI/Voice/SpeechTranscriber.swift`、`VoiceSession.swift`（两处日志）。
+- 验证：`xcodebuild build -scheme 'iOS Dev' -configuration DevDebug` 通过；已装到 iPhone 16 Pro（2.36.0 / 155）并启动。按要求未自测交互。
+- 限制/待办：单任务识别仍受 SFSpeechRecognizer 单次约 1 分钟上限约束（超过后按 1.5 秒规则续接一次；更长的连续通话留待改用 SpeechAnalyzer）；relay 默认关。
+- 关联：C0149、C0152、C0153、C0154。

@@ -1,6 +1,9 @@
 import CodyncKit
 import Foundation
 import SwiftUI
+import os
+
+private let voiceLog = Logger(subsystem: "com.pokai.Codync", category: "voice")
 
 /// Why the voice sheet stopped early, in the caller's words (`message` is a dictionary key).
 public enum VoiceNotice: Sendable, Equatable {
@@ -171,6 +174,7 @@ public final class VoiceSession {
             countdown = 0
             return
         }
+        voiceLog.info("sending \(toSend.count, privacy: .public) chars")
         let delivered = await onSend?(toSend) ?? false
         sending = false
         guard delivered else {
@@ -214,6 +218,9 @@ public final class VoiceSession {
     private func settlePaused() {
         editing = false
         sendFailed = false
+        // The whole text, not just what earlier tasks committed: this is the decision that used to
+        // come out as "did not catch that" while the words were there.
+        voiceLog.info("pause settled with \(self.words.count, privacy: .public) chars, empty=\(self.words.isEmpty, privacy: .public)")
         guard !words.isEmpty else {
             notHeard = true
             phase = .paused

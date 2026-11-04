@@ -1,7 +1,10 @@
 import AVFoundation
 import CodyncKit
 import Foundation
+import os
 import Speech
+
+private let voiceLog = Logger(subsystem: "com.pokai.Codync", category: "voice")
 
 /// What one recording reports while it runs. No display strings: the caller localizes.
 public enum SpeechEvent: Sendable {
@@ -49,15 +52,24 @@ public protocol SpeechTranscriber: AnyObject {
 
 /// The phone's own recognizer (SFSpeechRecognizer), on device when the phone supports it.
 ///
-/// One recognizer task lives for about a minute, so a long recording is a relay of tasks. The next
-/// one starts *before* the last is closed and both hear the microphone for a beat, so no audio falls
-/// into the seam; the closing task's last words are then folded in, with the words repeated across
-/// the seam dropped. To the user it is one continuous recording.
+/// One recognizer task hears a recording at a time, as C0152 did: that path is the one proven to
+/// transcribe on the phone. When a task ends — it gives up, or runs out of its ~1 minute — its words
+/// are kept and, if the task ran for longer than `restartAfter`, one new task carries on from there.
+/// A task that dies sooner than that is *not* restarted, so a recognizer that refuses immediately
+/// can't turn into a restart loop that hears nothing.
+///
+/// The C0154 relay (start the next task before closing the last, both on the microphone, seams
+/// deduplicated) is still here behind `relayTasks`, off by default until it is proven on device.
 @MainActor
 public final class OnDeviceSpeechTranscriber: SpeechTranscriber {
-    /// A task is replaced this long after it starts, well inside the recognizer's own minute.
+    /// Overlapping task relay. Off: one task at a time, the C0152 path.
+    public static var relayTasks = false
+    /// A task that lasted less than this is not restarted: something is wrong with it, not the mic.
+    /// Short enough that a sentence spoken after a natural final still gets its own task.
+    private static let restartAfter: TimeInterval = 1.5
+    /// A task is replaced this long after it starts when the relay is on.
     private static let taskLifetime: TimeInterval = 44
-    /// How long the old and the new task both hear the microphone.
+    /// How long the old and the new task both hear the microphone in relay mode.
     private static let overlap: Duration = .milliseconds(300)
 
     public var locale: Locale
@@ -66,31 +78,35 @@ public final class OnDeviceSpeechTranscriber: SpeechTranscriber {
     /// Built on the first recording: an AVAudioEngine is heavy enough to be felt when the home draws.
     private lazy var engine = AVAudioEngine()
     private var recognizer: SFSpeechRecognizer?
+    /// The request hearing the microphone now, and (relay only) the one finishing up.
+    private var request: SFSpeechAudioBufferRecognitionRequest?
+    private var closing: SFSpeechAudioBufferRecognitionRequest?
+    private var task: SFSpeechRecognitionTask?
+    /// The input's format, kept so a tap can be swapped without reopening the session.
+    private var format: AVAudioFormat?
+    /// Relay only: both requests read the microphone through this.
     private let sink = BufferSink()
+    /// On device unless a first task fails at once: a phone without the language's on-device model
+    /// answers an on-device request with an error, and the network recognizer is better than none.
+    private var preferOnDevice = true
     private var report: (@MainActor @Sendable (SpeechEvent) -> Void)?
     /// Bumped by every start and cancel, so late results from an older recording are dropped.
     private var generation = 0
+    /// Which task the results belong to: the closing one in relay mode must not overwrite the new.
+    private var taskID = 0
     /// A tap is installed on the input node; only then may it be taken off.
     private var tapped = false
-    /// The tasks hearing the microphone, oldest first; a closing one is only waiting for its last words.
-    private var hearings: [Hearing] = []
-    /// Words of tasks that are wholly finished, oldest first.
+    /// Words of tasks that already ended, and of the one running: together they are the text.
     private var committed: [String] = []
-    private var nextID = 1
-    /// When the newest task started: a task is replaced a little before the recognizer's own limit.
+    private var partial = ""
+    /// Relay only: the closing task's last words, until it hands them over.
+    private var fading = ""
+    private var taskStartedAt = Date.now
     private var newestTaskAt = Date.now
     private var rotation: Task<Void, Never>?
-    /// `finish` waits here for the recognizers' last words, unless they take too long.
+    private var stats: Task<Void, Never>?
+    /// `finish` waits here for the recognizer's last word, unless it takes too long.
     private var settling: CheckedContinuation<Void, Never>?
-
-    private struct Hearing {
-        let id: Int
-        let request: SFSpeechAudioBufferRecognitionRequest
-        var task: SFSpeechRecognitionTask?
-        var text = ""
-        /// Its audio is closed; it only has to hand back its last words.
-        var closing = false
-    }
 
     public init(locale: Locale = Locale(identifier: "zh-CN")) {
         self.locale = locale
@@ -98,7 +114,7 @@ public final class OnDeviceSpeechTranscriber: SpeechTranscriber {
 
     /// Everything heard so far, the seams between tasks deduplicated.
     private var words: String {
-        Self.join(committed + hearings.map(\.text))
+        Self.join(committed + (fading.isEmpty ? [] : [fading]) + (partial.isEmpty ? [] : [partial]))
     }
 
     // MARK: permission
@@ -124,18 +140,26 @@ public final class OnDeviceSpeechTranscriber: SpeechTranscriber {
         generation += 1
         self.report = report
         committed = []
+        let locale = self.locale
         guard let recognizer = SFSpeechRecognizer(locale: locale) ?? SFSpeechRecognizer(), recognizer.isAvailable else {
+            voiceLog.error("no recognizer for \(locale.identifier, privacy: .public)")
             self.report = nil
             throw SpeechUnavailable()
         }
         self.recognizer = recognizer
+        voiceLog.info("""
+            start locale=\(locale.identifier, privacy: .public) \
+            onDevice=\(recognizer.supportsOnDeviceRecognition, privacy: .public) \
+            relay=\(Self.relayTasks, privacy: .public)
+            """)
         startTask()
-        guard openMic() else {
+        guard let request, openMic(with: request) else {
             cancel()
             throw SpeechUnavailable()
         }
         isRecording = true
         watchRotation(generation: generation)
+        watchLevel()
     }
 
     public func pause() {
@@ -143,33 +167,36 @@ public final class OnDeviceSpeechTranscriber: SpeechTranscriber {
         isRecording = false
         closeMic()
         report?(.level(0))
+        voiceLog.info("pause after \(Int(self.words.count)) chars")
     }
 
     @discardableResult
     public func resume() -> Bool {
-        guard !isRecording, !hearings.isEmpty else { return false }
-        guard openMic() else {
+        guard !isRecording else { return false }
+        // Every task may have ended while we were paused: hearing again needs one to write into.
+        if request == nil { startTask() }
+        guard let request, openMic(with: request) else {
             cancel()
             report?(.failed(.microphone))
             return false
         }
         isRecording = true
         newestTaskAt = .now
-        // Every task may have run out of its minute while we were paused.
-        if !hearings.contains(where: { !$0.closing }) { startTask() }
+        voiceLog.info("resume with \(Int(self.words.count)) chars so far")
         return true
     }
 
     public func finish() async -> String {
-        guard !hearings.isEmpty else {
+        guard request != nil || task != nil else {
             let said = words
             release()
             return said
         }
         isRecording = false
         closeMic()
-        for hearing in hearings where !hearing.closing { close(id: hearing.id) }
-        // The recognizers' last words arrive a moment after the audio ends.
+        request?.endAudio()
+        closing?.endAudio()
+        // The recognizer's last word arrives a moment after the audio ends.
         await withCheckedContinuation { (done: CheckedContinuation<Void, Never>) in
             settling = done
             Task { @MainActor [weak self] in
@@ -178,6 +205,7 @@ public final class OnDeviceSpeechTranscriber: SpeechTranscriber {
             }
         }
         let said = words
+        voiceLog.info("finish with \(said.count, privacy: .public) chars")
         release()
         return said
     }
@@ -188,53 +216,58 @@ public final class OnDeviceSpeechTranscriber: SpeechTranscriber {
         settle()
     }
 
-    // MARK: the relay of tasks
+    // MARK: one task at a time
 
-    /// Starts hearing with a fresh request: the first task, and every replacement after it.
+    /// Starts hearing with a fresh request; in relay mode the previous one keeps hearing for a beat.
     private func startTask() {
         guard let recognizer else { return }
         let request = SFSpeechAudioBufferRecognitionRequest()
         request.shouldReportPartialResults = true
         request.addsPunctuation = true
         // On device when the phone can: nothing said leaves the phone.
-        if recognizer.supportsOnDeviceRecognition { request.requiresOnDeviceRecognition = true }
-        let id = nextID
-        nextID += 1
-        hearings.append(Hearing(id: id, request: request))
-        refreshSink()
-        newestTaskAt = .now
+        if recognizer.supportsOnDeviceRecognition, preferOnDevice { request.requiresOnDeviceRecognition = true }
+        taskID += 1
+        let id = taskID
         let generation = generation
-        let task = recognizer.recognitionTask(with: request,
-                                             resultHandler: Self.results(id: id, generation: generation, into: self))
-        if let index = hearings.firstIndex(where: { $0.id == id }) { hearings[index].task = task }
+        self.request = request
+        taskStartedAt = .now
+        newestTaskAt = .now
+        partial = ""
+        refreshSink()
+        task = recognizer.recognitionTask(with: request,
+                                          resultHandler: Self.results(id: id, generation: generation, into: self))
+        voiceLog.info("task \(id, privacy: .public) started")
+        // The tap was bound to the request it was installed with: a new one needs a new tap.
+        if tapped, !Self.relayTasks { installTap(on: request) }
     }
 
     /// The next task hears the microphone before the last one stops: whichever buffer a seam falls
     /// between, one of them has it. The old one is closed a beat later and its words folded in.
     private func rotate() {
-        guard isRecording, let old = hearings.first(where: { !$0.closing }) else { return }
+        guard isRecording, let old = request else { return }
+        closing = old
         startTask()
-        let id = old.id
+        refreshSink()
         Task { @MainActor [weak self] in
             try? await Task.sleep(for: Self.overlap)
-            self?.close(id: id)
+            self?.closeClosing()
         }
     }
 
-    private func close(id: Int) {
-        guard let index = hearings.firstIndex(where: { $0.id == id }), !hearings[index].closing else { return }
-        hearings[index].closing = true
-        hearings[index].request.endAudio()
+    private func closeClosing() {
+        closing?.endAudio()
         refreshSink()
     }
 
-    /// Whatever is still hearing goes to the microphone; a closing task gets nothing more.
+    /// Relay mode: whatever is still hearing goes to the microphone; a closing task gets nothing more.
     private func refreshSink() {
-        sink.hold(hearings.filter { !$0.closing }.map(\.request))
+        guard Self.relayTasks else { return }
+        sink.hold([closing, request].compactMap { $0 })
     }
 
     private func watchRotation(generation: Int) {
         rotation?.cancel()
+        guard Self.relayTasks else { return }
         rotation = Task { @MainActor [weak self] in
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(1))
@@ -244,7 +277,7 @@ public final class OnDeviceSpeechTranscriber: SpeechTranscriber {
         }
     }
 
-    // MARK: what the recognizers say
+    // MARK: what the recognizer says
 
     /// The recognizer calls this on its own queue, so it's built outside the main actor and hops
     /// back before touching anything (an inferred main-actor closure called off the main thread
@@ -254,39 +287,64 @@ public final class OnDeviceSpeechTranscriber: SpeechTranscriber {
         { result, error in
             let text = result?.bestTranscription.formattedString
             let final = result?.isFinal ?? false
-            let failed = error != nil
             Task { @MainActor in
                 guard transcriber.generation == generation else { return }
-                if let text { transcriber.recognized(id: id, text: text) }
-                if final || failed { transcriber.taskEnded(id: id) }
+                transcriber.heard(id: id, text: text, final: final, error: error)
             }
         }
     }
 
-    private func recognized(id: Int, text: String) {
-        guard let index = hearings.firstIndex(where: { $0.id == id }) else { return }
-        hearings[index].text = text
-        report?(.partial(words))
+    private func heard(id: Int, text: String?, final: Bool, error: (any Error)?) {
+        let isCurrent = id == taskID
+        if let text, !text.isEmpty {
+            if isCurrent { partial = text } else { fading = text }
+            report?(.partial(words))
+        }
+        guard final || error != nil else { return }
+        let lived = Date.now.timeIntervalSince(taskStartedAt)
+        if let error {
+            let ns = error as NSError
+            voiceLog.error("task \(id, privacy: .public) error \(ns.domain, privacy: .public)/\(ns.code, privacy: .public) after \(lived, format: .fixed(precision: 1), privacy: .public)s: \(ns.localizedDescription, privacy: .public)")
+        } else {
+            voiceLog.info("task \(id, privacy: .public) final after \(lived, format: .fixed(precision: 1), privacy: .public)s, \(self.words.count, privacy: .public) chars")
+        }
+        if isCurrent { taskEnded(lived: lived, failed: error != nil) } else { foldClosing() }
     }
 
-    /// A task is done: its words move into the running text and it leaves the microphone alone. With
-    /// nothing left hearing but a live recording — a task that gave up early — a new one starts.
-    private func taskEnded(id: Int) {
-        guard let index = hearings.firstIndex(where: { $0.id == id }) else { return }
-        let text = hearings[index].text
-        hearings.remove(at: index)
-        if !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { committed.append(text) }
+    /// The current task is done. Its words stay; if it lived long enough to have run into the
+    /// recognizer's limit, one new task carries on. A task that dies at once is left alone: restarting
+    /// it would only spin.
+    private func taskEnded(lived: TimeInterval, failed: Bool) {
+        if !partial.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { committed.append(partial) }
+        partial = ""
+        task = nil
+        request = nil
         report?(.partial(words))
-        if hearings.isEmpty {
+        // A task that failed at once on an on-device request gets one retry on the network model.
+        if failed, isRecording, lived <= Self.restartAfter, preferOnDevice {
+            preferOnDevice = false
+            voiceLog.info("on-device recognition failed at once: retrying without it")
+            startTask()
+            return
+        }
+        guard isRecording, lived > Self.restartAfter else {
             if isRecording {
-                startTask()
-            } else {
-                settle()
+                voiceLog.info("task died after \(lived, format: .fixed(precision: 1), privacy: .public)s: not restarted")
             }
+            settle()
+            return
         }
+        startTask()
     }
 
-    /// Wakes `finish` once; anything the recognizers say afterwards is dropped.
+    private func foldClosing() {
+        if !fading.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { committed.append(fading) }
+        fading = ""
+        closing = nil
+        report?(.partial(words))
+    }
+
+    /// Wakes `finish` once; anything the recognizer says afterwards is dropped.
     private func settle() {
         settling?.resume()
         settling = nil
@@ -295,24 +353,29 @@ public final class OnDeviceSpeechTranscriber: SpeechTranscriber {
     private func release() {
         rotation?.cancel()
         rotation = nil
-        for hearing in hearings {
-            hearing.task?.cancel()
-            hearing.request.endAudio()
-        }
-        hearings = []
-        committed = []
+        stats?.cancel()
+        stats = nil
+        task?.cancel()
+        task = nil
+        request?.endAudio()
+        request = nil
+        closing?.endAudio()
+        closing = nil
         sink.hold([])
         recognizer = nil
         closeMic()
         report?(.level(0))
         report = nil
+        committed = []
+        partial = ""
+        fading = ""
         isRecording = false
     }
 
     // MARK: the seam
 
-    /// The tasks end and start mid-sentence, so their words overlap: drop the longest tail of the
-    /// text so far that repeats the head of the next one.
+    /// Tasks end and start mid-sentence, so their words overlap: drop the longest tail of the text so
+    /// far that repeats the head of the next one.
     private static func join(_ parts: [String]) -> String {
         parts
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
@@ -340,7 +403,7 @@ public final class OnDeviceSpeechTranscriber: SpeechTranscriber {
 
     // MARK: the microphone
 
-    private func openMic() -> Bool {
+    private func openMic(with request: SFSpeechAudioBufferRecognitionRequest) -> Bool {
         let audio = AVAudioSession.sharedInstance()
         do {
             // The session has to be in a record category and active before the tap goes on.
@@ -350,17 +413,16 @@ public final class OnDeviceSpeechTranscriber: SpeechTranscriber {
             let input = engine.inputNode
             // The buffer's own format: a tap in any other format is refused or raises.
             let format = try MicTap.format(of: input)
+            self.format = format
             input.removeTap(onBus: 0)
-            let sink = self.sink
-            input.installTap(onBus: 0, bufferSize: 2048, format: format,
-                             block: Self.tap(sink) { [weak self] level in
-                                 Task { @MainActor in self?.heard(level: level) }
-                             })
+            input.installTap(onBus: 0, bufferSize: 2048, format: format, block: block(for: request))
             tapped = true
             engine.prepare()
             try engine.start()
+            voiceLog.info("microphone open, \(format.sampleRate, privacy: .public) Hz")
             return true
         } catch {
+            voiceLog.error("microphone failed: \(error.localizedDescription, privacy: .public)")
             if tapped {
                 engine.inputNode.removeTap(onBus: 0)
                 tapped = false
@@ -369,6 +431,25 @@ public final class OnDeviceSpeechTranscriber: SpeechTranscriber {
             try? audio.setActive(false, options: .notifyOthersOnDeactivation)
             return false
         }
+    }
+
+    /// While the engine runs, the tap follows the request it feeds.
+    private func installTap(on request: SFSpeechAudioBufferRecognitionRequest) {
+        guard tapped, let format else { return }
+        engine.inputNode.removeTap(onBus: 0)
+        engine.inputNode.installTap(onBus: 0, bufferSize: 2048, format: format, block: block(for: request))
+    }
+
+    /// Relay mode feeds both requests through the sink; otherwise the tap writes to the one request
+    /// directly, exactly as C0152 did.
+    private func block(for request: SFSpeechAudioBufferRecognitionRequest) -> AVAudioNodeTapBlock {
+        let onLevel: @Sendable (Float) -> Void = { [weak self] level in
+            Task { @MainActor in self?.heard(level: level) }
+        }
+        let counter = TapStats.shared
+        return Self.relayTasks
+            ? Self.tap(into: sink, counting: counter, onLevel: onLevel)
+            : Self.tap(into: request, counting: counter, onLevel: onLevel)
     }
 
     private func closeMic() {
@@ -387,14 +468,41 @@ public final class OnDeviceSpeechTranscriber: SpeechTranscriber {
         report?(.level(level))
     }
 
+    /// A buffer a second, logged: whether the microphone is really reaching the recognizer.
+    private func watchLevel() {
+        stats?.cancel()
+        let counter = TapStats.shared
+        stats = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(1))
+                guard let self, self.isRecording else { return }
+                let count = counter.take()
+                let feeding = Self.relayTasks ? "sink" : (self.request == nil ? "nothing" : "request")
+                let chars = self.words.count
+                voiceLog.debug("buffers \(count, privacy: .public)/s, feeding \(feeding, privacy: .public), \(chars, privacy: .public) chars")
+            }
+        }
+    }
+
     /// The tap itself, built outside the main actor: it runs on the audio thread, where touching
-    /// main-actor state traps (`_dispatch_assert_queue_fail`). The buffer goes to the sink, where
-    /// every task that is still hearing gets a copy — which is what makes the seams gapless — and the
-    /// level is thinned to about 18 reports a second.
-    private nonisolated static func tap(_ sink: BufferSink,
+    /// main-actor state traps (`_dispatch_assert_queue_fail`).
+    private nonisolated static func tap(into request: SFSpeechAudioBufferRecognitionRequest,
+                                        counting counter: TapStats,
                                         onLevel: @escaping @Sendable (Float) -> Void) -> AVAudioNodeTapBlock {
         let clock = TapClock()
         return { buffer, _ in
+            counter.add()
+            request.append(buffer)
+            guard clock.tick() else { return }
+            onLevel(level(of: buffer))
+        }
+    }
+
+    private nonisolated static func tap(into sink: BufferSink, counting counter: TapStats,
+                                        onLevel: @escaping @Sendable (Float) -> Void) -> AVAudioNodeTapBlock {
+        let clock = TapClock()
+        return { buffer, _ in
+            counter.add()
             sink.append(buffer)
             guard clock.tick() else { return }
             onLevel(level(of: buffer))
@@ -402,8 +510,29 @@ public final class OnDeviceSpeechTranscriber: SpeechTranscriber {
     }
 }
 
-/// The requests the microphone writes into. There is more than one at a seam, so the audio thread
-/// reads a copy under a lock instead of reaching into the main actor per buffer.
+/// How many buffers the microphone handed over: one number a second is enough to tell whether the
+/// tap is wired to a request at all.
+private final class TapStats: @unchecked Sendable {
+    static let shared = TapStats()
+    private let lock = NSLock()
+    private var count = 0
+
+    func add() {
+        lock.lock()
+        count += 1
+        lock.unlock()
+    }
+
+    func take() -> Int {
+        lock.lock()
+        defer { lock.unlock() }
+        let taken = count
+        count = 0
+        return taken
+    }
+}
+
+/// The requests the microphone writes into in relay mode: there is more than one at a seam.
 private final class BufferSink: @unchecked Sendable {
     private let lock = NSLock()
     private var requests: [SFSpeechAudioBufferRecognitionRequest] = []
