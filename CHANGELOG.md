@@ -2054,3 +2054,13 @@
   - 只被死岛调用、但仍被**测试**引用的 Swift 符号（删了会破测试，保留）：`Store/ComputerSelection.swift`（`ComputerSelection` / `ConnectionSummary`，测试 17 处）、`Store/RosterSectionOrder.swift`（测试 3 处）、`Store/RosterSection.swift` 的 `RosterSection.lines` 与 `RosterSectionLine`（测试 5 处）。
   - 与本次无关的孤儿（清单外，未动）：`Views/QuickCapture.swift` 的 `QuickCaptureModel`（C0184 删 `QuickCaptureOverlay` 后零引用）、`CodyncKit/Models/Cloud.swift` 的 `CloudClaim`（C0186 删 `createClaim()` 后零引用）、`Controls.swift` 的 `CardForm` / `ChoiceList`。
 - 关联：C0111、C0184、C0186。
+
+### C0190 · 2026-11-05 · 玻璃收口第 1 步：`GlassSurface` 取代 `glass(in:)` 的两分支写法
+
+- 原因：全 App 的玻璃有 4 套写法（`glass(in:)` 7 处、`VoiceGlass` 6 处、裸 `glassEffect` 5 处、裸 material 5 处）。其中通用的 `glass(in:)` 既没有 `interactive()` 也没有 tint；而 iOS 26 以下的 material 回退在本工程（deployment target 26.0）里不可达。
+- 变化（`Kit/Sources/CodyncUI/Platform.swift`）：
+  - 新增 `GlassSurface<S: Shape>` 修饰器：`glassEffect` + `interactive`（布尔）+ `tint`（可选），内部按 `tint.map { Glass.regular.tint($0) } ?? .regular` 再叠 `.interactive()`。
+  - `glass(in:)` 改成它的薄封装，并加 `interactive:` / `tint:` 两个带默认值的参数——7 个现有调用点（GlassToast、CallView ×2、CommandList、Composer ×2、ConversationList）一行未改，观感不变。
+  - 删掉 `#available(iOS 26, *)` 分支与 `ultraThinMaterial` 回退：target 是 26.0，else 不可达。
+- 验证：`xcodebuild build -scheme 'iOS Dev' -configuration DevDebug` 通过（0 error / 0 warning）。按要求未跑测试、未截图。
+- 关联：C0191、C0192、C0193。
