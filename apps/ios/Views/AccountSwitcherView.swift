@@ -166,8 +166,9 @@ private struct AccountProfileView: View {
                 Button { path.append(.profile) } label: {
                     HStack(spacing: 12) {
                         profileAvatar
+                            .frame(width: 28, height: 28)
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(displayName).font(.headline).lineLimit(1).truncationMode(.middle)
+                            Text(displayName).font(.body.weight(.medium)).lineLimit(1).truncationMode(.middle)
                             Text(displayBio).font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
                         }
                         Spacer(minLength: 8)
@@ -253,9 +254,9 @@ private struct AccountProfileView: View {
     @ViewBuilder private var profileAvatar: some View {
         if let image = avatarImage {
             Image(uiImage: image).resizable().scaledToFill()
-                .frame(width: 44, height: 44).clipShape(Circle())
+                .frame(width: 28, height: 28).clipShape(Circle())
         } else {
-            AccountAvatar(url: account.avatarURL, email: account.email, size: 44)
+            AccountAvatar(url: account.avatarURL, email: account.email, size: 28)
         }
     }
 }

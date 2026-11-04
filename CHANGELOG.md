@@ -1310,4 +1310,24 @@
 - 验证：按要求本轮只验证编译通过（DevDebug 真机构建）。
 - 限制/待办：无已知新增限制。
 - 关联：C0140、C0141。
+### C0143 · 2026-11-04 · 设置行统一：图标 20/28、标题 medium、同一个行组件
+
+- 原因：设置里开关行和箭头行用的布局不同，COE/DSHB/DSHC/通知的文字比别的行往右偏；图标大小、字重、间距也不一致。
+- 变化：
+  - `SettingsRow`：图标 18→20，固定 28pt 宽的框居中，图标与标题间距 12；标题字重改为 `.body.weight(.medium)`（原 regular 加粗一档）。
+  - 新增 `SettingsToggleRow`：与 `SettingsRow` 完全相同的 HStack/图标框/间距/字重，右侧 `Toggle` 加 `.labelsHidden()`，不再带 Toggle 自带的 label 间距。
+  - 来源开关（COE/DSHB/DSHC）改用 `SettingsToggleRow`，图标统一 Remix：`ghost-4-line`、`deepseek-line`、`chat-ai-line`（20pt/28pt 框）。
+  - 「通知」「思考细节」改用 `SettingsToggleRow`。
+  - 「退出登录」「删除账户」从纯文字按钮改为 `SettingsRow`（`logout-box-line` / `delete-bin-line`，destructive）。
+  - 个人资料行：头像 44→28（与图标框同宽），标题 `.body.weight(.medium)`。
+- 对齐审计（修前哪些行偏了）：
+  - COE / DSHB / DSHC / 通知 / 思考细节：走 `Toggle` 自带 label，标题比 `SettingsRow` 右偏（Toggle 内部间距，约 8–12pt），且图标尺寸不一致（18/22）。
+  - 退出登录 / 删除账户：纯文字行没有图标，标题比其它行左偏约 34pt。
+  - 个人资料：头像 44 + 12 间距，标题比其它行右偏约 22pt。
+  - 状态 / 排序 / 凭证 / 连接 / 电脑 / DSH 连接 / 主题 / 语言 / 触感 / 重新开始：彼此已经对齐（18/22+12），本轮随统一参数整体右移 6pt（22→28 框，18→20 图标）。
+  - 未改：多账户切换列表、登录按钮、`ShortcutLeadSettings`（不在本次清单内）。
+- 文件：`apps/ios/Kit/Sources/CodyncUI/Controls.swift`、`Thread/ThinkingDetailsSettings.swift`、`apps/ios/Views/HomeSource.swift`、`SettingsView.swift`、`AccountSwitcherView.swift`。
+- 验证：按要求本轮只验证编译通过（DevDebug 真机构建）。
+- 限制/待办：多账户/登录/快捷指令 Picker 仍沿用原样；若需要也统一可另开一条。
+- 关联：C0133、C0141、C0142。
 

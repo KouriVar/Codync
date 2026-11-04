@@ -557,6 +557,36 @@ public extension View {
 }
 
 
+/// A settings row with a trailing switch. Same icon box, spacing and title weight as `SettingsRow`,
+/// so switch rows and arrow rows line up; the switch carries no label of its own.
+public struct SettingsToggleRow: View {
+    let icon: String
+    let title: String
+    @Binding var isOn: Bool
+
+    public init(_ icon: String, title: String, isOn: Binding<Bool>) {
+        self.icon = icon
+        self.title = title
+        _isOn = isOn
+    }
+
+    public var body: some View {
+        HStack(spacing: 12) {
+            RemixIcon(icon, size: 20)
+                .frame(width: 28, height: 28)
+                .foregroundStyle(.primary)
+            Text(title)
+                .font(.body.weight(.medium))
+                .foregroundStyle(.primary)
+            Spacer(minLength: 8)
+            Toggle("", isOn: $isOn)
+                .labelsHidden()
+                .tint(.black)
+        }
+        .listRowSeparator(.hidden)
+    }
+}
+
 /// A settings row: a leading Remix glyph, a title, an optional value and a trailing chevron.
 /// The system separator is hidden; Settings draws no dividers between rows.
 public struct SettingsRow: View {
@@ -577,10 +607,12 @@ public struct SettingsRow: View {
 
     public var body: some View {
         HStack(spacing: 12) {
-            RemixIcon(icon, size: 18)
-                .frame(width: 22)
+            RemixIcon(icon, size: 20)
+                .frame(width: 28, height: 28)
                 .foregroundStyle(destructive ? Color.red : Color.primary)
-            Text(title).foregroundStyle(destructive ? Color.red : Color.primary)
+            Text(title)
+                .font(.body.weight(.medium))
+                .foregroundStyle(destructive ? Color.red : Color.primary)
             Spacer(minLength: 8)
             if let value {
                 Text(value).foregroundStyle(.secondary)

@@ -46,10 +46,9 @@ struct SettingsView: View {
                 .buttonStyle(.plain)
 
                 ForEach(HomeSource.allCases) { source in
-                    Toggle(isOn: Binding(get: { enabledSources.contains(source) },
-                                        set: { setSource(source, on: $0) })) {
-                        Label { Text(source.title) } icon: { HomeSourceIcon(source: source) }
-                    }
+                    SettingsToggleRow(source.settingsIcon, title: source.title,
+                                      isOn: Binding(get: { enabledSources.contains(source) },
+                                                    set: { setSource(source, on: $0) }))
                 }
             }
             .listRowSeparator(.hidden)
@@ -92,10 +91,14 @@ struct SettingsView: View {
             if showAdvanced {
                 Section {
                     if account.isSignedIn {
-                        Button(L10n.tr("Sign out"), role: .destructive) { confirmSignOut = true }
-                            .disabled(account.isBusy)
-                        Button(L10n.tr("Delete account"), role: .destructive) { confirmDelete = true }
-                            .disabled(account.isBusy)
+                        Button(role: .destructive) { confirmSignOut = true } label: {
+                            SettingsRow("logout-box-line", title: L10n.tr("Sign out"), destructive: true, chevron: false)
+                        }
+                        .disabled(account.isBusy)
+                        Button(role: .destructive) { confirmDelete = true } label: {
+                            SettingsRow("delete-bin-line", title: L10n.tr("Delete account"), destructive: true, chevron: false)
+                        }
+                        .disabled(account.isBusy)
                     }
                     Button(role: .destructive) { confirmStartOver = true } label: {
                         SettingsRow("restart-line", title: L10n.tr("Start over"), destructive: true, chevron: false)
@@ -151,16 +154,15 @@ struct SettingsView: View {
     }
 
     private var notificationsRow: some View {
-        Toggle(isOn: Binding(get: { notificationsAllowed == true }, set: { on in
+        SettingsToggleRow("notification-3-line", title: L10n.tr("Notifications"),
+                          isOn: Binding(get: { notificationsAllowed == true }, set: { on in
             if on {
                 Task { notificationsAllowed = await PushRegistrar.shared.requestAuthorization(from: .settings) }
             } else if let url = URL(string: UIApplication.openNotificationSettingsURLString) {
                 // iOS has no API to revoke; send the user to the system switch.
                 UIApplication.shared.open(url)
             }
-        })) {
-            Label { Text(L10n.tr("Notifications")) } icon: { RemixIcon("notification-3-line") }
-        }
+        }))
     }
 
     private var hapticsRow: some View {
@@ -225,24 +227,5 @@ struct HapticsSettingsView: View {
                 ToolbarItem(placement: .cancellationAction) { Button("关闭") { dismiss() } }
             }
         }
-    }
-}
-
-/// The home source's icon: the COE agent glyph from the design files, Remix's DeepSeek and chat-ai.
-private struct HomeSourceIcon: View {
-    let source: HomeSource
-
-    var body: some View {
-        Group {
-            switch source {
-            case .coe:
-                RemixIcon("ghost-4-line", size: 18).foregroundStyle(.primary)
-            case .dsBot:
-                RemixIcon("deepseek-line", size: 18).foregroundStyle(.primary)
-            case .dsh:
-                RemixIcon("chat-ai-line", size: 18).foregroundStyle(.primary)
-            }
-        }
-        .frame(width: 22, height: 22)
     }
 }

@@ -84,3 +84,14 @@ enum HomeSessionVisibility {
         return false
     }
 }
+
+/// The Remix glyph used for this source in Settings.
+extension HomeSource {
+    var settingsIcon: String {
+        switch self {
+        case .coe: return "ghost-4-line"
+        case .dsBot: return "deepseek-line"
+        case .dsh: return "chat-ai-line"
+        }
+    }
+}

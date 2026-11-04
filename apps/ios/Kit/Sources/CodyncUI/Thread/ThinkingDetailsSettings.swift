@@ -14,14 +14,6 @@ public struct ThinkingDetailsSettings: View {
     public init() {}
 
     public var body: some View {
-        Toggle(isOn: $details) {
-            HStack(spacing: 12) {
-                RemixIcon("brain-line", size: 18).frame(width: 22).foregroundStyle(.primary)
-                Text("思考细节")
-            }
-        }
-            .toggleStyle(.switch)
-            .tint(.black)
-            .listRowSeparator(.hidden)
+        SettingsToggleRow("brain-line", title: "思考细节", isOn: $details)
     }
 }
