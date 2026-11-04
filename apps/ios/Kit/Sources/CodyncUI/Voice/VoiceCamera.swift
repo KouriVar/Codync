@@ -146,6 +146,7 @@ public struct VoiceCameraPage: View {
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var picked: PhotosPickerItem?
+    @State private var picking = false
 
     public init(camera: VoiceCamera, onBack: @escaping () -> Void, onCapture: @escaping (UIImage) -> Void) {
         self.camera = camera
@@ -189,19 +190,18 @@ public struct VoiceCameraPage: View {
 
     private var controls: some View {
         VStack {
+            // Two buttons and nothing else: back on the left, more on the right, 16pt in.
             HStack {
-                circle("arrow-left-line", label: "Back") { onBack() }
+                glassButton("arrow-left-line", label: "Back") { onBack() }
                 Spacer(minLength: 0)
+                moreButton
             }
+            .padding(.horizontal, 16)
             Spacer(minLength: 0)
-            HStack(alignment: .center) {
-                PhotosPicker(selection: $picked, matching: .images) {
-                    RemixIcon("image-line", size: 24, weight: .medium)
-                        .foregroundStyle(.white)
-                        .frame(width: 44, height: 44)
-                        .contentShape(Circle())
-                }
-                .accessibilityLabel(Text(L10n.tr("Choose a photo")))
+            // Shutter in the middle, album at the left corner, flip at the right, all the same glass.
+            HStack {
+                glassButton("image-line", label: "Choose a photo") { picking = true }
+                    .photosPicker(isPresented: $picking, selection: $picked, matching: .images)
                 Spacer(minLength: 0)
                 Button {
                     Task {
@@ -211,23 +211,43 @@ public struct VoiceCameraPage: View {
                         }
                     }
                 } label: {
-                    Circle()
-                        .strokeBorder(.white, lineWidth: 4)
-                        .frame(width: 72, height: 72)
+                    RemixIcon("record-circle-line", size: 24, weight: .medium)
+                        .foregroundStyle(.white)
+                        .frame(width: 44, height: 44)
                         .contentShape(Circle())
                 }
                 .buttonStyle(CameraPress())
+                .modifier(VoiceGlass(tint: .white.opacity(0.25), shape: AnyShape(Circle())))
                 .disabled(camera.capturing)
                 .accessibilityLabel(Text(L10n.tr("Take a photo")))
                 Spacer(minLength: 0)
-                circle("camera-switch-line", label: "Flip the camera") { camera.flip() }
+                glassButton("camera-switch-line", label: "Flip the camera") { camera.flip() }
             }
+            .padding(.horizontal, 16)
+            .padding(.bottom, 16)
         }
-        .padding(.horizontal, 16)
-        .padding(.bottom, 24)
     }
 
-    private func circle(_ icon: String, label: String, action: @escaping () -> Void) -> some View {
+    /// The ⋯ the page asks for: the one thing worth offering here is where the permission lives.
+    private var moreButton: some View {
+        Menu {
+            if let url = URL(string: UIApplication.openSettingsURLString) {
+                Link(destination: url) {
+                    Label { Text(L10n.tr("Open Settings")) } icon: { RemixIcon("settings-3-line") }
+                }
+            }
+        } label: {
+            RemixIcon("more-line", size: 24, weight: .medium)
+                .foregroundStyle(.white)
+                .frame(width: 44, height: 44)
+                .contentShape(Circle())
+        }
+        .modifier(VoiceGlass(tint: nil, shape: AnyShape(Circle())))
+        .accessibilityLabel(Text(L10n.tr("More")))
+    }
+
+    /// One 44pt glass circle, the same one the voice sheet uses.
+    private func glassButton(_ icon: String, label: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             RemixIcon(icon, size: 24, weight: .medium)
                 .foregroundStyle(.white)
@@ -235,6 +255,7 @@ public struct VoiceCameraPage: View {
                 .contentShape(Circle())
         }
         .buttonStyle(CameraPress())
+        .modifier(VoiceGlass(tint: nil, shape: AnyShape(Circle())))
         .accessibilityLabel(Text(L10n.tr(label)))
     }
 

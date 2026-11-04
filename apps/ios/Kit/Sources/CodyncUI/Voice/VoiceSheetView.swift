@@ -50,6 +50,8 @@ public struct VoiceSheetView: View {
                     session.attach(image)
                     flipCamera(to: false)
                 }
+                // The sheet turns over to get here, so this face starts upside down: turn it back.
+                .rotation3DEffect(.degrees(180), axis: (x: 0, y: 1, z: 0))
                 .rotation3DEffect(.degrees(flip), axis: (x: 0, y: 1, z: 0))
             } else if isSmall {
                 pill
@@ -416,8 +418,9 @@ public struct VoiceSheetView: View {
     }
 }
 
-/// The sheet's glass: Liquid Glass on iOS 26, `ultraThinMaterial` with a hairline before that.
-private struct VoiceGlass: ViewModifier {
+/// The sheet's glass: Liquid Glass on iOS 26, `ultraThinMaterial` with a hairline before that. Shared
+/// with the camera page, so every circle in the sheet is the same circle.
+struct VoiceGlass: ViewModifier {
     let tint: Color?
     let shape: AnyShape
 

@@ -1739,3 +1739,16 @@
 - 验证：`xcodebuild build -scheme 'iOS Dev' -configuration DevDebug` 通过；已装到 iPhone 16 Pro（2.36.0 / 168）并启动。按要求未自测、未截图。
 - 限制/待办：无。
 - 关联：C0169、C0168。
+### C0171 · 2026-11-04 · 相机页：翻转后正回、只有两个顶部按钮、底部统一玻璃按钮
+
+- 原因：C0168 的相机页是 sheet 翻过去的第二面，方向是反的；顶部按钮布局和 sheet 不一致（只有返回，字号/材质也不统一）；底部快门还是白圈样式。
+- 变化：
+  - 镜像：相机页在原有翻转之外再加一层 `.rotation3DEffect(.degrees(180), axis: (0,1,0))`，翻过来后是正的（`180 + 翻转角`，静止时合 360°）。
+  - 顶部只有两个 44pt 圆形玻璃钮、图标 24pt、离边缘 16pt：左 `arrow-left-line` 返回（反向翻转回语音页，录音与文字保留），右 `more-line`（⋯，菜单里只放了「打开设置」，相机权限在那里）；相机页上不再有关闭按钮或其它按钮。
+  - 底部同样统一成玻璃按钮：中间快门（`record-circle-line`，白色 tint 玻璃）、左下相册（`image-line`，`photosPicker` 打开系统相册）、右下切换前后摄（`camera-switch-line`），尺寸与顶部一致。
+  - 玻璃按钮复用语音 sheet 现成的 `VoiceGlass`（由 `private` 提升为模块内共用），相机页与 sheet 的圆钮完全同一套。
+  - 其余逻辑（拍照/选图后自动翻回、缩略图、权限请求）未改。
+- 文件：`apps/ios/Kit/Sources/CodyncUI/Voice/VoiceCamera.swift`、`VoiceSheetView.swift`（`VoiceGlass` 可见性 + 相机面镜像）。
+- 验证：`xcodebuild build -scheme 'iOS Dev' -configuration DevDebug` 通过；已装到 iPhone 16 Pro（2.36.0 / 169）并启动。按要求未自测、未截图。
+- 限制/待办：⋯ 目前只提供「打开设置」一项。
+- 关联：C0168、C0169。
