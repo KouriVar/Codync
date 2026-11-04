@@ -24,7 +24,6 @@ struct HomeSourcesView: View {
     @State private var showCameraSheet = false
     @State private var openDSHSession: DSHSession?
     @State private var showDSHConnect = false
-    @State private var page = 0
     @State private var naming: SectionNaming?
     @State private var sharingTemplate: EditTarget?
     @State private var editing: EditTarget?
@@ -41,8 +40,6 @@ struct HomeSourcesView: View {
     }
 
     private var enabledOrdered: [HomeSource] { HomeSource.allCases.filter { enabledSources.contains($0) } }
-    /// The pinned page is always page 0.
-    private var pageCount: Int { 1 + enabledOrdered.count }
 
     private var searchQuery: String { searchText.trimmingCharacters(in: .whitespacesAndNewlines) }
     private var isSearching: Bool { !searchQuery.isEmpty }
@@ -64,10 +61,7 @@ struct HomeSourcesView: View {
                 }
                 #endif
             }
-            .onChange(of: sourcesRaw) { _, _ in
-                syncDSHConnection()
-                if page >= pageCount { page = max(0, pageCount - 1) }
-            }
+            .onChange(of: sourcesRaw) { _, _ in syncDSHConnection() }
             .onChange(of: availableStores.map(\.selection)) { handleStoreSelections() }
             // DSH pauses in the background and reconnects when the app comes back.
             .onChange(of: scenePhase) { _, phase in
@@ -107,25 +101,41 @@ struct HomeSourcesView: View {
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar(.visible, for: .navigationBar)
+            // Let the list and the top fade reach under the bar.
+            .toolbarBackground(.hidden, for: .navigationBar)
             .toolbar { toolbarContent }
     }
 
     private var baseView: some View {
-        TabView(selection: pageBinding) {
-            pinnedPage.tag(0)
-            ForEach(Array(enabledOrdered.enumerated()), id: \.element) { index, source in
-                sourcePage(source).tag(index + 1)
+        // A paged TabView confines every page to the safe area, so a page's List can never reach
+        // under the navigation bar. A horizontal paging ScrollView can, and the blur is mounted on
+        // it exactly like the chat page mounts it on its scroll view.
+        ScrollView(.horizontal) {
+            LazyHStack(spacing: 0) {
+                pinnedPage
+                    .containerRelativeFrame(.horizontal)
+                ForEach(Array(enabledOrdered.enumerated()), id: \.element) { _, source in
+                    sourcePage(source)
+                        .containerRelativeFrame(.horizontal)
+                }
             }
+            .scrollTargetLayout()
         }
-        // Swipe between pages; no page control dots.
-        .tabViewStyle(.page(indexDisplayMode: .never))
+        .scrollTargetBehavior(.paging)
+        .scrollIndicators(.hidden)
         .background(Palette.background)
+        .ignoresSafeArea(edges: .top)
+        .overlay(alignment: .top) { ProgressiveTopBlur() }
         .safeAreaInset(edge: .bottom, spacing: 0) { bottomBar }
     }
 
-    private var pageBinding: Binding<Int> {
-        Binding(get: { min(max(page, 0), pageCount - 1) },
-                set: { page = min(max($0, 0), pageCount - 1) })
+    /// Status bar + inline navigation bar height: the list scrolls under the bar, but its first
+    /// row still starts below the avatar and the "+".
+    private var topBarInset: CGFloat {
+        let status = UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .first?.windows.first(where: \.isKeyWindow)?.safeAreaInsets.top ?? 0
+        return status + 44
     }
 
     private var bottomBar: some View {
@@ -173,9 +183,7 @@ struct HomeSourcesView: View {
                 entryRow(entry)
             }
         }
-        .plainRosterList()
-        // Mounted on the scroll view itself, exactly where the chat page mounts it.
-        .overlay(alignment: .top) { ProgressiveTopBlur() }
+        .plainRosterList(topInset: topBarInset)
     }
 
     private func sourcePage(_ source: HomeSource) -> some View {
@@ -196,9 +204,7 @@ struct HomeSourcesView: View {
                 entryRow(entry)
             }
         }
-        .plainRosterList()
-        // Mounted on the scroll view itself, exactly where the chat page mounts it.
-        .overlay(alignment: .top) { ProgressiveTopBlur() }
+        .plainRosterList(topInset: topBarInset)
     }
 
     private var pinnedEmptyState: some View {
@@ -592,9 +598,9 @@ private extension View {
     }
 
     /// The shared plain-list styling the roster used.
-    func plainRosterList() -> some View {
+    func plainRosterList(topInset: CGFloat) -> some View {
         listStyle(.plain)
-            .contentMargins(.top, 12, for: .scrollContent)
+            .contentMargins(.top, topInset + 12, for: .scrollContent)
             .scrollContentBackground(.hidden)
             .environment(\.defaultMinListRowHeight, 0)
             .scrollDismissesKeyboard(.interactively)

@@ -1264,3 +1264,17 @@
 - 限制/待办：`TabView(.page)` 的分页容器是否仍会裁页内 overlay 需要真机确认；若裁则采用上面的备选。
 - 关联：C0128、C0132。
 
+### C0139 · 2026-11-04 · 首页改用横向 ScrollView 分页，顶部渐变从屏幕顶开始
+
+- 原因：首页顶部渐变从导航栏下方才开始，导航栏区域是一整块白底，中间有硬边。
+- 根因：聊天页的 `ConversationList` 是显式延伸到安全区外的——它用 `safeFrame` / `fullFrame` 计算 `outsets`，让集合视图到达导航栏和状态栏下面；而首页的 `TabView(.page)` 把每一页限制在安全区内，页内 `List` 的 frame 到不了导航栏下，挂在其上的 overlay 自然从栏底开始。`toolbarBackground(.hidden)` 只去掉栏背景，不能让页面延伸，所以 C0138 的做法不完整。
+- 变化：
+  - 去掉 `TabView(.page)`，改成横向 `ScrollView` + `LazyHStack` + `.scrollTargetBehavior(.paging)`；页序（置顶、COE、DSHB、DSHC）和左右滑动不变，仍然没有圆点。
+  - 整个分页 ScrollView `.ignoresSafeArea(edges: .top)`，`ProgressiveTopBlur` 挂在这个滚动视图的上沿（与聊天页挂在 `ConversationList` 上同一层级），从屏幕顶部开始渐隐。
+  - 首页导航栏 `.toolbarBackground(.hidden, for: .navigationBar)`。
+  - 每页 `List` 的滚动内容顶部留出「状态栏 + 44pt 导航栏 + 12pt」的边距，第一行不会被头像/「+」挡住。
+- 文件：`apps/ios/Views/HomeSourcesView.swift`。
+- 验证：按要求本轮只验证编译通过（DevDebug 真机构建）。
+- 限制/待办：`topBarInset` 以「状态栏 + 44pt inline 栏」估算，若系统栏高度不同可能差几 pt；横向 ScrollView 与竖向 List 的手势组合需真机确认。
+- 关联：C0138、C0128。
+
