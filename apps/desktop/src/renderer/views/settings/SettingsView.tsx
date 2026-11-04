@@ -9,6 +9,7 @@ import { useDismiss } from '../../components/Overlay'
 import { HStack, IconSlot, VStack } from '../../components/Stack'
 import { Text } from '../../components/Text'
 import { useModel } from '../../lib/observable'
+import { accountsInUse } from '../../lib/account-mode'
 import { appLanguages, languageTitle } from '../../lib/l10n'
 import { useTr } from '../../lib/use-language'
 import { DEFAULT_TEXT_SIZE, prefs, TEXT_SIZES, usePref } from '../../lib/prefs'
@@ -119,7 +120,11 @@ function PageContent({ page }: { page: SettingsPage }) {
 
 /** Account, window and app preferences. */
 function GeneralSettings() {
+  const app = useApp()
   const account = useAccount()
+  // This computer's cloud off (CODYNC_CLOUD=off) keeps the account out of Settings too; the
+  // section and everything behind it stay, they just have no place to show (account-mode.ts).
+  const accountInUse = accountsInUse(account.isConfigured, useModel(app.local)?.cloud ?? null)
   const [appearance, setAppearance] = useState<Appearance>('system')
   useEffect(() => void window.codync.app.appearance().then(setAppearance), [])
   const [textSize, setTextSize] = usePref(prefs.textSize)
@@ -140,36 +145,38 @@ function GeneralSettings() {
 
   return (
     <CardForm>
-      <CardSection title="Account" footer={account.errorMessage}>
-        <div className="settings-row">
-          <Icon name="person.crop.circle" size={26} color="var(--secondary)" />
-          <VStack grow className="settings-stack">
-            <Text truncate>
-              {account.isSignedIn ? (account.user?.email ?? tr(`Signed in`)) : tr(`Not signed in`)}
-            </Text>
-            <Text size="caption" tone="secondary">
-              {account.isSignedIn ? tr(`Reach your computers from anywhere`) : tr(`Sign in to reach your computers from anywhere`)}
-            </Text>
-          </VStack>
-          {account.isSignedIn ? (
-            <Button kind="secondary" onClick={() => void account.signOut()} disabled={account.isBusy}>
-              {account.isBusy ? 'Please wait…' : 'Sign out'}
-            </Button>
-          ) : (
-            <>
-              <Button kind="secondary" onClick={() => void account.signIn('apple')} disabled={account.isBusy}>
-                Apple
+      {accountInUse ? (
+        <CardSection title="Account" footer={account.errorMessage}>
+          <div className="settings-row">
+            <Icon name="person.crop.circle" size={26} color="var(--secondary)" />
+            <VStack grow className="settings-stack">
+              <Text truncate>
+                {account.isSignedIn ? (account.user?.email ?? tr(`Signed in`)) : tr(`Not signed in`)}
+              </Text>
+              <Text size="caption" tone="secondary">
+                {account.isSignedIn ? tr(`Reach your computers from anywhere`) : tr(`Sign in to reach your computers from anywhere`)}
+              </Text>
+            </VStack>
+            {account.isSignedIn ? (
+              <Button kind="secondary" onClick={() => void account.signOut()} disabled={account.isBusy}>
+                {account.isBusy ? 'Please wait…' : 'Sign out'}
               </Button>
-              <Button kind="secondary" onClick={() => void account.signIn('google')} disabled={account.isBusy}>
-                Google
-              </Button>
-              <Button kind="secondary" onClick={() => void account.signIn('github')} disabled={account.isBusy}>
-                GitHub
-              </Button>
-            </>
-          )}
-        </div>
-      </CardSection>
+            ) : (
+              <>
+                <Button kind="secondary" onClick={() => void account.signIn('apple')} disabled={account.isBusy}>
+                  Apple
+                </Button>
+                <Button kind="secondary" onClick={() => void account.signIn('google')} disabled={account.isBusy}>
+                  Google
+                </Button>
+                <Button kind="secondary" onClick={() => void account.signIn('github')} disabled={account.isBusy}>
+                  GitHub
+                </Button>
+              </>
+            )}
+          </div>
+        </CardSection>
+      ) : null}
       <CardSection title="Appearance">
         <ValueRow label="Theme">
           <ChoicePicker selection={appearance} options={[...APPEARANCES]} onChange={(value) => void window.codync.app.setAppearance(value).then(setAppearance)} />

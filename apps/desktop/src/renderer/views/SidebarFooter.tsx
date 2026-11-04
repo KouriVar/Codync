@@ -15,15 +15,17 @@ import drive from '../assets/google-drive.png'
 import './sidebar-footer.css'
 
 /** Account and app connections float above the scrolling roster; Extensions only when given. */
-export function SidebarFooter({ accountOpen, onAccount, onExtensions, onComputers }: {
+export function SidebarFooter({ accountOpen, onAccount, onExtensions, onComputers, showAccount = true }: {
   accountOpen: boolean
   onAccount: () => void
   onExtensions?: () => void
   /** Settings → Computers, where a computer out of the account is added. */
   onComputers: () => void
+  /** False with this computer's cloud off: no account entry and no account notice (account-mode.ts). */
+  showAccount?: boolean
 }) {
   const tr = useTr()
-  const notice = useAccountNotice(onComputers)
+  const notice = showAccount ? useAccountNotice(onComputers) : null
   const footer = useRef<HTMLDivElement>(null)
   // The roster scrolls under the footer: its height (taller with the notice, wrapped or not) is the roster's bottom padding.
   useLayoutEffect(() => {
@@ -48,15 +50,17 @@ export function SidebarFooter({ accountOpen, onAccount, onExtensions, onComputer
           <Icon name="chevron.right" size={10} color="var(--tertiary)" />
         </button>
       ) : null}
-      <button
-        className={`sidebar-account ${accountOpen ? 'active' : ''}`}
-        aria-label="Open account menu for Account"
-        aria-expanded={accountOpen}
-        title="Account menu"
-        onClick={onAccount}
-      >
-        <ProfileAvatar />
-      </button>
+      {showAccount ? (
+        <button
+          className={`sidebar-account ${accountOpen ? 'active' : ''}`}
+          aria-label="Open account menu for Account"
+          aria-expanded={accountOpen}
+          title="Account menu"
+          onClick={onAccount}
+        >
+          <ProfileAvatar />
+        </button>
+      ) : null}
       {onExtensions ? (
         <button className="extensions" onClick={onExtensions}>
           <span>{tr('Extensions')}</span>

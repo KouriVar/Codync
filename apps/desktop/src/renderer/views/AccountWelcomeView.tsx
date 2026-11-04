@@ -6,10 +6,13 @@ import { HStack, Spacer, VStack } from '../components/Stack'
 import { Text } from '../components/Text'
 import { useReduceMotion } from '../lib/theme'
 import { useTr } from '../lib/use-language'
+import { accountsInUse } from '../lib/account-mode'
 import { showsWelcome } from '../lib/welcome-gate'
+import { useModel } from '../lib/observable'
 import { prefs, usePref } from '../lib/prefs'
 import { account, useAccount } from '../store/account'
 import { analytics } from '../store/analytics'
+import { useApp } from '../store/context'
 import googleLogo from '../assets/google.svg'
 import type { SignInProvider } from '@shared/analytics'
 import './account-welcome.css'
@@ -19,13 +22,18 @@ const deviceName = window.codync.platform === 'darwin' ? 'Mac' : 'computer'
 /** Whether the welcome covers the window (`showsWelcome`). `finish`: the first run's choice was made. */
 export function useWelcomeGate() {
   const [onboarded, setOnboarded] = usePref(prefs.onboardingDone)
+  const app = useApp()
   const { isConfigured, isReady, isSignedIn } = useAccount()
+  const cloud = useModel(app.local)?.cloud ?? null
   const finish = useCallback(() => {
     if (prefs.onboardingDone.get()) return
     setOnboarded(true)
     analytics.track({ event: 'onboarding_completed', signed_in: account.isSignedIn })
   }, [setOnboarded])
-  return { shown: showsWelcome({ onboarded, configured: isConfigured, ready: isReady, signedIn: isSignedIn }), finish }
+  // With this computer's cloud off (C0107) the account cannot reach anyone: the welcome never
+  // blocks the window, and the app opens straight into the roster (account-mode.ts).
+  const configured = accountsInUse(isConfigured, cloud)
+  return { shown: showsWelcome({ onboarded, configured, ready: isReady, signedIn: isSignedIn }), finish }
 }
 
 /** The welcome: signing in, or, in a build without accounts, going on without one. A restored session skips it as soon as it is back. */

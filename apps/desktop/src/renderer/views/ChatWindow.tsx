@@ -7,10 +7,12 @@ import { Button, IconButton, ResizeHandle } from '../components/Controls'
 import { AnchoredMenu, Dialog, ModalHeader, Sheet, type MenuItem } from '../components/Overlay'
 import { HStack, Spacer } from '../components/Stack'
 import { Text } from '../components/Text'
-import { useModels } from '../lib/observable'
+import { useModel, useModels } from '../lib/observable'
+import { accountsInUse } from '../lib/account-mode'
 import { prefs, stepTextSize, usePref, DEFAULT_TEXT_SIZE } from '../lib/prefs'
 import { useApp, StoreContext } from '../store/context'
 import { analytics } from '../store/analytics'
+import { useAccount } from '../store/account'
 import { refKey, sameRef, parseRef } from '../store/app-model'
 import type { BotStore } from '../store/bot-store'
 import { useComputerRoster } from '../store/computer-roster'
@@ -193,6 +195,10 @@ interface CreateTarget {
 function ChatSplitView() {
   const tr = useTr()
   const app = useApp()
+  // This computer's cloud off (CODYNC_CLOUD=off) takes the account out of the window: no entry in
+  // the sidebar, no account panel (account-mode.ts). Nothing is removed — turning the cloud back
+  // on brings it all back.
+  const accountInUse = accountsInUse(useAccount().isConfigured, useModel(app.local)?.cloud ?? null)
   const ssh = useSSH()
   const connecting = ssh.state.profiles.some((p) => isSSHConnecting(ssh.status(p.id))) || [...app.stores.values()].some((s) => s.shownConnection.kind === 'connecting')
   const [compact, setCompact] = usePref(prefs.sidebarCompact)
@@ -411,14 +417,16 @@ function ChatSplitView() {
             <IconButton title="New" icon="plus" size={36} buttonRef={railNewButton} menuOpen={railNewMenu} disabled={!onlineStores.length} onClick={() => setRailNewMenu((o) => !o)} />
             <AnchoredMenu open={railNewMenu} onClose={() => setRailNewMenu(false)} anchor={railNewButton} items={newItems} />
             <IconButton title="Extensions" icon="square.grid.2x2" size={36} onClick={openMarketplace} />
-            <RailAccountNotice onComputers={() => setSettings('computers')} />
-            <button className={`rail-profile ${showAccount ? 'open' : ''}`} aria-label="Open account menu for Account" title="Account" onClick={() => setShowAccount((s) => !s)}>
-              <ProfileAvatar />
-            </button>
+            {accountInUse ? <RailAccountNotice onComputers={() => setSettings('computers')} /> : null}
+            {accountInUse ? (
+              <button className={`rail-profile ${showAccount ? 'open' : ''}`} aria-label="Open account menu for Account" title="Account" onClick={() => setShowAccount((s) => !s)}>
+                <ProfileAvatar />
+              </button>
+            ) : null}
           </div>
         ) : (
           // With several computers each heading opens its own Extensions instead.
-          <SidebarFooter accountOpen={showAccount} onAccount={() => setShowAccount((s) => !s)} onExtensions={roster.grouped ? undefined : openMarketplace} onComputers={() => setSettings('computers')} />
+          <SidebarFooter accountOpen={showAccount} showAccount={accountInUse} onAccount={() => setShowAccount((s) => !s)} onExtensions={roster.grouped ? undefined : openMarketplace} onComputers={() => setSettings('computers')} />
         )}
       </aside>
       <ResizeHandle label="Resize sidebar" width={width} min={76} max={sidebarMax} edge="trailing" onResize={resizeSidebar} onDragging={setResizing} />
@@ -427,7 +435,7 @@ function ChatSplitView() {
         <OpenVoiceSettings.Provider value={openVoiceSettings}>{detail}</OpenVoiceSettings.Provider>
       </main>
 
-      {showAccount ? (
+      {showAccount && accountInUse ? (
         <AccountPanelLayer
           compact={compact}
           approvals={app.approvals.length}
