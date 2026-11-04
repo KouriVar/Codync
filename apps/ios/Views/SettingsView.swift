@@ -10,6 +10,8 @@ import UIKit
 struct SettingsView: View {
     @Binding var path: [AccountRoute]
     @Binding var showComputersSheet: Bool
+    @Binding var showDSHConnect: Bool
+    @Binding var showHaptics: Bool
     @Environment(AppStore.self) private var app
     @Environment(AccountSession.self) private var account
     @Environment(\.openURL) private var openURL
@@ -20,8 +22,6 @@ struct SettingsView: View {
     @AppStorage(Haptics.storageKey) private var hapticsRaw = HapticsLevel.medium.rawValue
 
     @State private var notificationsAllowed: Bool?
-    @State private var showDSHConnect = false
-    @State private var showHaptics = false
     @State private var confirmSignOut = false
     @State private var confirmDelete = false
     @State private var confirmStartOver = false
@@ -105,12 +105,6 @@ struct SettingsView: View {
             }
         }
         .tint(.primary)
-        .sheet(isPresented: $showDSHConnect) {
-            DSHConnectSheet(gateway: dsh, scan: { onCode in
-                AnyView(QRScanner(onCode: onCode, onError: { _ in }, acceptedPrefixes: nil))
-            })
-        }
-        .sheet(isPresented: $showHaptics) { HapticsSettingsView() }
         .confirmationDialog(L10n.tr("Sign out of \(account.email ?? "this account")?"),
                             isPresented: $confirmSignOut, titleVisibility: .visible) {
             Button(L10n.tr("Sign out"), role: .destructive) { Task { await app.signOut() } }
@@ -201,7 +195,7 @@ struct SettingsView: View {
 }
 
 /// 触感：五档单选，选中时立刻震一下；「关」让全 App 不再震。
-private struct HapticsSettingsView: View {
+struct HapticsSettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @AppStorage(Haptics.storageKey) private var raw = HapticsLevel.medium.rawValue
 

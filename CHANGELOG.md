@@ -1233,3 +1233,13 @@
 - 限制/待办：若仍频繁失败，看 Console 里 `com.suiyikou.codync.dsh-gateway` 的 `DSH socket dropped`：`NSURLErrorDomain/-1005/1006` 多为隧道/网络；网关 `authentication-required` 则需要重新配对。需要你在网络侧确认 Cloudflare 隧道稳定性。
 - 关联：C0130、C0124。
 
+### C0136 · 2026-11-04 · 修设置里打开「触感 / DSH 连接」后跳回首页
+
+- 原因：从设置 sheet 里打开「触感」或「DSH 连接」的子 sheet 时，设置页被一起关掉、退回首页。
+- 根因：C0035 记录过同类问题——从 `Form`/`List` 的行内（或 Form 内容的 `Group`）去 present sheet，呈现锚点会随行/内容重建失效，内层 sheet 一出现就把外层设置 sheet 顶掉。C0133 把这两个 `.sheet` 挂在了 `SettingsView` 的 `Group`（Form 内容）上，复发了同一个问题（不是 @AppStorage/Haptics 状态刷新导致的）。
+- 变化：把 `showDSHConnect` / `showHaptics` 提升到 `AccountSwitcherView`（设置 sheet 的根），在 Form 外层挂 `.sheet`；`SettingsView` 只保留 `@Binding` 并置位；`HapticsSettingsView` 改为模块内可见以便在根部使用。
+- 文件：`apps/ios/Views/AccountSwitcherView.swift`、`apps/ios/Views/SettingsView.swift`。
+- 验证：按要求本轮只验证编译通过（DevDebug 真机构建）。
+- 限制/待办：其余设置子页沿用原来的呈现方式，未改。
+- 关联：C0035、C0133。
+

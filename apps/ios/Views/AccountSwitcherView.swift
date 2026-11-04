@@ -1,5 +1,6 @@
 import CodyncKit
 import CodyncUI
+import DSHKit
 import SwiftUI
 import UIKit
 import PhotosUI
@@ -59,12 +60,15 @@ struct AccountSwitcherView: View {
     @State private var showVault = false
     @State private var showExtensions = false
     @State private var showComputersSheet = false
+    @State private var showDSHConnect = false
+    @State private var showHaptics = false
 
     var body: some View {
         NavigationStack(path: $path) {
             Form {
                 AccountProfileView(path: $path, showPairing: $showPairing, showVault: $showVault, showExtensions: $showExtensions)
-                SettingsView(path: $path, showComputersSheet: $showComputersSheet)
+                SettingsView(path: $path, showComputersSheet: $showComputersSheet,
+                             showDSHConnect: $showDSHConnect, showHaptics: $showHaptics)
             }
             // No separators between rows: each row hides its own.
             .listRowSeparator(.hidden)
@@ -80,6 +84,14 @@ struct AccountSwitcherView: View {
                 }
             }
             .codyncSheet(isPresented: $showComputersSheet) { ComputersView() }
+            // Presented at the sheet root, not from a Form row: a row-level anchor is rebuilt and
+            // would take the Settings sheet down with it (C0035).
+            .sheet(isPresented: $showDSHConnect) {
+                DSHConnectSheet(gateway: DSHGateway.shared, scan: { onCode in
+                    AnyView(QRScanner(onCode: onCode, onError: { _ in }, acceptedPrefixes: nil))
+                })
+            }
+            .sheet(isPresented: $showHaptics) { HapticsSettingsView() }
             .navigationTitle(L10n.tr("Settings"))
             .navigationBarTitleDisplayMode(.inline)
             .navigationDestination(for: AccountRoute.self) { route in
