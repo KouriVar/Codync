@@ -2121,3 +2121,51 @@
 - 验证：`xcodebuild build -scheme 'iOS Dev' -configuration DevDebug` 通过（0 error）。按要求未跑测试、未截图。
 - 按你的要求**本次没有补按压反馈**的 5 处（维持原样，仅登记）：输入框「＋」、Bot 头像铅笔角标、相机页 返回、相机页 更多、相机页 快门（都是 `press: .none` / `.buttonStyle(.plain)`）。其余圆钮是 standard 0.98，语音 sheet 保持 deep 0.92。
 - 关联：C0190、C0191、C0192。
+
+### C0194 · 2026-11-04 · 首页删掉原生 TabView，底部改成搜索框 + 语音圆钮
+
+- 原因：原生 `TabView` 的底部导航栏（置顶 / Coe / DS Bot / DSH + 系统搜索页）在首页占掉整整一条，
+  语音胶囊只能挂在它上面，为把它藏起来还写了每 tab 一个 `stack(voiceSheet:)`、3 处
+  `.toolbar(…, for: .tabBar)`、一段量 tab bar 高度的 `onGeometryChange` 和一套 40pt 下滑淡出动画。
+  现在底部只留一行：左边搜索框、右边圆钮；拍照已并入语音输入，不再有单独的照片按钮。
+- 变化：
+  - `Views/HomeSourcesView.swift` 删掉整套 tab 结构：`tabs`（`TabView` / `Tab` / `Tab(role: .search)`）、
+    每 tab 的一份 `stack(voiceSheet:)`、`.tabBarMinimizeBehavior(.onScrollDown)`、3 处
+    `.toolbar(…, for: .tabBar)`、量 tab bar 高度的 `onGeometryChange`，以及只服务它的
+    `selection` / `tabBarHidden` / `capsuleLeaving` / `tabBarInset` / `isTransitioning` / `barFade` /
+    `isTabRoot` / `capsuleShown`。首页改成一个 `NavigationStack`，根页面是「置顶」列表；会话仍按原来的
+    `path` 绑定推入同一栈。
+  - 删掉语音胶囊：`voiceCapsule` 的 `.overlay(alignment: .bottom)` 挂载、`VoiceCapsule` 与
+    `HomeVoiceAccessory` 两个类型、`beginVoice()` 里「胶囊下滑 40pt + 淡出、等 300ms 再抬 sheet」的过渡、
+    sheet `onDismiss` 里把胶囊和 tab bar 拉回的那段动画。语音 sheet 本身（`VoiceSheetView`、
+    `voice` / `showVoice` / `voiceDetent`、`sendToLeadBot`、`raiseSheet`、`voice.phase` 与 detent 处理）
+    一行未改。
+  - 新底部栏（同文件，就放在被删的胶囊段）：`HStack(spacing: 12)` + 左右 `.padding(.horizontal, 16)`
+    与 `.padding(.top, 8)`，作为首页根的 `.safeAreaInset(edge: .bottom, spacing: 0)` —— 只有根页面有，
+    push 进二级页就没有；键盘弹出时随安全区被顶到键盘上方（与聊天页 Composer 同一套做法）。
+  - 搜索框：`TextField`（`Search chats`）+ `search-line` 图标 + 内边距 14 + 高度 `ControlMetrics.Size.icon.side`
+    (44，与右侧圆钮同高) + `.glass(in: Capsule(), interactive: true)`；整颗胶囊 `.contentShape(Capsule())`
+    加点击即 `@FocusState` 聚焦。不跳页、不弹 sheet，键盘就地出现。
+  - 过滤：复用原搜索 tab 的 `searchEntries`——所有已启用来源的会话按标题 `localizedStandardContains` 匹配
+    （与搜索范围一致：不限于置顶）；空结果显示 `No matches`。原独立搜索页 `searchList` 换成就地显示的
+    `searchResults`（同样的行、同样的空状态，去掉 `.searchable`）。
+  - 右侧圆钮：`GlassButton(size: .icon)`，两个状态同位置叠加、`.animation(Motion.fade)` 淡入淡出；
+    未聚焦显示 `mic-line`（`beginVoice()` 打开现有语音 sheet，含「先设置主 Bot」的 toast 校验），
+    聚焦时显示 `close-line`（清空 `searchText`、取消聚焦收键盘、列表复原、圆钮变回麦克风）。
+  - `Views/HomeSource.swift`：删除只服务 tabs 的 `enum HomeTab`（含 `title` / `symbol` / `source`）。
+- 文件：`apps/ios/Views/HomeSourcesView.swift`、`apps/ios/Views/HomeSource.swift`。
+  未改 `VoiceSheetView` / `VoiceCamera` / Kit 任意文件，未新建文件，`apps/Codync.xcodeproj` 未重新生成
+  （`project.yml` 无新文件可加）。
+- 验证：`xcodebuild build -project apps/Codync.xcodeproj -scheme 'iOS Dev' -configuration DevDebug`（真机 destination、
+  ui-preview 覆盖、构建号 182）**编译通过，0 error**，改动的两个文件 0 warning；`xcrun devicectl device install app`
+  装到 iPhone 16 Pro（`com.suiyikou.codync.uipreview` 2.36.0 / 182）成功。按你的要求**不自测**：
+  不跑测试、不截图、不用 CDP，界面与交互均未实测。
+- 限制/待办：
+  - 暂时没有入口、但代码保留的视图：Coe 来源列表 `rosterList(botEntries(for: .coe))`、
+    DS Bot 来源列表 `rosterList(botEntries(for: .dsBot))`、DSH 对话列表 `rosterList(dshEntries, hint: dshHint)`
+    （含 `dshHintRow` 的未连接提示）；「首页来源」开关仍在 `Views/SettingsView.swift` 的
+    `ForEach(HomeSource.allCases)` 三行里可切，当前只影响搜索范围与 DSH 连接，不影响首页主体。
+  - 底部栏贴键盘、✕ 清空收键盘、进会话页隐藏等交互只按代码实现，尚未真机确认。
+  - `Views/RootView.swift`（第 81–83 行）与 `Views/SettingsView.swift`（第 47 行）各有一句提到
+    tab bar / 语音胶囊的注释已过时；按「清单外一律不动」本次未改。
+- 关联：C0192、C0193。

@@ -4,8 +4,9 @@ import DSHKit
 import SwiftUI
 import UIKit
 
-/// The home: a pinned page first, then one page per selected source (Coe, DS Bot, DSH 对话) in a
-/// fixed order. The source selection lives in Settings; the top-right keeps only the "+".
+/// The home: one list — the pinned conversations — with a search field and one round button under
+/// it. Each source's own list (Coe, DS Bot, DSH 对话) is still built here, but nothing opens it for
+/// now; the source selection itself still lives in Settings. The top-right keeps only the "+".
 @MainActor
 struct HomeSourcesView: View {
     @Environment(AppStore.self) private var app
@@ -20,14 +21,14 @@ struct HomeSourcesView: View {
     @AppStorage(HomeSourcePrefs.pinnedKey) private var pinnedRaw = ""
 
     @State private var searchText = ""
+    /// The field in the bottom bar has the keyboard.
+    @FocusState private var searchFocused: Bool
     @State private var creating: NewTarget?
     @State private var confirmDelete: RosterItem?
-    /// The voice capsule and what it says to the lead bot.
+    /// The voice sheet's session and what it says to the lead bot.
     @State private var voice = VoiceSession()
-    /// The voice sheet is up (it opens on the microphone button).
+    /// The voice sheet is up (it opens on the round button).
     @State private var showVoice = false
-    /// Which tab is showing. The system keeps the accessory and the tab bar in step with it.
-    @State private var selection = HomeTab.pinned
     /// Which height it rests at: the 76pt pill, half, or full.
     @State private var voiceDetent: PresentationDetent = VoiceSheetView.small
     /// The glass pill that says what was just sent.
@@ -57,7 +58,7 @@ struct HomeSourcesView: View {
     // MARK: - Body
 
     var body: some View {
-        tabs
+        navigationStack
             .task {
                 syncDSHConnection()
                 #if DEBUG
@@ -87,20 +88,9 @@ struct HomeSourcesView: View {
             // The voice sheet: on the home's root view, never from a list row — a rebuilt anchor
             // there takes the sheet, and the home with it (C0035, C0136).
             .sheet(isPresented: $showVoice, onDismiss: {
-                // Pulled down or sent: the recording is over, and the bar climbs back the way it left.
+                // Pulled down or sent: the recording is over.
                 voice.discard()
                 voiceDetent = VoiceSheetView.small
-                isTransitioning = true
-                // The capsule never left the screen — it is still mounted, down 40 and invisible — so
-                // it can climb straight home from where it went down, with the tab bar beside it.
-                withAnimation(Self.barFade) {
-                    capsuleLeaving = false
-                    tabBarHidden = false
-                }
-                Task { @MainActor in
-                    try? await Task.sleep(for: .milliseconds(320))
-                    isTransitioning = false
-                }
             }) {
                 VoiceSheetView(lead: leadBot?.bot, session: voice, detent: $voiceDetent,
                                openSystemSettings: { openSystemVoiceSettings() })
@@ -153,105 +143,49 @@ struct HomeSourcesView: View {
             }
     }
 
-    /// The home as four native tabs — 置顶, then one per source Settings leaves on — and the system's
-    /// own search tab on the right. Each tab has its own stack, so a conversation pushes inside the
-    /// tab it was opened from.
-    private var tabs: some View {
-        TabView(selection: $selection) {
-            Tab(HomeTab.pinned.title, systemImage: HomeTab.pinned.symbol, value: HomeTab.pinned) {
-                stack(voiceSheet: tabBarHidden) { rosterList(pinnedEntries, pinnedEmpty: true) }
-            }
-            if enabledSources.contains(.coe) {
-                Tab(HomeTab.coe.title, systemImage: HomeTab.coe.symbol, value: HomeTab.coe) {
-                    stack(voiceSheet: tabBarHidden) { rosterList(botEntries(for: .coe)) }
-                }
-            }
-            if enabledSources.contains(.dsBot) {
-                Tab(HomeTab.dsBot.title, systemImage: HomeTab.dsBot.symbol, value: HomeTab.dsBot) {
-                    stack(voiceSheet: tabBarHidden) { rosterList(botEntries(for: .dsBot)) }
-                }
-            }
-            if enabledSources.contains(.dsh) {
-                Tab(HomeTab.dsh.title, systemImage: HomeTab.dsh.symbol, value: HomeTab.dsh) {
-                    stack(voiceSheet: tabBarHidden) { rosterList(dshEntries, hint: dshHint) }
-                }
-            }
-            // No label of our own: with role .search and the system's default label, iOS draws this
-            // as the separate round button on the right instead of a fifth tab.
-            Tab(value: HomeTab.search, role: .search) {
-                stack(voiceSheet: tabBarHidden) { searchList }
-            }
-        }
-        // Scrolling down shrinks the bar to the tab you are on. The capsule does not shrink with it.
-        .tabBarMinimizeBehavior(.onScrollDown)
-        // The capsule is drawn here rather than by the system: `.tabViewBottomAccessory` takes the
-        // whole bar away with it and cannot be animated either way.
-        .overlay(alignment: .bottom) { voiceCapsule }
-        .tint(Palette.text)
-        .onChange(of: enabledSources) { _, sources in
-            // The tab you were on has just been switched off in Settings: back to 置顶.
-            if let source = selection.source, !sources.contains(source) { selection = .pinned }
-        }
-    }
-
-    /// One tab's stack: the same toolbar, pushes and DSH destination in every tab.
-    /// One tab's stack. `voiceSheet` is handed down from the home so each tab's root can hide the bar
-    /// while the voice sheet is up — a rule on the TabView itself is ignored by the system.
-    private func stack<Content: View>(voiceSheet: Bool, @ViewBuilder _ content: () -> Content) -> some View {
+    /// The home's one stack. The root is the pinned list; a conversation pushes inside it, and the
+    /// bottom bar belongs to the root alone, so a pushed page has none of it.
+    private var navigationStack: some View {
         NavigationStack(path: path) {
-            content()
-                .toolbar(voiceSheet ? .hidden : .visible, for: .tabBar)
-                // The bar's footprint, for the capsule drawn outside the tab view: SwiftUI tells a
-                // tab's own content the safe area but says nothing to anything above it. Only the
-                // larger value is kept, so hiding the bar does not drag the capsule down with it.
-                .onGeometryChange(for: CGFloat.self) { $0.safeAreaInsets.bottom } action: { inset in
-                    if inset > tabBarInset { tabBarInset = inset }
+            Group {
+                // Typing anything shows the whole home filtered, as the search tab used to; with the
+                // field empty it is the pinned list again.
+                if isSearching {
+                    searchResults
+                } else {
+                    rosterList(pinnedEntries, pinnedEmpty: true)
                 }
-                .navigationTitle("")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar { toolbarContent }
-                // A pushed page is not the tab's root: the tab bar goes with it.
-                .navigationDestination(for: BotReference.self) { ref in
-                    ChatScreen(ref: ref).toolbar(.hidden, for: .tabBar)
-                }
-                .navigationDestination(item: $openDSHSession) { _ in
-                    DSHConversationView(gateway: dsh).toolbar(.hidden, for: .tabBar)
-                }
+            }
+            .navigationTitle("")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { toolbarContent }
+            // A bottom inset rather than an overlay: the list keeps clear of it, and a keyboard takes
+            // it up so the field and the button rest just above the keys.
+            .safeAreaInset(edge: .bottom, spacing: 0) { bottomBar }
+            .navigationDestination(for: BotReference.self) { ref in
+                ChatScreen(ref: ref)
+            }
+            .navigationDestination(item: $openDSHSession) { _ in
+                DSHConversationView(gateway: dsh)
+            }
         }
+        .tint(Palette.text)
     }
-
-    /// The open conversation, shared by every tab: opening one from a notification or a link lands in
-    /// whichever tab is on screen.
-    /// The system bar is hidden while the voice sheet is up.
-    @State private var tabBarHidden = false
-    /// The capsule is down 40pt and invisible: on its way out, or waiting to come back. It is never
-    /// unmounted, so both ends of the transition are just this pair of values animating.
-    @State private var capsuleLeaving = false
-    /// How tall the system tab bar is, measured from a tab's own safe area: what the capsule sits on.
-    @State private var tabBarInset: CGFloat = 0
-    /// One transition at a time: the bar and the sheet can't be summoned twice.
-    @State private var isTransitioning = false
-    /// The bar's exit and entrance: one ease, both ways.
-    private static let barFade = Animation.easeInOut(duration: 0.3)
-
-    /// Nothing is pushed on the tab in front, so its root is what the user is looking at.
-    private var isTabRoot: Bool { accounts.selection == nil && openDSHSession == nil }
-
-    /// The two tabs that talk to Coe carry the capsule; the others leave the screen to their list.
-    private var capsuleShown: Bool { (selection == .pinned || selection == .coe) && isTabRoot }
 
     private var path: Binding<[BotReference]> {
         Binding(get: { accounts.selection.map { [$0] } ?? [] }, set: { accounts.selection = $0.last })
     }
 
-    /// A tab's sessions, in the same row style as before, with the system's soft top edge.
+    /// One list of sessions, in the same row style as before, with the system's soft top edge. The
+    /// home's root draws the pinned one; each source draws its own with `hint` and no pinned empty
+    /// state, and keeps that shape for when an entry to it comes back.
     private func rosterList(_ entries: [HomeEntry], hint: String? = nil, pinnedEmpty: Bool = false) -> some View {
         List {
             if let hint {
                 dshHintRow(hint)
             }
             if entries.isEmpty {
-                // The 置顶 tab teaches how to pin; the source tabs just say there is nothing.
+                // The pinned list teaches how to pin; a source list just says there is nothing.
                 if pinnedEmpty {
                     pinnedEmptyState
                 } else {
@@ -268,11 +202,12 @@ struct HomeSourcesView: View {
         .refreshable { await refreshAll() }
     }
 
-    /// The search tab: the same rows, filtered by title as you type.
-    private var searchList: some View {
+    /// The filtered home: the same rows, matching by title as you type. What the search tab used to
+    /// show, now under the field in place — no push, no sheet.
+    private var searchResults: some View {
         List {
             if searchEntries.isEmpty {
-                Text(L10n.tr(searchQuery.isEmpty ? "Search chats" : "No matches"))
+                Text(L10n.tr("No matches"))
                     .font(.footnote)
                     .foregroundStyle(Palette.secondary)
                     .frame(maxWidth: .infinity)
@@ -286,7 +221,6 @@ struct HomeSourcesView: View {
         .plainRosterList()
         .scrollEdgeEffectStyle(.soft, for: .top)
         .background(Palette.background)
-        .searchable(text: $searchText, prompt: Text(L10n.tr("Search chats")))
     }
 
     /// Every session of an enabled source whose title matches the search field.
@@ -320,51 +254,83 @@ struct HomeSourcesView: View {
             .rosterRow()
     }
 
-    // MARK: - The voice capsule
+    // MARK: - The bottom bar
 
-    /// The bot the capsule speaks to: the one the long-press menu made lead, and the store it lives on.
+    /// The bot the round button speaks to: the one the long-press menu made lead, and the store it
+    /// lives on.
     private var leadBot: RosterItem? {
         accounts.roster.first { $0.bot.lead && !$0.bot.isGroup }
     }
 
-    /// The capsule over the tab bar. It is never unmounted: the two ends of the transition are an
-    /// offset and an opacity on the same view, so the sheet can never catch it half built.
-    private var voiceCapsule: some View {
-        VoiceCapsule(lead: leadBot?.bot, onTap: beginVoice)
-            // The tab bar's own 16pt sides, so the capsule lines up with it.
-            .padding(.horizontal, 16)
-            // Directly above the bar: its measured footprint, plus 8pt of air.
-            .padding(.bottom, tabBarInset + 8)
-            .offset(y: capsuleLeaving ? 40 : 0)
-            .opacity(capsuleShown && !capsuleLeaving ? 1 : 0)
-            .allowsHitTesting(capsuleShown && !capsuleLeaving)
-            // Measured from the screen's bottom edge, not from the safe area above the bar.
-            .ignoresSafeArea(.container, edges: .bottom)
+    /// The home's one bar: the search capsule takes the width left over, the round button sits at the
+    /// right end. 16pt at the screen's edges, 12pt between the two.
+    private var bottomBar: some View {
+        HStack(spacing: 12) {
+            searchBox
+            circleButton
+        }
+        .padding(.horizontal, 16)
+        // 8pt of air above it; its own bottom edge rests on the safe area (or on the keyboard).
+        .padding(.top, 8)
+    }
+
+    /// The search field in place: `.searchable` used to push a separate page, and this one stays on
+    /// the home — tapping anywhere on the capsule focuses it and brings the keyboard up, and the list
+    /// below answers as you type. No clear button of its own: the round button beside it is the one.
+    private var searchBox: some View {
+        HStack(spacing: 8) {
+            RemixIcon("search-line")
+                .foregroundStyle(Palette.secondary)
+            TextField(L10n.tr("Search chats"), text: $searchText)
+                .textFieldStyle(.plain)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .focused($searchFocused)
+        }
+        .font(.body)
+        // The field's own insets, unchanged from the shared search box the rest of the app uses.
+        .padding(.horizontal, 14)
+        // The round button's diameter, so the two ends of the bar are one height.
+        .frame(height: ControlMetrics.Size.icon.side)
+        .glass(in: Capsule(), interactive: true)
+        .contentShape(Capsule())
+        .onTapGesture { searchFocused = true }
+    }
+
+    /// The round button, in two states over the same circle: the microphone while the field is idle,
+    /// a ✕ that empties the field and puts the keyboard away once it has focus. The swap is a fade.
+    private var circleButton: some View {
+        ZStack {
+            GlassButton(L10n.tr("Voice"), glyph: .remix("mic-line"), size: .icon) { beginVoice() }
+                .opacity(searchFocused ? 0 : 1)
+                .allowsHitTesting(!searchFocused)
+                .accessibilityHidden(searchFocused)
+            GlassButton(L10n.tr("Close search"), glyph: .remix("close-line"), size: .icon) { endSearch() }
+                .opacity(searchFocused ? 1 : 0)
+                .allowsHitTesting(searchFocused)
+                .accessibilityHidden(!searchFocused)
+        }
+        .animation(Motion.reduced(Motion.fade, reduceMotion), value: searchFocused)
+    }
+
+    /// ✕: the words go, the keyboard goes with them, the list comes back whole, and the circle turns
+    /// back into the microphone.
+    private func endSearch() {
+        searchText = ""
+        searchFocused = false
     }
 
     /// No lead bot is a setup problem, not a recording one: say where to fix it instead of opening the mic.
     private func beginVoice() {
-        guard !isTransitioning else { return }
+        guard !showVoice else { return }
         guard leadBot != nil else {
             toast = GlassToastItem(icon: "error-warning-line",
                                    text: L10n.tr("Pick a main bot in Settings first"))
             return
         }
-        isTransitioning = true
-        // The capsule slides down 40pt and fades on one ease while the tab bar hides. It stays
-        // mounted throughout, so the sheet has nothing but the capsule's own values to wait for and
-        // the page underneath never moves.
-        withAnimation(Self.barFade) {
-            capsuleLeaving = true
-            tabBarHidden = true
-        }
-        Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(300))
-            voiceDetent = VoiceSheetView.small
-            showVoice = true
-            await voice.begin()
-            isTransitioning = false
-        }
+        voiceDetent = VoiceSheetView.small
+        showVoice = true
+        Task { @MainActor in await voice.begin() }
     }
 
     /// The same send a typed message uses, so the bot answers exactly as it would in the chat. The
@@ -951,59 +917,5 @@ struct DSHSessionRow: View {
         guard let value = session.updatedAt else { return nil }
         let ms = value > 1_000_000_000_000 ? value : value * 1000
         return Date(timeIntervalSince1970: ms / 1000)
-    }
-}
-
-/// The resting capsule: the lead bot's face and an invitation, in one glass pill. Drawn by the home
-/// itself rather than handed to the system, so it can slide and fade on both ends of the sheet.
-private struct VoiceCapsule: View {
-    let lead: Bot?
-    let onTap: () -> Void
-
-    var body: some View {
-        GlassEffectContainer(spacing: 12) {
-            HomeVoiceAccessory(lead: lead, onTap: onTap)
-                .padding(.vertical, 10)
-                .glass(in: Capsule(), interactive: true)
-        }
-    }
-}
-
-/// What the capsule says: the lead bot's face and an invitation.
-struct HomeVoiceAccessory: View {
-    let lead: Bot?
-    let onTap: () -> Void
-
-    private var name: String { lead?.name ?? "Coe" }
-
-    var body: some View {
-        Button(action: onTap) {
-            HStack(spacing: 8) {
-                avatar
-                Text("跟 \(name) 说点什么…")
-                    .font(.system(size: 17))
-                    .foregroundStyle(Palette.secondary)
-                    .lineLimit(1)
-                Spacer(minLength: 0)
-            }
-            // 12pt at both ends, inside the capsule's own edges.
-            .padding(.horizontal, 12)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(Text("跟 \(name) 说点什么…"))
-    }
-
-    /// 24pt, round, filled.
-    private var avatar: some View {
-        Group {
-            if let lead {
-                CharacterAvatar(bot: lead, size: 24, animated: false)
-            } else {
-                Circle().fill(Palette.bubbleAgent)
-            }
-        }
-        .frame(width: 24, height: 24)
-        .clipShape(Circle())
     }
 }
