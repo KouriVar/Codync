@@ -48,6 +48,23 @@ public struct DSHSession: Identifiable, Codable, Hashable, Sendable {
     }
 }
 
+/// A tool the assistant ran inside one message: what it called, and the result's short preview.
+public struct DSHTool: Identifiable, Hashable, Sendable {
+    public let id: String
+    public let name: String
+    public let arguments: String
+    public var output: String?
+    public var isError: Bool
+
+    public init(id: String, name: String, arguments: String = "", output: String? = nil, isError: Bool = false) {
+        self.id = id
+        self.name = name
+        self.arguments = arguments
+        self.output = output
+        self.isError = isError
+    }
+}
+
 /// A conversation row shown in the DSH chat screen.
 public struct DSHMessage: Identifiable, Hashable, Sendable {
     public enum Role: String, Sendable { case user, assistant }
@@ -55,12 +72,98 @@ public struct DSHMessage: Identifiable, Hashable, Sendable {
     public let role: Role
     public var text: String
     public var streaming: Bool
+    /// The assistant's reasoning for this message (the `reasoning` field of `assistant/message`).
+    public var reasoning: String
+    /// Tools called in this step, in order.
+    public var tools: [DSHTool]
+    /// The turn this message belongs to.
+    public var turn: Int?
+    /// Time from the turn's start to this message.
+    public var durationSeconds: Int?
+    /// When it was written (ms since epoch).
+    public var createdAt: Int64
 
-    public init(id: String = UUID().uuidString, role: Role, text: String, streaming: Bool = false) {
+    public init(id: String = UUID().uuidString, role: Role, text: String, streaming: Bool = false,
+                reasoning: String = "", tools: [DSHTool] = [], turn: Int? = nil, durationSeconds: Int? = nil,
+                createdAt: Int64 = Int64(Date().timeIntervalSince1970 * 1000)) {
         self.id = id
         self.role = role
         self.text = text
         self.streaming = streaming
+        self.reasoning = reasoning
+        self.tools = tools
+        self.turn = turn
+        self.durationSeconds = durationSeconds
+        self.createdAt = createdAt
+    }
+}
+
+// MARK: - Transcript conversion
+
+/// A folded stretch of one assistant message: its thinking and the tools it ran.
+public struct DSHSummary: Identifiable, Hashable, Sendable {
+    public let id: String
+    public let title: String
+    public let reasoning: String
+    public let tools: [DSHTool]
+
+    public init(id: String, title: String, reasoning: String, tools: [DSHTool]) {
+        self.id = id
+        self.title = title
+        self.reasoning = reasoning
+        self.tools = tools
+    }
+}
+
+/// One row of a DSH conversation, already shaped for Codync's chat page: a user/assistant message,
+/// with an optional folded summary for the thinking + tools that came with it.
+public struct DSHTranscriptItem: Identifiable, Sendable {
+    public enum Kind: Sendable { case user, assistant }
+    public let id: String
+    public let kind: Kind
+    public let text: String
+    public let summary: DSHSummary?
+    /// When the message was written (ms since epoch), for the page's time separators.
+    public let createdAt: Int64
+
+    public init(id: String, kind: Kind, text: String, summary: DSHSummary?, createdAt: Int64) {
+        self.id = id
+        self.kind = kind
+        self.text = text
+        self.summary = summary
+        self.createdAt = createdAt
+    }
+}
+
+/// Turns DSH's messages into the intermediate rows the host maps onto Codync's chat model.
+/// (DSHKit does not depend on CodyncKit: the host owns that last hop.)
+public enum DSHConversationAdapter {
+    public static func transcript(from messages: [DSHMessage]) -> [DSHTranscriptItem] {
+        messages.map { message in
+            if message.role == .user {
+                return DSHTranscriptItem(id: message.id, kind: .user, text: message.text,
+                                         summary: nil, createdAt: message.createdAt)
+            }
+            let hasDetail = !message.reasoning.isEmpty || !message.tools.isEmpty
+            let summary = hasDetail
+                ? DSHSummary(id: message.id, title: title(for: message),
+                             reasoning: message.reasoning, tools: message.tools)
+                : nil
+            return DSHTranscriptItem(id: message.id, kind: .assistant, text: message.text,
+                                     summary: summary, createdAt: message.createdAt)
+        }
+    }
+
+    /// "思考了 12 秒 · 运行了 3 个命令".
+    static func title(for message: DSHMessage) -> String {
+        var parts: [String] = []
+        if !message.reasoning.isEmpty {
+            parts.append("思考了 \(max(1, message.durationSeconds ?? 1)) 秒")
+        }
+        if !message.tools.isEmpty {
+            parts.append("运行了 \(message.tools.count) 个命令")
+        }
+        return parts.isEmpty ? "过程" : parts.joined(separator: " · ")
     }
 }
 

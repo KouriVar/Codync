@@ -15,6 +15,9 @@ public final class DSHGateway: ObservableObject {
     @Published public private(set) var phase: Phase = .idle
     @Published public private(set) var gatewayName: String = "DSH"
     @Published public private(set) var sessions: [DSHSession] = []
+    /// The last message of a session, read lazily for the home's list rows (the `sessions` list
+    /// itself carries only titles).
+    @Published public private(set) var previews: [String: String] = [:]
     @Published public private(set) var messages: [DSHMessage] = []
     @Published public private(set) var openSessionId: String?
     @Published public private(set) var isStreaming = false
@@ -28,6 +31,11 @@ public final class DSHGateway: ObservableObject {
     private var shouldReconnect = false
     /// assistant-stream attempts being written, so a stale chunk from an earlier attempt is ignored.
     private var streamingAttempts = Set<String>()
+    /// The open turn's start, number and tools, folded into the assistant message it produces.
+    private var turnStartedAt: Date?
+    private var turnNumber: Int?
+    private var turnTools: [DSHTool] = []
+
     private var pendingPairing: CheckedContinuation<DSHGatewayProfile, Error>?
     private var pairingTimeoutTask: Task<Void, Never>?
 
@@ -198,6 +206,10 @@ public final class DSHGateway: ObservableObject {
         case "sessions":
             sessions = Self.decodeSessions(frame)
             if phase != .ready { phase = .ready }
+        case "projection-baseline":
+            handleProjectionBaseline(frame)
+        case "turn-outline-updated":
+            handleTurnOutline(frame)
         case "sent":
             reconnectAttempt = 0
         case "session-created":
@@ -260,12 +272,37 @@ public final class DSHGateway: ObservableObject {
         guard let sid = frame.string("sessionId"), sid == openSessionId,
               let event = frame.dict("event"), let type = event["type"] as? String else { return }
         switch type {
+        case "turn/start":
+            turnNumber = event["turn"] as? Int
+            turnStartedAt = Date()
+            turnTools = []
+        case "tool/call":
+            let callId = event["callId"] as? String ?? UUID().uuidString
+            if !turnTools.contains(where: { $0.id == callId }) {
+                turnTools.append(DSHTool(id: callId,
+                                         name: event["name"] as? String ?? "tool",
+                                         arguments: event["arguments"] as? String ?? ""))
+            }
+        case "tool/result":
+            guard let callId = event["callId"] as? String,
+                  let index = turnTools.firstIndex(where: { $0.id == callId }) else { return }
+            turnTools[index].output = event["preview"] as? String
+            turnTools[index].isError = event["isError"] as? Bool ?? false
         case "assistant/message":
-            let text = Self.text(of: event)
-            guard !text.isEmpty else { return }
+            let text = (event["text"] as? String) ?? Self.text(of: event)
+            let reasoning = event["reasoning"] as? String ?? ""
+            for raw in (event["toolCalls"] as? [[String: Any]] ?? []) {
+                guard let callId = raw["id"] as? String, !turnTools.contains(where: { $0.id == callId }) else { continue }
+                turnTools.append(DSHTool(id: callId,
+                                         name: raw["name"] as? String ?? "tool",
+                                         arguments: raw["arguments"] as? String ?? ""))
+            }
+            guard !text.isEmpty || !reasoning.isEmpty || !turnTools.isEmpty else { return }
             isStreaming = false
             streamingAttempts.removeAll()
-            upsertFinishedAssistant(text)
+            let duration = turnStartedAt.map { max(1, Int(Date().timeIntervalSince($0))) }
+            upsertFinishedAssistant(text, reasoning: reasoning, tools: turnTools,
+                                    turn: turnNumber, duration: duration)
             refreshSession(sid)
         case "user/message":
             let text = Self.text(of: event)
@@ -275,6 +312,8 @@ public final class DSHGateway: ObservableObject {
             }
         case "turn/end":
             isStreaming = false
+            turnStartedAt = nil
+            turnTools = []
         default:
             break
         }
@@ -288,14 +327,20 @@ public final class DSHGateway: ObservableObject {
         var seeded: [DSHMessage] = []
         for event in events {
             guard let type = event["type"] as? String else { continue }
+            // Snapshot events are the host's raw records: `{type, time, data}`.
+            let data = event["data"] as? [String: Any] ?? event
+            let time = (event["time"] as? NSNumber)?.int64Value ?? Int64(Date().timeIntervalSince1970 * 1000)
             if type == "user/message" {
-                let text = Self.text(of: event)
+                let text = Self.text(of: data)
                 if !text.isEmpty, !DSHSystemMessageFilter.isInjected(text) {
-                    seeded.append(DSHMessage(role: .user, text: text))
+                    seeded.append(DSHMessage(role: .user, text: text, createdAt: time))
                 }
             } else if type == "assistant/message" {
-                let text = Self.text(of: event)
-                if !text.isEmpty { seeded.append(DSHMessage(role: .assistant, text: text)) }
+                let message = data["message"] as? [String: Any]
+                let text = message.map { Self.text(of: $0) } ?? Self.text(of: data)
+                if !text.isEmpty {
+                    seeded.append(DSHMessage(role: .assistant, text: text, createdAt: time))
+                }
             }
         }
         if !seeded.isEmpty || messages.isEmpty { messages = seeded }
@@ -371,17 +416,58 @@ public final class DSHGateway: ObservableObject {
     }
 
     /// The stream usually commits as an `assistant/message`; replace the temporary bubble with it.
-    private func upsertFinishedAssistant(_ text: String) {
+    private func upsertFinishedAssistant(_ text: String, reasoning: String, tools: [DSHTool],
+                                         turn: Int?, duration: Int?) {
         if let index = messages.lastIndex(where: { $0.role == .assistant }) {
             messages[index].text = text
             messages[index].streaming = false
+            messages[index].reasoning = reasoning
+            messages[index].tools = tools
+            messages[index].turn = turn
+            messages[index].durationSeconds = duration
         } else {
-            messages.append(DSHMessage(role: .assistant, text: text))
+            messages.append(DSHMessage(role: .assistant, text: text, reasoning: reasoning,
+                                       tools: tools, turn: turn, durationSeconds: duration))
         }
     }
 
     private func refreshSession(_ sessionId: String) {
         send(["type": "sessions"])
+    }
+
+    // MARK: - Session previews
+
+    /// `projection-baseline` (sent on connect) and `turn-outline-updated` carry each session's
+    /// turn outline, whose last response is the row's subtitle. No extra round trips.
+    private func handleProjectionBaseline(_ frame: DSHFrame) {
+        guard let projections = frame.dict("projections") else { return }
+        for (sessionId, raw) in projections {
+            guard let entry = raw as? [String: Any],
+                  let values = entry["values"] as? [String: Any] else { continue }
+            applyTurnOutline(values["turnOutline"], sessionId: sessionId)
+        }
+    }
+
+    private func handleTurnOutline(_ frame: DSHFrame) {
+        guard let sessionId = frame.string("sessionId") else { return }
+        applyTurnOutline(frame.json["turnOutline"], sessionId: sessionId)
+    }
+
+    private func applyTurnOutline(_ raw: Any?, sessionId: String) {
+        guard let outline = raw as? [[String: Any]], let last = outline.last else { return }
+        let response = (last["response"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let prompt = (last["prompt"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let text = response.isEmpty ? prompt : response
+        guard !text.isEmpty else { return }
+        previews[sessionId] = Self.compactPreview(text)
+    }
+
+    static func compactPreview(_ text: String, limit: Int = 120) -> String {
+        let oneLine = text.split(whereSeparator: \.isNewline)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+        return oneLine.count > limit ? String(oneLine.prefix(limit)) + "…" : oneLine
     }
 
     private func handleDrop(_ error: Error) {

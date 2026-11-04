@@ -1035,3 +1035,31 @@
 - 验证：DevDebug 模拟器与 `generic/platform=iOS` 真机构建通过；签名安装并启动到 iPhone 16 Pro（`com.suiyikou.codync.uipreview`），首页混排列表、来源角标、DSH 状态区移除均实测可见。
 - 限制/待办：分页布局与来源菜单弹层尚未截图；「未连接」小字要网关失败时才出现；角标按 48pt 头像 + 16pt 行内边距固定偏移，超大字号下会偏。
 - 关联：C0117。编号说明：桌面端已占用 C0119–C0121，本条把原 C0118–C0121 合并为 C0118；iOS 后续从 C0122 起。
+
+### C0122 · 2026-11-04 · 首页：方形头像、顶部模糊、来源角标与 DSH 消息预览
+
+- 原因：真机验收发现左上头像在工具栏里被拉宽变形、列表上滚会从顶栏透出来、来源角标与约定不符、DSH 会话副标题没有信息量。
+- 变化：
+  - 左上头像改用 iOS 27 的 `contentMarginsRemoved()` toolbar 项，保持 40pt 正方形（`AccountAvatar` 已是 scaledToFill + Circle，问题在工具栏的胶囊内缩）。
+  - 顶栏加 `.toolbarBackground(.visible/.ultraThinMaterial)`，列表上滚不再透出。
+  - 角标：Coe 不加；DS Bot 用字母 `D`（绿）；DSH 用终端图标（橙）。
+  - DSH 会话副标题改为最后一条消息预览：读网关连接时推送的 `projection-baseline` 和 `turn-outline-updated` 里的 `turnOutline` 最后一项（response 优先、prompt 兜底）。不再为每行发 `history` 请求——一次发 12 条会让 WebSocket 反复掉线。
+  - 截图用调试开关：`CODYNC_HOME_LAYOUT`、`CODYNC_HOME_SOURCES`、`CODYNC_OPEN_DSH_SESSION`（均 `#if DEBUG`）。
+- 文件：`apps/ios/Views/HomeSourcesView.swift`、`apps/ios/Views/HomeSource.swift`、`apps/ios/DSHKit/Sources/DSHKit/DSHGateway.swift`、`CHANGELOG.md`。
+- 验证：DevDebug 真机构建、安装并启动到 iPhone 16 Pro；真机截图确认头像方形、顶栏模糊、Coe 无角标 / DSH 终端角标、DSH 副标题为最后一条消息。
+- 限制/待办：预览是 `turnOutline` 原文，可能带 Markdown 记号；超大字号下 17pt 角标的固定偏移会偏。
+- 关联：C0118。
+
+### C0123 · 2026-11-04 · 抽出 ChatTranscriptView 与 DSH 对话页骨架（默认关闭）
+
+- 原因：第四部分的方向是 DSH 对话页复用 Coe 聊天页；先把滚动容器抽成可复用组件，再接 DSH。
+- 变化：
+  - 新增 `apps/ios/Kit/Sources/CodyncUI/Thread/ChatTranscript.swift`：`TranscriptSummary` / `TranscriptItem` / `ChatTranscriptList`（Coe 和 DSH 共用的 `ConversationList` 容器）/ `ChatTranscriptView`（不需要 `BotStore` 的聊天页，气泡样式与 Coe 一致）。
+  - `ThreadView` 只把 `ConversationList(...)` 换成 `ChatTranscriptList(...)`，参数与行为不变。
+  - DSHKit：`DSHMessage` 增加 `reasoning` / `tools` / `turn` / `durationSeconds` / `createdAt`；`DSHGateway` 从 `turn/start`、`tool/call`、`tool/result`、`assistant/message` 收集并写入；`session-snapshot` 改为按 `{type, time, data}` 读取（修掉快照文本取错层的问题）；新增 `DSHTranscriptItem` / `DSHSummary` / `DSHConversationAdapter` 中间结构（DSHKit 不依赖 CodyncKit）。
+  - 新增宿主 `apps/ios/Views/DSHConversationView.swift`：`ChatTranscriptView` + 每轮一行摘要（「思考了 N 秒 · 运行了 N 个命令」）+ 点开 sheet 看思考/工具全文。
+  - 新页默认不启用：旧的 `DSHChatScreen` 仍是默认；`CODYNC_DSH_CHAT_PAGE=1`（`#if DEBUG`）切到新页。
+- 文件：`apps/ios/Kit/Sources/CodyncUI/Thread/ChatTranscript.swift`（新）、`ThreadView.swift`、`apps/ios/DSHKit/Sources/DSHKit/DSHGateway.swift`、`DSHModels.swift`、`apps/ios/Views/DSHConversationView.swift`（新）、`apps/ios/Views/HomeSourcesView.swift`、`apps/Codync.xcodeproj/project.pbxproj`（XcodeGen 重新生成）。
+- 验证：DevDebug 真机构建、安装通过；新页能打开，但当前会话历史为空（`session-snapshot` 未到达/未解析，正在排查），所以默认仍走旧页；Coe 页未做人工点按回归（`ThreadView` 只换了滚动容器，参数一致）。
+- 限制/待办：新 DSH 页历史为空待修；修好后把默认切到新页并补 Coe/DSH 回归截图。
+- 关联：C0118、C0122。

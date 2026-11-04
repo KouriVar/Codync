@@ -332,7 +332,7 @@ extension ThreadView {
             })
         }
         // Pull to refresh reconnects, like Reconnect in the computer menu, until the link is back.
-        return ConversationList(rows: rows, following: $following, nearTop: { showEarlier() }, refresh: {
+        return ChatTranscriptList(rows: rows, following: $following, nearTop: { showEarlier() }, refresh: {
             model.restartStream()
             _ = try? await model.ready()
         })

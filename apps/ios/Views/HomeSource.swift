@@ -19,12 +19,12 @@ enum HomeSource: String, CaseIterable, Identifiable, Sendable {
         }
     }
 
-    /// A short letter for the avatar's source badge (kept tiny next to a 48pt avatar).
-    var badgeLetter: String {
+    /// The avatar badge: Coe shows none, DS Bot a "D", DSH a terminal glyph.
+    var badge: HomeBadge? {
         switch self {
-        case .coe: return "C"
-        case .dsBot: return "D"
-        case .dsh: return "S"
+        case .coe: return nil
+        case .dsBot: return .letter("D")
+        case .dsh: return .symbol("terminal")
         }
     }
 
@@ -45,6 +45,12 @@ enum HomeSource: String, CaseIterable, Identifiable, Sendable {
         }
         return .coe
     }
+}
+
+/// What a source badge draws inside its circle.
+enum HomeBadge {
+    case letter(String)
+    case symbol(String)
 }
 
 /// The home's two list layouts, switched in Settings → 调试.

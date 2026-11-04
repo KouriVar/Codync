@@ -29,8 +29,25 @@ struct HomeSourcesView: View {
     @State private var page: HomeSource = .coe
     @AppStorage("manualUnreadConversations") private var manualUnreadData = Data()
 
-    private var enabledSources: Set<HomeSource> { HomeSourcePrefs.enabled(from: sourcesRaw) }
-    private var layout: HomeLayout { HomeLayout(rawValue: layoutRaw) ?? .mixed }
+    private var enabledSources: Set<HomeSource> {
+        #if DEBUG
+        // Screenshots: SIMCTL_CHILD_CODYNC_HOME_SOURCES=coe,dsBot,dsh / devicectl -e …
+        if let raw = ProcessInfo.processInfo.environment["CODYNC_HOME_SOURCES"] {
+            return HomeSourcePrefs.enabled(from: raw)
+        }
+        #endif
+        return HomeSourcePrefs.enabled(from: sourcesRaw)
+    }
+
+    private var layout: HomeLayout {
+        #if DEBUG
+        // Screenshots: CODYNC_HOME_LAYOUT=paged overrides the Settings switch.
+        if let raw = ProcessInfo.processInfo.environment["CODYNC_HOME_LAYOUT"], let value = HomeLayout(rawValue: raw) {
+            return value
+        }
+        #endif
+        return HomeLayout(rawValue: layoutRaw) ?? .mixed
+    }
     private var enabledOrdered: [HomeSource] { HomeSource.allCases.filter { enabledSources.contains($0) } }
 
     private var searchQuery: String { searchText.trimmingCharacters(in: .whitespacesAndNewlines) }
@@ -41,11 +58,32 @@ struct HomeSourcesView: View {
     var body: some View {
         chromeView
             .refreshable { await refreshAll() }
-            .task { syncDSHConnection() }
+            .task {
+            syncDSHConnection()
+            #if DEBUG
+            // Screenshots: CODYNC_OPEN_DSH_SESSION=1 opens the newest DSH conversation.
+            if ProcessInfo.processInfo.environment["CODYNC_OPEN_DSH_SESSION"] != nil {
+                for _ in 0..<40 {
+                    if let session = dsh.sessions.first { openDSH(session); break }
+                    try? await Task.sleep(for: .milliseconds(250))
+                }
+            }
+            #endif
+        }
             .onChange(of: sourcesRaw) { _, _ in sourceSelectionChanged() }
             .onChange(of: availableStores.map(\.selection)) { handleStoreSelections() }
             .sheet(isPresented: $showCameraSheet, content: cameraSheet)
-            .sheet(isPresented: $showDSHChat) { DSHChatScreen(gateway: dsh) }
+            .sheet(isPresented: $showDSHChat) {
+            #if DEBUG
+            if ProcessInfo.processInfo.environment["CODYNC_DSH_CHAT_PAGE"] == "1" {
+                DSHConversationView(gateway: dsh)
+            } else {
+                DSHChatScreen(gateway: dsh)
+            }
+            #else
+            DSHChatScreen(gateway: dsh)
+            #endif
+        }
             .sheet(isPresented: $showDSHConnect, content: dshConnectSheet)
             .codyncSheet(item: $creating) { target in creatingSheet(target) }
             .alert(deleteTitle, isPresented: deleteShown, presenting: confirmDelete) { item in
@@ -62,6 +100,9 @@ struct HomeSourcesView: View {
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar(.visible, for: .navigationBar)
+            // A blurred bar so rows passing under the top edge don't read through it.
+            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
             .toolbar { toolbarContent }
     }
 
@@ -84,8 +125,15 @@ struct HomeSourcesView: View {
     }
 
     @ToolbarContentBuilder private var toolbarContent: some ToolbarContent {
-        ToolbarItem(placement: .topBarLeading) { AccountSwitcherButton() }
-        // The source switch, left of the "+": same native-menu appearance as the "+".
+        // iOS 27 can keep the native glass rim without the default icon-sized inset around a
+        // photo; without this the avatar is stretched inside the bar's capsule.
+        if #available(iOS 27.0, *) {
+            ToolbarItem(placement: .topBarLeading) { AccountSwitcherButton() }
+                .contentMarginsRemoved()
+        } else {
+            ToolbarItem(placement: .topBarLeading) { AccountSwitcherButton() }
+        }
+        // The source switch, left of the "+": same native menu as the "+".
         ToolbarItem(placement: .topBarTrailing) { sourceMenu }
         ToolbarItem(placement: .topBarTrailing) { newBotMenu }
     }
@@ -350,7 +398,8 @@ struct HomeSourcesView: View {
                 botRow(item, store: store)
             }
         case .dsh(let session):
-            DSHSessionRow(session: session, sourceBadge: layout == .mixed ? badge(.dsh) : nil)
+            DSHSessionRow(session: session, preview: dsh.previews[session.id],
+                          sourceBadge: layout == .mixed ? AnyView(SourceBadge(source: .dsh)) : nil)
                 .contentShape(Rectangle())
                 .onTapGesture { openDSH(session) }
                 .contextActions {
@@ -361,13 +410,14 @@ struct HomeSourcesView: View {
     }
 
     private func botRow(_ item: RosterItem, store: BotStore) -> some View {
-        BotRow(bot: item.bot, manuallyUnread: manuallyUnread(item))
+        let source = HomeSource.of(bot: item.bot)
+        return BotRow(bot: item.bot, manuallyUnread: manuallyUnread(item))
             .environment(store)
-            // The source badge sits on the avatar's bottom-right, same size/place as the lead
-            // agent's star: avatar is 48pt with 16pt vertical row padding.
+            // Only DS Bot carries a badge; the source badge sits where the lead agent's star
+            // does (avatar is 48pt with 16pt vertical row padding).
             .overlay(alignment: .topLeading) {
-                if layout == .mixed {
-                    SourceBadge(source: HomeSource.of(bot: item.bot))
+                if layout == .mixed, source.badge != nil {
+                    SourceBadge(source: source)
                         .offset(x: 31, y: 47)
                         .allowsHitTesting(false)
                 }
@@ -376,10 +426,6 @@ struct HomeSourcesView: View {
             .onTapGesture { accounts.selection = item.ref }
             .contextActions { botMenuItems(item, store: store) }
             .rosterRow()
-    }
-
-    private func badge(_ source: HomeSource) -> AnyView {
-        AnyView(SourceBadge(source: source))
     }
 
     private var dshHint: String? {
@@ -525,13 +571,23 @@ struct SourceBadge: View {
     let source: HomeSource
 
     var body: some View {
-        Text(source.badgeLetter)
-            .font(.system(size: 9, weight: .bold, design: .rounded))
+        badgeContent
             .foregroundStyle(.white)
             .frame(width: 17, height: 17)
             .background(source.badgeColor, in: Circle())
             .overlay(Circle().stroke(Palette.background, lineWidth: 2))
             .accessibilityLabel(source.title)
+    }
+
+    @ViewBuilder private var badgeContent: some View {
+        switch source.badge {
+        case .letter(let letter):
+            Text(letter).font(.system(size: 9, weight: .bold, design: .rounded))
+        case .symbol(let name):
+            Image(systemName: name).font(.system(size: 9, weight: .bold))
+        case nil:
+            EmptyView()
+        }
     }
 }
 
@@ -540,6 +596,8 @@ struct SourceBadge: View {
 /// A DSH conversation in the home list: styled like `BotRow` so the mixed list reads as one.
 struct DSHSessionRow: View {
     let session: DSHSession
+    /// The last message in the session, when the gateway has given us one.
+    let preview: String?
     let sourceBadge: AnyView?
 
     @ScaledMetric(relativeTo: .body) private var avatar: CGFloat = 48
@@ -575,7 +633,7 @@ struct DSHSessionRow: View {
                             .fixedSize(horizontal: true, vertical: false)
                     }
                 }
-                Text(session.running ? "运行中" : "DSH 对话")
+                Text(subtitle)
                     .font(.system(size: previewSize))
                     .foregroundStyle(session.running ? Palette.warning : Color(uiColor: .secondaryLabel))
                     .lineLimit(1)
@@ -585,6 +643,11 @@ struct DSHSessionRow: View {
         .padding(.vertical, rowPadding)
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
+    }
+
+    private var subtitle: String {
+        if let preview, !preview.isEmpty { return preview }
+        return session.running ? "运行中" : "DSH 对话"
     }
 
     private var date: Date? {
