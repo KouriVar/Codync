@@ -174,8 +174,11 @@ struct HomeSourcesView: View {
         // Scrolling down shrinks the bar to the tab you are on and folds the accessory into it.
         .tabBarMinimizeBehavior(.onScrollDown)
         // Only the two tabs that talk to Coe carry the bar; the others leave the screen to their list.
-        .modifier(VoiceBar(shown: (selection == .pinned || selection == .coe) && isTabRoot,
+        .modifier(VoiceBar(shown: (selection == .pinned || selection == .coe) && isTabRoot && !showVoice,
                            lead: leadBot?.bot, onTap: beginVoice))
+        // The voice sheet owns the screen while it is up: the bar and the accessory step aside and come
+        // back the moment it closes, on the system's own animation.
+        .toolbar(showVoice ? .hidden : .visible, for: .tabBar)
         .tint(Palette.text)
         .onChange(of: enabledSources) { _, sources in
             // The tab you were on has just been switched off in Settings: back to 置顶.

@@ -1731,3 +1731,11 @@
 - 验证：`xcodebuild build -scheme 'iOS Dev' -configuration DevDebug` 通过；已装到 iPhone 16 Pro（2.36.0 / 167）并启动。按要求未自测、未截图。
 - 限制/待办：附属栏不再有原地录音态，录音一律在 sheet 里进行。
 - 关联：C0168、C0167、C0153。
+### C0170 · 2026-11-04 · 语音 sheet 打开时隐藏 tab bar 与附属栏
+
+- 原因：语音 sheet 弹出后 tab bar 与附属栏仍留在下面，和 sheet 争屏幕；打开语音时它们应该让位。
+- 变化：在 `TabView` 上按 `showVoice` 切换 `.toolbar(showVoice ? .hidden : .visible, for: .tabBar)`；附属栏的挂载条件加上 `!showVoice`，两个都在 sheet 打开期间消失、关闭后由系统动画恢复。没有加额外的自定义动画，其它内容未动。
+- 文件：`apps/ios/Views/HomeSourcesView.swift`。
+- 验证：`xcodebuild build -scheme 'iOS Dev' -configuration DevDebug` 通过；已装到 iPhone 16 Pro（2.36.0 / 168）并启动。按要求未自测、未截图。
+- 限制/待办：无。
+- 关联：C0169、C0168。
