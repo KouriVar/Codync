@@ -980,3 +980,25 @@
 - 验证：`cargo test --bin codync-host` 668 passed；release 重编；`codync-host install` 后 plist 仍含两项；本地 `npm ci` + `electron-vite build` + `electron-builder --mac --dir --arm64`（ad-hoc）产出 2.36.0，替换 `/Applications/Codync.app`（原版备份 `~/Backups/Codync.app.bak-20261104-002447`）；`/health` 2.36.0/main、host 环境含 `CODYNC_CLOUD=off`/`CODYNC_EXTERNAL_URL`、`cloudStatus.enabled=false`、`codesign --verify --deep --strict` 通过、autoCheck/autoDownload=false。
 - 限制：本机只有 Apple Development 证书（无 Developer ID / 公证凭据）→ App 为 ad-hoc 签名、arm64-only，`spctl` 仍 rejected；可分发需另行签名公证。
 - 关联：C0107。
+
+### C0115 · 2026-11-04 · 云端关闭时桌面端跳过登录欢迎页，隐藏账号入口
+
+- 原因：本机 host 以 `CODYNC_CLOUD=off` 运行（C0107），账号已无法把任何东西送到别处；但桌面端仍按 `pk_live_` 判断 `configured=true`（`main/account.ts:35`），`welcome-gate.ts` 于是在未登录时把窗口拦在 Apple/Google/GitHub 登录页上，账号入口也照旧显示。
+- 变化（只加开关，不删代码）：
+  - `apps/desktop/src/renderer/lib/account-mode.ts`（新）：`accountsInUse(configured, cloud)` / `accountHidden(configured, cloud)`。账号生效 = 构建里有账号 **且** 本机 host 的 `cloudStatus.enabled !== false`。host 尚未应答（`cloud` 为 null）时按「未知不等于关闭」处理，沿用构建的结论，避免窗口先闪后现账号入口。
+  - `apps/desktop/src/renderer/views/AccountWelcomeView.tsx`：`useWelcomeGate` 用 `accountsInUse` 计算 `configured` 再交给 `showsWelcome`；云端关闭时欢迎页不再盖住窗口。
+  - `apps/desktop/src/renderer/views/ChatWindow.tsx`：`ChatSplitView` 新增 `accountInUse`；窄栏头像与 `RailAccountNotice`、侧栏底部账号按钮、账号面板 `AccountPanelLayer` 均按它隐藏。
+  - `apps/desktop/src/renderer/views/SidebarFooter.tsx`：新增 `showAccount` prop（默认 true），false 时账号按钮与该菜单里的账号不一致提示都不渲染。
+  - `apps/desktop/src/renderer/views/settings/SettingsView.tsx`：General › Account 卡片按 `accountInUse` 隐藏。
+  - `apps/desktop/src/renderer/lib/account-mode.test.ts`（新）：4 条单测覆盖「云开/云关/未知/无账号构建」四种情形。
+- 保留：`AccountService`、Clerk 登录、`account.*` IPC、`store/cloud.ts`、欢迎页组件本身都没删；云端恢复为开启时全部原样回来。
+- 验证：`npm run typecheck` 通过；`npm test` 347 条 346 通过，仅剩既有的 catalogs 键不一致（HEAD 上 zh-Hans 比 ja 多键，与本次无关）。未构建、未替换 `/Applications/Codync.app`、未重启 host。
+- 关联：C0107、C0110。
+
+### C0116 · 2026-11-04 · 本机 host 版本行在 macOS/Windows 重新显示
+
+- 原因：`apps/desktop/src/renderer/views/settings/ComputersView.tsx:244` 用 `!(store === app.local && platform !== 'linux')` 隐藏本机版本行，注释理由是「版本与更新在 Updates 页」；但该页已随 C0110 删除，于是 macOS 与 Windows 上再也看不到本机 host 版本号。
+- 变化：`apps/desktop/src/renderer/views/settings/ComputersView.tsx`：去掉该平台排除条件，本机与其它电脑一样显示 `CodyncVersionRow`；注释同步改写，说明前提已不成立。
+- 保留：`CodyncVersionRow` 里的 host 更新入口（`installHostUpdate`、`hostUpdateStatus`、`UpdateNeededCard` 的 host 分支）未动 —— 停用的只是 App 自动更新，host 二进制更新仍然有效。
+- 验证：`npm run typecheck` 通过；`npm test` 见 C0115。未实机核对三平台观感。
+- 关联：C0110。
