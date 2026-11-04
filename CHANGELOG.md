@@ -1131,3 +1131,34 @@
 - 限制/待办：模糊高度暂定 110pt，真机可再调。
 - 关联：C0126。
 
+### C0129 · 2026-11-04 · DSH 会话改为二级页打开
+
+- 原因：点 DSH 会话应像 Coe 一样 push 进二级页，而不是 sheet。
+- 变化：
+  - 首页去掉 DSH 的 sheet，改用 `.navigationDestination(item: $openDSHSession)` 在同一个 `NavigationStack` 里 push `DSHConversationView`（系统返回按钮 + 侧滑返回）。
+  - `DSHConversationView` 去掉外层 `NavigationStack` 和「关闭」按钮，只保留新建会话按钮；sheet 只留给「思考 / 工具详情」。
+- 文件：`apps/ios/Views/HomeSourcesView.swift`、`apps/ios/Views/DSHConversationView.swift`。
+- 验证：按要求本轮只验证编译通过（DevDebug 真机构建）。
+- 限制/待办：返回手势依赖系统 NavigationStack，未在真机验证。
+- 关联：C0124。
+
+### C0130 · 2026-11-04 · 修 DSH 连接反复断开重连
+
+- 原因：DSH 连接反复断开又自动重试，一直循环。
+- 根因（对照网关源码与客户端代码）：
+  1. **旧 socket 的取消回响**：`receiveLoop` 对任何 socket 的 failure 都调用 `handleDrop`；当新一轮 `openSocket` 取消旧 socket 时，旧 socket 稍后报「已取消」，于是 `handleDrop → scheduleReconnect → start → 再取消新 socket → 新 socket 又报已取消`，形成循环。日志里的「已取消」「Socket未连接」与此一致。
+  2. **连接非幂等**：`connectLastPaired()` 在 profile 已存在时无条件 `start()`，每次调用都拆掉现有连接（首页任务重跑/前后台切换都会触发）。
+  3. **没有心跳**：网关支持 `ping` 并回 `pong`（`PROTOCOL.md`），但客户端从不发；空闲时隧道层会断开，客户端重连后又断，表现为周期性循环。
+  4. 之前「一次发 12 条 history」确实会导致掉线；现已改为打开会话只发一条，且重连后只恢复当前打开的那一个会话，没有批量请求。
+- 变化：
+  - 旧 socket 的 failure 在 `receiveLoop` 里按 identity 忽略，不触发 `handleDrop`。
+  - `connectLastPaired()` 幂等：`ready`/`connecting` 时不再重建连接。
+  - 每 20 秒发一次 `ping` 心跳；断开/配对失效/主动断开时停止。
+  - 重连仍是指数退避（上限 30 秒），同一时间只有一个 `reconnectTask`；进入后台 `disconnect()`，回到前台再连。
+  - 重连后只对当前打开的会话重发一次 `subscribe` + 一条 `history`。
+  - 日志：记录断开时的 `NSError` domain/code/message（URLSession 不暴露 WebSocket close code）与重连间隔，便于区分客户端主动断开和隧道/服务端断开。
+- 文件：`apps/ios/DSHKit/Sources/DSHKit/DSHGateway.swift`、`apps/ios/Views/HomeSourcesView.swift`。
+- 验证：按要求本轮只验证编译通过（DevDebug 真机构建）。
+- 限制/待办：若日志显示为隧道层断开（domain 为 NSURLErrorDomain、code 1006/57 等），需要你在 Cloudflare/网络侧处理；本轮未重启任何服务。
+- 关联：C0124、C0129。
+

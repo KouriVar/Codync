@@ -1,4 +1,7 @@
 import Foundation
+import os
+
+private let log = Logger(subsystem: "com.suiyikou.codync.dsh-gateway", category: "gateway")
 
 /// The DSH conversation client: one WebSocket to the mobile gateway, a session list, and one open
 /// conversation with its streamed reply. Deliberately small for the first slice — it speaks the
@@ -28,6 +31,7 @@ public final class DSHGateway: ObservableObject {
     private let session: URLSession
     private var reconnectAttempt = 0
     private var reconnectTask: Task<Void, Never>?
+    private var heartbeatTask: Task<Void, Never>?
     private var shouldReconnect = false
     /// assistant-stream attempts being written, so a stale chunk from an earlier attempt is ignored.
     private var streamingAttempts = Set<String>()
@@ -59,10 +63,14 @@ public final class DSHGateway: ObservableObject {
         // Never disturb a pairing handshake that is already on the wire: the pairing socket is
         // the only thing that can deliver the new token.
         guard pendingPairing == nil else { return }
-        guard profile == nil else { return start() }
-        guard let saved = DSHCredentialStore.load().first else { return }
-        profile = saved
-        gatewayName = saved.name
+        if profile == nil {
+            guard let saved = DSHCredentialStore.load().first else { return }
+            profile = saved
+            gatewayName = saved.name
+        }
+        // Idempotent: a live or connecting socket must not be torn down and rebuilt (that is what
+        // turned one cancellation into a reconnect loop).
+        if phase == .ready || phase == .connecting { return }
         start()
     }
 
@@ -76,6 +84,8 @@ public final class DSHGateway: ObservableObject {
         shouldReconnect = false
         reconnectTask?.cancel()
         reconnectTask = nil
+        heartbeatTask?.cancel()
+        heartbeatTask = nil
         task?.cancel(with: .goingAway, reason: nil)
         task = nil
         phase = .idle
@@ -165,13 +175,19 @@ public final class DSHGateway: ObservableObject {
         if pairing == nil { phase = .connecting }
         socket.resume()
         receiveLoop(on: socket)
-        if pairing == nil { send(["type": "sessions"]) }
+        if pairing == nil {
+            startHeartbeat()
+            send(["type": "sessions"])
+        }
     }
 
     private func receiveLoop(on socket: URLSessionWebSocketTask) {
         socket.receive { [weak self] result in
             guard let self else { return }
             Task { @MainActor in
+                // A cancelled socket's failure can arrive after its replacement is already live;
+                // ignoring it is what keeps one reseat from becoming a reconnect loop.
+                guard socket === self.task else { return }
                 switch result {
                 case .failure(let error):
                     self.handleDrop(error)
@@ -247,6 +263,14 @@ public final class DSHGateway: ObservableObject {
         reconnectAttempt = 0
         if pendingPairing == nil { phase = .ready }
         send(["type": "sessions"])
+        // A reconnect while a conversation is open restores that one session only (never a batch).
+        if let sessionId = openSessionId {
+            send(["type": "subscribe", "sessionId": sessionId, "assistantStream": true])
+            let requestId = "reopen-history-\(sessionId)"
+            openHistoryRequestId = requestId
+            send(["type": "history", "sessionId": sessionId, "maxMessages": 60,
+                  "view": "conversation", "requestId": requestId])
+        }
     }
 
     private func handlePaired(_ frame: DSHFrame) {
@@ -534,8 +558,26 @@ public final class DSHGateway: ObservableObject {
         return oneLine.count > limit ? String(oneLine.prefix(limit)) + "…" : oneLine
     }
 
+    /// Keeps the socket alive through idle proxies/tunnels (the gateway answers `ping` with `pong`).
+    private func startHeartbeat() {
+        heartbeatTask?.cancel()
+        heartbeatTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 20 * 1_000_000_000)
+                guard !Task.isCancelled, let self else { return }
+                self.send(["type": "ping"])
+            }
+        }
+    }
+
     private func handleDrop(_ error: Error) {
         let message = error.localizedDescription
+        let ns = error as NSError
+        // URLSession does not expose the WebSocket close code; the domain/code and message are
+        // the closest thing, and they are what a bug report needs.
+        log.error("DSH socket dropped: \(ns.domain, privacy: .public)/\(ns.code) \(message, privacy: .public)")
+        heartbeatTask?.cancel()
+        heartbeatTask = nil
         if pendingPairing != nil {
             pendingPairing?.resume(throwing: DSHError.transport(message))
             pendingPairing = nil
@@ -550,6 +592,7 @@ public final class DSHGateway: ObservableObject {
         guard shouldReconnect, profile != nil else { return }
         reconnectAttempt = min(reconnectAttempt + 1, 6)
         let delay = min(pow(2.0, Double(reconnectAttempt)), 30)
+        log.notice("DSH reconnecting in \(delay, privacy: .public)s (attempt \(self.reconnectAttempt, privacy: .public))")
         reconnectTask?.cancel()
         reconnectTask = Task { [weak self] in
             try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
@@ -563,6 +606,8 @@ public final class DSHGateway: ObservableObject {
 
     private func requirePairingAgain() {
         shouldReconnect = false
+        heartbeatTask?.cancel()
+        heartbeatTask = nil
         phase = .failed(DSHError.authenticationRequired.localizedDescription)
         if let id = profile?.id { DSHCredentialStore.delete(id: id) }
         profile = nil

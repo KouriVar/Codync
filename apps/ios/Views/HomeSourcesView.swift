@@ -11,6 +11,7 @@ struct HomeSourcesView: View {
     @Environment(AppStore.self) private var app
     @Environment(AccountStore.self) private var accounts
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.scenePhase) private var scenePhase
 
     @ObservedObject private var dsh = DSHGateway.shared
 
@@ -21,7 +22,7 @@ struct HomeSourcesView: View {
     @State private var creating: NewTarget?
     @State private var confirmDelete: RosterItem?
     @State private var showCameraSheet = false
-    @State private var showDSHChat = false
+    @State private var openDSHSession: DSHSession?
     @State private var showDSHConnect = false
     @State private var page = 0
     @State private var naming: SectionNaming?
@@ -68,8 +69,18 @@ struct HomeSourcesView: View {
                 if page >= pageCount { page = max(0, pageCount - 1) }
             }
             .onChange(of: availableStores.map(\.selection)) { handleStoreSelections() }
+            // DSH pauses in the background and reconnects when the app comes back.
+            .onChange(of: scenePhase) { _, phase in
+                switch phase {
+                case .background: dsh.disconnect()
+                case .active: syncDSHConnection()
+                default: break
+                }
+            }
             .sheet(isPresented: $showCameraSheet, content: cameraSheet)
-            .sheet(isPresented: $showDSHChat) { DSHConversationView(gateway: dsh) }
+            .navigationDestination(item: $openDSHSession) { _ in
+                DSHConversationView(gateway: dsh)
+            }
             .sheet(isPresented: $showDSHConnect, content: dshConnectSheet)
             .codyncSheet(item: $creating) { target in creatingSheet(target) }
             .alert(deleteTitle, isPresented: deleteShown, presenting: confirmDelete) { item in
@@ -351,7 +362,7 @@ struct HomeSourcesView: View {
 
     private func openDSH(_ session: DSHSession) {
         dsh.open(sessionId: session.id)
-        showDSHChat = true
+        openDSHSession = session
     }
 
     /// DSH connects when its page is on, or when a pinned DSH conversation needs it.

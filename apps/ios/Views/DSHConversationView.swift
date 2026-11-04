@@ -7,31 +7,28 @@ import SwiftUI
 /// thinking + tool calls folded into one tappable line that opens its full content.
 struct DSHConversationView: View {
     @ObservedObject var gateway: DSHGateway
-    @Environment(\.dismiss) private var dismiss
     @State private var following = true
     @State private var details: TranscriptSummary?
     @State private var draft = ""
 
     var body: some View {
-        NavigationStack {
-            VStack(spacing: 0) {
-                ChatTranscriptView(items: items, following: $following, working: gateway.isStreaming) { summary in
-                    details = summary
-                }
-                .background(Palette.background)
-                Divider()
-                composer
+        VStack(spacing: 0) {
+            ChatTranscriptView(items: items, following: $following, working: gateway.isStreaming) { summary in
+                details = summary
             }
-            .navigationTitle(title)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("关闭") { dismiss() } }
-                ToolbarItem(placement: .primaryAction) {
-                    Button { gateway.newSession() } label: { Image(systemName: "square.and.pencil") }
-                        .accessibilityLabel("新建会话")
-                }
+            .background(Palette.background)
+            Divider()
+            composer
+        }
+        .navigationTitle(title)
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button { gateway.newSession() } label: { Image(systemName: "square.and.pencil") }
+                    .accessibilityLabel("新建会话")
             }
-            .sheet(item: $details) { summary in
+        }
+        .sheet(item: $details) { summary in
                 NavigationStack {
                     ScrollView {
                         Text(summary.detail.isEmpty ? summary.title : summary.detail)
@@ -43,9 +40,8 @@ struct DSHConversationView: View {
                     .background(Palette.background)
                     .navigationTitle(summary.title)
                     .navigationBarTitleDisplayMode(.inline)
-                    .toolbar {
-                        ToolbarItem(placement: .cancellationAction) { Button("关闭") { details = nil } }
-                    }
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) { Button("关闭") { details = nil } }
                 }
             }
         }
