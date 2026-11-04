@@ -1,6 +1,7 @@
 import CodyncKit
 import CodyncUI
 import SwiftUI
+import UIKit
 
 /// What one card in the source switcher is — and what the home shows once it is picked: the pinned
 /// list, or one source's own list.
@@ -55,19 +56,24 @@ struct SourceSwitcher: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var scrolled: HomeFace?
 
-    /// A card is this much of the screen's width; the rest is the gap to its neighbours.
-    static let miniScale: CGFloat = 0.86
+    /// A card is this much of the screen's width — the wallpaper picker's proportion, with about
+    /// 15% of the neighbours showing at each edge.
+    static let cardScale: CGFloat = 0.70
+    /// The phone screen's own corner, before the shrink. iOS exposes no number for it; this is the
+    /// current iPhone display radius.
+    static let screenCorner: CGFloat = 55
     /// Between two cards.
     private static let gap: CGFloat = 12
-    /// The card's own corner.
-    private static let corner: CGFloat = 28
+    /// The glass rim drawn around the mini screen.
+    private static let rim: CGFloat = 4
 
     var body: some View {
         GeometryReader { proxy in
-            let width = proxy.size.width * Self.miniScale
-            let height = min(proxy.size.height * 0.62, width * 1.5)
-            VStack(spacing: 16) {
-                Spacer(minLength: 8)
+            let width = proxy.size.width * Self.cardScale
+            // The screen's own aspect: the card is the whole page, so nothing is cropped.
+            let height = width * (proxy.size.height / max(proxy.size.width, 1))
+            VStack(spacing: 14) {
+                Spacer(minLength: 0)
                 Text(centered.title)
                     .font(.title3.weight(.semibold))
                     .foregroundStyle(Palette.text)
@@ -118,34 +124,51 @@ struct SourceSwitcher: View {
         }
     }
 
-    /// One card: the face's real list, laid out at the screen's size and shrunk into a rounded
-    /// rectangle. The list itself takes no touches — the card's tap is the only thing that answers.
+    /// One card: the whole home screen (its navigation row, the list and the bar — all drawn by the
+    /// home) laid out at the screen's size and shrunk, so it is a smaller phone rather than a crop of
+    /// one. The glass rim is the app's own surface, not a new one.
     private func mini(_ face: HomeFace, screen: CGSize, cardWidth: CGFloat, cardHeight: CGFloat) -> some View {
+        let scale = cardWidth / max(screen.width, 1)
+        let corner = Self.screenCorner * scale
+        let shape = RoundedRectangle(cornerRadius: corner, style: .continuous)
         let content = card(face)
             .frame(width: screen.width, height: screen.height)
-            .scaleEffect(cardWidth / max(screen.width, 1), anchor: .topLeading)
+            .scaleEffect(scale, anchor: .topLeading)
             .allowsHitTesting(false)
-        return content
             .frame(width: cardWidth, height: cardHeight, alignment: .topLeading)
-            .clipShape(RoundedRectangle(cornerRadius: Self.corner, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: Self.corner, style: .continuous)
-                    .strokeBorder(Palette.text.opacity(0.08), lineWidth: 1)
-            }
-            .shadow(color: .black.opacity(0.18), radius: 18, y: 10)
-            .contentShape(RoundedRectangle(cornerRadius: Self.corner, style: .continuous))
+            .clipShape(shape)
+            .overlay { shape.strokeBorder(Palette.text.opacity(0.10), lineWidth: 0.5) }
+        return content
+            .padding(Self.rim)
+            .glass(in: RoundedRectangle(cornerRadius: corner + Self.rim, style: .continuous))
+            .shadow(color: .black.opacity(0.22), radius: 20, y: 12)
+            .contentShape(RoundedRectangle(cornerRadius: corner + Self.rim, style: .continuous))
     }
 
+    /// The system's own dots, so the indicator is the one iOS draws rather than a copy of it.
     private var dots: some View {
-        HStack(spacing: 8) {
-            ForEach(faces) { face in
-                Capsule()
-                    .fill(face == centered ? Palette.text : Palette.secondary.opacity(0.35))
-                    .frame(width: face == centered ? 18 : 7, height: 7)
-            }
-        }
-        .frame(height: 18)
-        .animation(Motion.reduced(Motion.layout, reduceMotion), value: centered)
-        .accessibilityHidden(true)
+        PageControl(count: faces.count, current: faces.firstIndex(of: centered) ?? 0)
+            .frame(height: 26)
+            .accessibilityHidden(true)
+    }
+}
+
+/// The system's own page dots: `UIPageControl` draws them, this only keeps them in step. It takes no
+/// touches — the pages are turned by the scroll view, as before.
+private struct PageControl: UIViewRepresentable {
+    let count: Int
+    let current: Int
+
+    func makeUIView(context: Context) -> UIPageControl {
+        let control = UIPageControl()
+        control.isUserInteractionEnabled = false
+        control.backgroundStyle = .minimal
+        control.allowsContinuousInteraction = false
+        return control
+    }
+
+    func updateUIView(_ control: UIPageControl, context: Context) {
+        control.numberOfPages = max(count, 1)
+        control.currentPage = current
     }
 }

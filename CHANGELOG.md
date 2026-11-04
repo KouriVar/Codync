@@ -2478,3 +2478,45 @@
   - 双指按住不动时，首根手指仍可能唤起行的长按预览（未在真机确认），若碍事可再加 `minimumScaleDelta` 门槛。
   - 切换态背景用 `Palette.background` 纯色，不是当前页的模糊快照。
 - 关联：C0194（首页只显示置顶、来源列表保留）、C0199、C0201。备份 tag：`backup/before-source-pinch`（`dde7eb62`）。
+
+### C0203 · 2026-11-05 · 捏合切换卡片细节：整屏等比、原生分页点、玻璃边框
+
+- 原因：C0202 的卡片只裁了中间的会话列表，比例和手机屏不一样（不是等比），分页点是自绘的，卡片也不够玻璃化。
+  目标：卡片 = 整个首页屏幕等比缩小，含顶部导航与底部栏；圆角按屏幕圆角等比缩；分页点换系统原生；
+  边框/底用现有 `glass(in:)`（GlassSurface）；进出用同一条缩放过渡、不裁切。
+- 备份：`backup/before-pinch-polish` → `37e1da1d`。
+- 变化（`apps/ios/Views/HomeSourceSwitcher.swift`）：
+  - **卡片等比**：`SourceSwitcher.cardScale = 0.70`（屏宽的 70%，左右各露出相邻卡片约 15%）；
+    卡片高 = `卡宽 × 屏高 / 屏宽`，即严格等于屏幕宽高比；原来「卡宽 × 1.5 / 屏高 × 0.62」的裁切式尺寸删除。
+  - **圆角**：新增 `SourceSwitcher.screenCorner = 55`（当前 iPhone 屏幕圆角；iOS 没有公开数值），
+    卡片圆角 = `screenCorner × cardScale` ≈ **38.5pt**，`RoundedRectangle(..., style: .continuous)`。
+  - **分页点**：自绘的 Capsule 圆点删除，改为 `private struct PageControl: UIViewRepresentable` 包 **`UIPageControl`**
+    （`backgroundStyle = .minimal`、`allowsContinuousInteraction = false`、`isUserInteractionEnabled = false`），
+    只由 `numberOfPages` / `currentPage` 驱动——系统原生指示器，翻页仍由 ScrollView 负责。
+  - **玻璃化**：卡片内容外套 4pt `padding`，再 `.glass(in: RoundedRectangle(圆角 + 4, .continuous))`（项目现有
+    `glass(in:)` / `GlassSurface`），形成一圈 Liquid Glass 边框；原来 1pt 的实色描边改为 0.5pt 极细线压在屏幕边上，
+    阴影保留。
+- 变化（`Views/HomeSourcesView.swift`）：
+  - 新增 `screenSize` / `screenInsets`（`onGeometryChange` 量窗口尺寸与安全区）。
+  - 新增 `miniHome(_:)`：**卡片内容 = 整个首页**——顶部安全区 + `miniNavRow`（头像 +「+」，同一批组件）+
+    `faceList(face)`（真实列表）+ `miniBar`（`miniSearchField` / `miniVoiceButton`，与底部栏同尺寸同 `glass`），
+    按窗口尺寸布局，整块 `allowsHitTesting(false)`。卡片里只是展示，不可点。
+  - 页面缩放范围改为 `.scaleEffect(pinchScale)` 作用在**包含底部栏**的整页上（挂在 `.safeAreaInset` 之后），
+    捏合时列表和底部栏一起缩；`pinchScale` 夹在 `[cardScale, 1]`。
+  - `chromeOpacity` 只留给系统 toolbar 的两个按钮：导航栏不属于我们的视图树、无法缩进卡片，所以只在切换态淡出，
+    卡片里用 `miniNavRow` 顶上；底部栏不再单独淡出（它跟着页面一起缩）。
+  - `pick(_:)` 把 `pinchScale` 置为 `cardScale`(0.70) 再动画回 1，与卡片的缩放比例对齐，视觉上是卡片放大回整屏。
+- 保持不变：4 张卡片（置顶 + 三个来源）、左右滑切换与吸附、翻页轻触感、点卡片进入、向外张开退出、
+  记住上次选择（`homeFace`）。
+- 文件：`apps/ios/Views/HomeSourceSwitcher.swift`、`apps/ios/Views/HomeSourcesView.swift`。
+- 验证：`xcodebuild build -project apps/Codync.xcodeproj -scheme 'iOS Dev' -configuration DevDebug`
+  （真机 destination、ui-preview 覆盖、构建号 191）**编译通过，0 error**，改动文件 0 warning；
+  `xcrun devicectl device install app` 装到 iPhone 16 Pro（`com.suiyikou.codync.uipreview` 2.36.0 / 191）成功。
+  按要求**不自测**：不跑测试、不截图、不用 CDP，卡片等比观感、原生分页点样式、玻璃边框与过渡均未实测。
+- 限制/待办：
+  - `screenCorner = 55` 是按当前 iPhone 屏幕圆角取的常数（iOS 无公开 API），换机型若要严格等比需要另测数值。
+  - 系统 toolbar 的两个按钮只能在切换态淡出，卡片里的导航行是 `miniNavRow` 复刻（同一批组件、同位置同尺寸），
+    不是把系统导航栏缩进卡片。
+  - 卡片里仍是 N 个真实 `List`（每个 `.scrollDisabled`），来源多时开销随之增加；卡片背景为纯色 `Palette.background`。
+  - 捏合过程中页面整体缩放，圆角不变形；圆角只在卡片态呈现（`clipShape` 在卡片上）。
+- 关联：C0202、C0199、C0201。

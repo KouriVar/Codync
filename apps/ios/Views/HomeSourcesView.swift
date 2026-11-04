@@ -25,8 +25,11 @@ struct HomeSourcesView: View {
     @State private var switcherShown = false
     /// The card in the middle while the switcher is up.
     @State private var switcherFace = HomeFace.pinned
-    /// The page's own scale while two fingers close on it: 1 is the page, `miniScale` is a card.
+    /// The page's own scale while two fingers close on it: 1 is the page, `cardScale` is a card.
     @State private var pinchScale: CGFloat = 1
+    /// The window's size and insets: a card is the whole screen shrunk, so it needs both.
+    @State private var screenSize = CGSize.zero
+    @State private var screenInsets = EdgeInsets()
 
     @State private var searchText = ""
     /// The field in the bottom bar has the keyboard.
@@ -90,12 +93,15 @@ struct HomeSourcesView: View {
 
     var body: some View {
         navigationStack
+            // The window, for the cards: each one is the whole screen at the screen's own aspect.
+            .onGeometryChange(for: CGSize.self) { $0.size } action: { screenSize = $0 }
+            .onGeometryChange(for: EdgeInsets.self) { $0.safeAreaInsets } action: { screenInsets = $0 }
             // The pages, over everything the home draws: the toolbar's buttons step out of the way
             // (they fade below), and the cards take the screen.
             .overlay {
                 if switcherShown {
                     SourceSwitcher(faces: faces, centered: $switcherFace,
-                                   card: { AnyView(faceList($0)) },
+                                   card: { AnyView(miniHome($0)) },
                                    commit: { pick($0) })
                         .ignoresSafeArea()
                         .transition(.opacity)
@@ -200,9 +206,6 @@ struct HomeSourcesView: View {
                     faceList(face)
                 }
             }
-            // The page becomes a card under two fingers: only the list scales, the bars stay put
-            // (they fade with it) and the card settles into the switcher on release.
-            .scaleEffect(pinchScale, anchor: .center)
             .simultaneousGesture(pinchToSwitch)
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
@@ -210,6 +213,9 @@ struct HomeSourcesView: View {
             // A bottom inset rather than an overlay: the list keeps clear of it, and a keyboard takes
             // it up so the field and the button rest just above the keys.
             .safeAreaInset(edge: .bottom, spacing: 0) { bottomBar }
+            // The page becomes a card under two fingers: the list and the bar shrink together, so
+            // what the switcher shows is the same view, smaller.
+            .scaleEffect(pinchScale, anchor: .center)
             .navigationDestination(for: BotReference.self) { ref in
                 ChatScreen(ref: ref)
             }
@@ -316,15 +322,67 @@ struct HomeSourcesView: View {
         }
     }
 
-    /// How far the page has shrunk toward a card, 0…1: what the chrome fades on.
-    private var shrink: Double {
-        let span = 1 - SourceSwitcher.miniScale
-        return Double(min(1, max(0, (1 - pinchScale) / span)))
+    /// One card's content: the home exactly as it looks full screen — the navigation row, the list and
+    /// the bar, at the window's own size — so the switcher only has to shrink it. Nothing in it takes
+    /// a touch: the card itself answers, and it only picks the face.
+    private func miniHome(_ face: HomeFace) -> some View {
+        VStack(spacing: 0) {
+            Color.clear.frame(height: screenInsets.top)
+            miniNavRow
+            faceList(face)
+            miniBar
+                .padding(.bottom, 28)
+        }
+        .frame(width: screenSize.width, height: screenSize.height)
+        .background(Palette.background)
+        .allowsHitTesting(false)
     }
 
-    /// The navigation buttons and the bottom bar fade as the page shrinks, and are gone entirely while
-    /// the pages are up.
-    private var chromeOpacity: Double { switcherShown ? 0 : 1 - shrink }
+    /// The card's navigation row: the avatar and the "+" where the real bar puts them.
+    private var miniNavRow: some View {
+        HStack(spacing: 0) {
+            AccountSwitcherButton(avatarSize: 36)
+            Spacer(minLength: 0)
+            RemixImage("add-line", size: 24)
+        }
+        .padding(.horizontal, 16)
+        .frame(height: 44)
+    }
+
+    /// The card's bar: the same field and circle as below, drawn rather than wired to anything.
+    private var miniBar: some View {
+        HStack(spacing: 12) {
+            miniSearchField
+            miniVoiceButton
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 6)
+    }
+
+    private var miniSearchField: some View {
+        HStack(spacing: 8) {
+            RemixIcon("search-line")
+                .foregroundStyle(Palette.secondary)
+            Text(L10n.tr("Search chats"))
+                .foregroundStyle(Palette.secondary)
+            Spacer(minLength: 0)
+        }
+        .font(.body)
+        .padding(.horizontal, 14)
+        .frame(height: ControlMetrics.Size.bar.hitTarget)
+        .glass(in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+    }
+
+    private var miniVoiceButton: some View {
+        RemixIcon("mic-line", size: ControlMetrics.Size.bar.glyph)
+            .foregroundStyle(Palette.text)
+            .frame(width: ControlMetrics.Size.bar.side, height: ControlMetrics.Size.bar.side)
+            .glass(in: Capsule())
+    }
+
+    /// The system toolbar's buttons are the one piece of chrome that cannot shrink into a card (the
+    /// bar isn't ours), so they step aside while the pages are up; the card draws its own row.
+    private var chromeOpacity: Double { switcherShown ? 0 : 1 }
 
     /// The switcher's front door: two fingers closed on the list shrink the page toward a card and
     /// letting go makes the card. One finger still scrolls — this wakes only once the pinch has
@@ -335,7 +393,7 @@ struct HomeSourcesView: View {
                 guard canPinch else { return }
                 // The keyboard goes first: the page is about to become a card.
                 if searchFocused { searchFocused = false }
-                pinchScale = min(1, max(SourceSwitcher.miniScale, value.magnification))
+                pinchScale = min(1, max(SourceSwitcher.cardScale, value.magnification))
             }
             .onEnded { value in
                 guard canPinch else {
@@ -376,7 +434,7 @@ struct HomeSourcesView: View {
     private func pick(_ face: HomeFace) {
         faceRaw = face.stored
         switcherFace = face
-        pinchScale = SourceSwitcher.miniScale
+        pinchScale = SourceSwitcher.cardScale
         withAnimation(switchAnimation) {
             switcherShown = false
             pinchScale = 1
@@ -430,8 +488,6 @@ struct HomeSourcesView: View {
         // The voice's phase changes live in a view of their own: on the home's root they would
         // rebuild the roster list on every one of them — including the first, while the bar is moving.
         .background { VoicePhaseWatcher(voice: voice, onPhase: handleVoicePhase) }
-        // Out of the way while the pages are up, fading with the page as it shrinks.
-        .opacity(chromeOpacity)
         .allowsHitTesting(!switcherShown)
     }
 
