@@ -1752,3 +1752,11 @@
 - 验证：`xcodebuild build -scheme 'iOS Dev' -configuration DevDebug` 通过；已装到 iPhone 16 Pro（2.36.0 / 169）并启动。按要求未自测、未截图。
 - 限制/待办：⋯ 目前只提供「打开设置」一项。
 - 关联：C0168、C0169。
+### C0172 · 2026-11-04 · 语音 sheet 打开时隐藏 tab bar（改在每个 tab 的根视图上）
+
+- 原因：C0170 把 `.toolbar(.hidden, for: .tabBar)` 加在 `TabView` 外层，系统不认（这类工具栏可见性只对被包在 `NavigationStack` 里的内容生效），所以 sheet 打开时 tab bar 仍然在。
+- 变化：把规则挪进每个 tab 的 `NavigationStack` 根视图——`stack(voiceSheet:)` 里对内容加 `.toolbar(voiceSheet ? .hidden : .visible, for: .tabBar)`，五个 tab（置顶、Coe、DS Bot、DSH、搜索）的调用处都传 `voiceSheet: showVoice`（从首页把状态传下去）；`showVoice` 的所有赋值（打开、sheet onDismiss、发送/取消后面板清空、退到后台）都用 `withAnimation(.spring(response: 0.35, dampingFraction: 0.9))` 包住，让 tab bar 与附属栏一起退下去、一起回来。其他内容未动。
+- 文件：`apps/ios/Views/HomeSourcesView.swift`。
+- 验证：`xcodebuild build -scheme 'iOS Dev' -configuration DevDebug` 通过；已装到 iPhone 16 Pro（2.36.0 / 170）并启动。按要求未自测、未截图。
+- 限制/待办：无。
+- 关联：C0170。

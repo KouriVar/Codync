@@ -78,7 +78,7 @@ struct HomeSourcesView: View {
                 case .background:
                     dsh.disconnect()
                     // iOS takes the microphone away when the app leaves, so the sheet goes too.
-                    showVoice = false
+                    withAnimation(Self.barSpring) { showVoice = false }
                     voice.discard()
                 case .active: syncDSHConnection()
                 default: break
@@ -90,6 +90,7 @@ struct HomeSourcesView: View {
                 // Pulled down or sent: either way the recording is over and the bar comes back.
                 voice.discard()
                 voiceDetent = VoiceSheetView.small
+                withAnimation(Self.barSpring) { showVoice = false }
             }) {
                 VoiceSheetView(lead: leadBot?.bot, session: voice, detent: $voiceDetent,
                                openSystemSettings: { openSystemVoiceSettings() })
@@ -114,7 +115,7 @@ struct HomeSourcesView: View {
                     raiseSheet()
                 // Sent or cancelled: the sheet has done its work.
                 case .idle:
-                    if showVoice { showVoice = false }
+                    if showVoice { withAnimation(Self.barSpring) { showVoice = false } }
                 default: break
                 }
             }
@@ -148,27 +149,27 @@ struct HomeSourcesView: View {
     private var tabs: some View {
         TabView(selection: $selection) {
             Tab(HomeTab.pinned.title, systemImage: HomeTab.pinned.symbol, value: HomeTab.pinned) {
-                stack { rosterList(pinnedEntries, pinnedEmpty: true) }
+                stack(voiceSheet: showVoice) { rosterList(pinnedEntries, pinnedEmpty: true) }
             }
             if enabledSources.contains(.coe) {
                 Tab(HomeTab.coe.title, systemImage: HomeTab.coe.symbol, value: HomeTab.coe) {
-                    stack { rosterList(botEntries(for: .coe)) }
+                    stack(voiceSheet: showVoice) { rosterList(botEntries(for: .coe)) }
                 }
             }
             if enabledSources.contains(.dsBot) {
                 Tab(HomeTab.dsBot.title, systemImage: HomeTab.dsBot.symbol, value: HomeTab.dsBot) {
-                    stack { rosterList(botEntries(for: .dsBot)) }
+                    stack(voiceSheet: showVoice) { rosterList(botEntries(for: .dsBot)) }
                 }
             }
             if enabledSources.contains(.dsh) {
                 Tab(HomeTab.dsh.title, systemImage: HomeTab.dsh.symbol, value: HomeTab.dsh) {
-                    stack { rosterList(dshEntries, hint: dshHint) }
+                    stack(voiceSheet: showVoice) { rosterList(dshEntries, hint: dshHint) }
                 }
             }
             // No label of our own: with role .search and the system's default label, iOS draws this
             // as the separate round button on the right instead of a fifth tab.
             Tab(value: HomeTab.search, role: .search) {
-                stack { searchList }
+                stack(voiceSheet: showVoice) { searchList }
             }
         }
         // Scrolling down shrinks the bar to the tab you are on and folds the accessory into it.
@@ -176,9 +177,6 @@ struct HomeSourcesView: View {
         // Only the two tabs that talk to Coe carry the bar; the others leave the screen to their list.
         .modifier(VoiceBar(shown: (selection == .pinned || selection == .coe) && isTabRoot && !showVoice,
                            lead: leadBot?.bot, onTap: beginVoice))
-        // The voice sheet owns the screen while it is up: the bar and the accessory step aside and come
-        // back the moment it closes, on the system's own animation.
-        .toolbar(showVoice ? .hidden : .visible, for: .tabBar)
         .tint(Palette.text)
         .onChange(of: enabledSources) { _, sources in
             // The tab you were on has just been switched off in Settings: back to 置顶.
@@ -187,9 +185,12 @@ struct HomeSourcesView: View {
     }
 
     /// One tab's stack: the same toolbar, pushes and DSH destination in every tab.
-    private func stack<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
+    /// One tab's stack. `voiceSheet` is handed down from the home so each tab's root can hide the bar
+    /// while the voice sheet is up — a rule on the TabView itself is ignored by the system.
+    private func stack<Content: View>(voiceSheet: Bool, @ViewBuilder _ content: () -> Content) -> some View {
         NavigationStack(path: path) {
             content()
+                .toolbar(voiceSheet ? .hidden : .visible, for: .tabBar)
                 .navigationTitle("")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar { toolbarContent }
@@ -205,6 +206,9 @@ struct HomeSourcesView: View {
 
     /// The open conversation, shared by every tab: opening one from a notification or a link lands in
     /// whichever tab is on screen.
+    /// One spring for the bar going and coming, so it does not jump either way.
+    private static let barSpring = Animation.spring(response: 0.35, dampingFraction: 0.9)
+
     /// Nothing is pushed on the tab in front, so its root is what the user is looking at.
     private var isTabRoot: Bool { accounts.selection == nil && openDSHSession == nil }
 
@@ -303,7 +307,7 @@ struct HomeSourcesView: View {
             return
         }
         voiceDetent = VoiceSheetView.small
-        showVoice = true
+        withAnimation(Self.barSpring) { showVoice = true }
         Task { await voice.begin() }
     }
 
