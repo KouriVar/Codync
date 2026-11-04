@@ -2169,3 +2169,40 @@
   - `Views/RootView.swift`（第 81–83 行）与 `Views/SettingsView.swift`（第 47 行）各有一句提到
     tab bar / 语音胶囊的注释已过时；按「清单外一律不动」本次未改。
 - 关联：C0192、C0193。
+
+### C0195 · 2026-11-04 · 首页底部栏改用会话页输入栏的数值，并补上中文文案
+
+- 原因：C0194 的底部栏按「上 8 / 下 0、圆钮 44、间距 12」自行定的数，结果比会话页输入栏偏上、
+  圆钮比输入栏的「＋」大一号、胶囊是正圆端而不是输入框的圆角，中文界面里 placeholder 和空结果
+  还落在英文（`Search chats` / `No matches` 两条词条根本没进 zh-Hans）。
+- 核验（会话页 `Kit/Sources/CodyncUI/Thread/Composer.swift` 的实际数值）：
+  - 输入栏底边：键盘收起时 `padding(.bottom, 28)` + `ignoresSafeArea(.container, .bottom)`，
+    即距屏幕物理底边 28pt；键盘弹起时 `padding(.bottom, 12)`，即距键盘顶部 12pt；顶部 `padding(.top, 6)`。
+  - 「＋」与输入框水平间距：外层 `HStack(spacing: 8)`；「＋」是 `.compact` 36pt 圆放在
+    `ControlMetrics.Size.compact.hitTarget`(44) 命中框内，左右各 4pt 不可见留白，**视觉间距 8 + 4 = 12pt**。
+    因此「键盘顶部间距 12 = ＋号与输入框间距 12」在视觉上成立（原始 spacing 是 8，差在命中框那 4pt）。
+  - 输入框：最小高度 44（= `compact.hitTarget`），圆角 `RoundedRectangle(cornerRadius: 24, style: .continuous)`，
+    胶囊内左内边距 14，整行左右外边距 16；输入框右侧是 36pt 圆、44pt 命中框的发送/停止按钮。
+- 变化（`Views/HomeSourcesView.swift`）：
+  - 底部栏 `HStack(spacing: 12)` → `spacing: 8`；`.padding(.top, 8)` → `.padding(.top, 6)`；
+    新增 `.padding(.bottom, keyboardUp ? 12 : 28)` 与 `.ignoresSafeArea(.container, edges: keyboardUp ? [] : .bottom)`，
+    与会话页逐项相同；新增 `keyboardUp` 状态，由 `keyboardWillShow/WillHide` 通知驱动（会话页同款）。
+    键盘弹起时栏底距键盘 12pt，不再贴着键盘。
+  - 右侧圆钮 `GlassButton(size: .icon)`(44) → `size: .compact`(36)，外面套
+    `.frame(compact.hitTarget)` 44pt 命中框，与会话页「＋」一致；`HStack` 8 + 命中框 4 = 视觉 12。
+  - 搜索框：`Capsule` 正圆端 → `RoundedRectangle(cornerRadius: 24, style: .continuous)`，
+    高度用 `ControlMetrics.Size.compact.hitTarget`(44)，内边距 14、外层 16 不变。
+- 变化（`Kit/Sources/CodyncKit/Resources/Languages/zh-Hans.json`）：
+  - 新增 `"Search chats": "搜索"`、`"No matches": "没有找到"`（两条之前都不存在，所以中文界面显示英文）。
+  - 英文仍是键本身（无 en 表）；zh-Hant 沿用既有的「缺词回退简体」行为，日/韩/法/德/西五个表未动。
+- 文件：`apps/ios/Views/HomeSourcesView.swift`、`apps/ios/Kit/Sources/CodyncKit/Resources/Languages/zh-Hans.json`。
+  `Composer.swift` 只读核验，未改；未新建文件，`apps/Codync.xcodeproj` 未重新生成。
+- 验证：`xcodebuild build -project apps/Codync.xcodeproj -scheme 'iOS Dev' -configuration DevDebug`（真机 destination、
+  ui-preview 覆盖、构建号 183）**编译通过，0 error**；`xcrun devicectl device install app` 装到 iPhone 16 Pro
+  （`com.suiyikou.codync.uipreview` 2.36.0 / 183）成功。按你的要求**不自测**：不跑测试、不截图、不用 CDP，
+  首页与会话页对齐、键盘间距、中文文案都未实测。
+- 限制/待办：
+  - 其他语言表未加这两条词条，五个目录与 zh-Hans 的键本来就不完全一致（各比 zh-Hans 少 75 条）；
+    未运行桌面端的 catalog 对拍测试（按要求不跑测试）。
+  - zh-Hant 没有这两条，会按既有规则回退到简体的「搜索」/「没有找到」；要繁体需另加。
+- 关联：C0194。

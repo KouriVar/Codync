@@ -23,6 +23,8 @@ struct HomeSourcesView: View {
     @State private var searchText = ""
     /// The field in the bottom bar has the keyboard.
     @FocusState private var searchFocused: Bool
+    /// Keyboard up: the bar sits the composer's 12pt above it instead of 28pt above the safe area.
+    @State private var keyboardUp = false
     @State private var creating: NewTarget?
     @State private var confirmDelete: RosterItem?
     /// The voice sheet's session and what it says to the lead bot.
@@ -262,16 +264,25 @@ struct HomeSourcesView: View {
         accounts.roster.first { $0.bot.lead && !$0.bot.isGroup }
     }
 
-    /// The home's one bar: the search capsule takes the width left over, the round button sits at the
-    /// right end. 16pt at the screen's edges, 12pt between the two.
+    /// The home's one bar, at the conversation page's composer numbers: 16pt at the screen's edges,
+    /// the composer's 8pt between the field and the round button (12pt of visible air, since the
+    /// button is a 36pt circle in the composer's 44pt hit frame), 6pt above, and 28pt — or the
+    /// composer's 12pt while the keyboard is up — below.
     private var bottomBar: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 8) {
             searchBox
             circleButton
         }
         .padding(.horizontal, 16)
-        // 8pt of air above it; its own bottom edge rests on the safe area (or on the keyboard).
-        .padding(.top, 8)
+        .padding(.top, 6)
+        .padding(.bottom, keyboardUp ? 12 : 28)
+        .ignoresSafeArea(.container, edges: keyboardUp ? [] : .bottom)
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
+            keyboardUp = true
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
+            keyboardUp = false
+        }
     }
 
     /// The search field in place: `.searchable` used to push a separate page, and this one stays on
@@ -288,28 +299,30 @@ struct HomeSourcesView: View {
                 .focused($searchFocused)
         }
         .font(.body)
-        // The field's own insets, unchanged from the shared search box the rest of the app uses.
+        // The composer's own insets: 14pt inside the capsule, and the 48pt row it draws against.
         .padding(.horizontal, 14)
-        // The round button's diameter, so the two ends of the bar are one height.
-        .frame(height: ControlMetrics.Size.icon.side)
-        .glass(in: Capsule(), interactive: true)
-        .contentShape(Capsule())
+        .frame(minHeight: ControlMetrics.Size.compact.hitTarget)
+        // The composer's box, corner for corner.
+        .glass(in: RoundedRectangle(cornerRadius: 24, style: .continuous), interactive: true)
+        .contentShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
         .onTapGesture { searchFocused = true }
     }
 
     /// The round button, in two states over the same circle: the microphone while the field is idle,
     /// a ✕ that empties the field and puts the keyboard away once it has focus. The swap is a fade.
+    /// A 36pt circle in a 44pt target, exactly like the composer's "+" beside it.
     private var circleButton: some View {
         ZStack {
-            GlassButton(L10n.tr("Voice"), glyph: .remix("mic-line"), size: .icon) { beginVoice() }
+            GlassButton(L10n.tr("Voice"), glyph: .remix("mic-line"), size: .compact) { beginVoice() }
                 .opacity(searchFocused ? 0 : 1)
                 .allowsHitTesting(!searchFocused)
                 .accessibilityHidden(searchFocused)
-            GlassButton(L10n.tr("Close search"), glyph: .remix("close-line"), size: .icon) { endSearch() }
+            GlassButton(L10n.tr("Close search"), glyph: .remix("close-line"), size: .compact) { endSearch() }
                 .opacity(searchFocused ? 1 : 0)
                 .allowsHitTesting(searchFocused)
                 .accessibilityHidden(!searchFocused)
         }
+        .frame(width: ControlMetrics.Size.compact.hitTarget, height: ControlMetrics.Size.compact.hitTarget)
         .animation(Motion.reduced(Motion.fade, reduceMotion), value: searchFocused)
     }
 
