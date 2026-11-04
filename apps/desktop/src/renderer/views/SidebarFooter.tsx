@@ -25,7 +25,11 @@ export function SidebarFooter({ accountOpen, onAccount, onExtensions, onComputer
   showAccount?: boolean
 }) {
   const tr = useTr()
-  const notice = showAccount ? useAccountNotice(onComputers) : null
+  // Call the hook unconditionally: `showAccount` flips once this computer's cloud turns out to be
+  // off (account-mode.ts), and a hook skipped between renders is React #300 — the window goes
+  // blank. Only the result is conditional now.
+  const accountNotice = useAccountNotice(onComputers)
+  const notice = showAccount ? accountNotice : null
   const footer = useRef<HTMLDivElement>(null)
   // The roster scrolls under the footer: its height (taller with the notice, wrapped or not) is the roster's bottom padding.
   useLayoutEffect(() => {

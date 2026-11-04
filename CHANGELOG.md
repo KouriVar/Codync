@@ -1002,3 +1002,12 @@
 - 保留：`CodyncVersionRow` 里的 host 更新入口（`installHostUpdate`、`hostUpdateStatus`、`UpdateNeededCard` 的 host 分支）未动 —— 停用的只是 App 自动更新，host 二进制更新仍然有效。
 - 验证：`npm run typecheck` 通过；`npm test` 见 C0115。未实机核对三平台观感。
 - 关联：C0110。
+
+### C0119 · 2026-11-04 · 桌面端修复 cloud off 时的白屏（账号提示 hook 被条件调用）
+
+- 原因：C0115 让本机 host 关云（`CODYNC_CLOUD=off`）时把 `SidebarFooter` 的 `showAccount` 置为 false；该组件却写成 `showAccount ? useAccountNotice(onComputers) : null`，把 5 个 hook 放在条件分支里。cloud 从「未知」变为「off」的那一刻 hook 数量变少，React 抛 #300（Rendered fewer hooks than expected），整棵渲染树崩溃，`#root` 为空，窗口白屏、设置也进不去。
+- 变化：`apps/desktop/src/renderer/views/SidebarFooter.tsx`：hook 改为无条件调用，`showAccount` 只决定结果是否使用（`const accountNotice = useAccountNotice(...); const notice = showAccount ? accountNotice : null`）。
+- 测试：新增 `apps/desktop/src/renderer/views/sidebar-footer.test.ts`：①静态守卫 `useAccountNotice` 不得出现在条件里；②`accountsInUse` 在 cloud `null→on→off` 迁移中恰好翻转一次（即曾崩溃的那次切换）。
+- 验证：`npm run typecheck` 通过；`npm test` 348/349（唯一失败是既有的 catalogs 键不一致，与本次无关，见 C0115）。重编 arm64 ad-hoc 安装到真机后，CDP 检查 `#root.children=1`、页面有真实内容、无控制台异常、「新建 Bot」弹窗可打开；底部栏在 cloud off 时不再渲染账号按钮/提示且不崩。
+- 已知未处理：cloud off 时「设置」在 UI 上没有入口（唯一入口在账号面板，被 C0115 一并隐藏），另见 C0120。
+- 关联：C0115。
