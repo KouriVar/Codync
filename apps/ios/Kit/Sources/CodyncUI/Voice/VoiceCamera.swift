@@ -223,7 +223,7 @@ public struct VoiceCameraPage: View {
             .contentShape(Circle())
         }
         .buttonStyle(ShutterPress())
-        .modifier(VoiceGlass(tint: .white.opacity(0.18), shape: AnyShape(Circle())))
+        .glass(in: Circle(), interactive: true, tint: .white.opacity(0.18))
         .disabled(camera.capturing)
         .accessibilityLabel(Text(L10n.tr("Take a photo")))
     }
@@ -237,7 +237,7 @@ public struct VoiceCameraPage: View {
                 .contentShape(Circle())
         }
         .buttonStyle(CameraPress())
-        .modifier(VoiceGlass(tint: .black.opacity(0.35), shape: AnyShape(Circle())))
+        .glass(in: Circle(), interactive: true, tint: .black.opacity(0.35))
         .accessibilityLabel(Text(L10n.tr(label)))
     }
 

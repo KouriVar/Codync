@@ -37,13 +37,18 @@ public enum Motion {
     }
 }
 
-/// Grok's press: shrink to 98% in 50ms, spring back.
+/// Grok's press: shrink to 98% in 50ms, spring back. `scale` is the squeeze depth: the voice
+/// sheet's big circles use a deeper 0.92 (its own feel), everything else the standard 0.98.
 public struct PressScale: ButtonStyle {
-    public init() {}
+    private let scale: CGFloat
+
+    public init(scale: CGFloat = Motion.pressScale) {
+        self.scale = scale
+    }
 
     public func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .scaleEffect(configuration.isPressed ? Motion.pressScale : 1)
+            .scaleEffect(configuration.isPressed ? scale : 1)
             .animation(Motion.press, value: configuration.isPressed)
     }
 }

@@ -257,8 +257,8 @@ public struct VoiceSheetView: View {
                         .frame(height: 44)
                         .contentShape(Capsule())
                 }
-                .buttonStyle(VoicePress())
-                .modifier(VoiceGlass(tint: nil, shape: AnyShape(Capsule())))
+                .buttonStyle(PressScale(scale: 0.92))
+                .glass(in: Capsule(), interactive: true)
             }
             Spacer(minLength: 0)
         }
@@ -317,7 +317,7 @@ public struct VoiceSheetView: View {
                         .frame(width: 22, height: 22)
                         .background(Palette.accentFill, in: Circle())
                 }
-                .buttonStyle(VoicePress())
+                .buttonStyle(PressScale(scale: 0.92))
                 .offset(x: 6, y: -6)
                 .accessibilityLabel(Text(L10n.tr("Remove the photo")))
             }
@@ -368,9 +368,8 @@ public struct VoiceSheetView: View {
                 // A play triangle reads left-heavy; nudge it into the circle's optical middle.
                 .offset(x: session.phase == .recording ? 0 : 1.5)
         }
-        .buttonStyle(VoicePress())
-        .modifier(VoiceGlass(tint: session.phase == .recording ? Palette.accentFill : nil,
-                             shape: AnyShape(Circle())))
+        .buttonStyle(PressScale(scale: 0.92))
+        .glass(in: Circle(), interactive: true, tint: session.phase == .recording ? Palette.accentFill : nil)
         .accessibilityLabel(Text(L10n.tr(session.phase == .recording ? "Pause recording" : "Continue recording")))
     }
 
@@ -393,8 +392,8 @@ public struct VoiceSheetView: View {
             .frame(width: 44, height: 44)
             .contentShape(Circle())
         }
-        .buttonStyle(VoicePress())
-        .modifier(VoiceGlass(tint: Palette.accentFill, shape: AnyShape(Circle())))
+        .buttonStyle(PressScale(scale: 0.92))
+        .glass(in: Circle(), interactive: true, tint: Palette.accentFill)
         .accessibilityLabel(Text(L10n.tr("Send")))
     }
 
@@ -418,38 +417,8 @@ public struct VoiceSheetView: View {
                 .frame(width: 44, height: 44)
                 .contentShape(Circle())
         }
-        .buttonStyle(VoicePress())
-        .modifier(VoiceGlass(tint: tint, shape: AnyShape(Circle())))
+        .buttonStyle(PressScale(scale: 0.92))
+        .glass(in: Circle(), interactive: true, tint: tint)
         .accessibilityLabel(Text(L10n.tr(label)))
-    }
-}
-
-/// The sheet's glass: Liquid Glass on iOS 26, `ultraThinMaterial` with a hairline before that. Shared
-/// with the camera page, so every circle in the sheet is the same circle.
-struct VoiceGlass: ViewModifier {
-    let tint: Color?
-    let shape: AnyShape
-
-    func body(content: Content) -> some View {
-        if #available(iOS 26, *) {
-            content.glassEffect(tint.map { Glass.regular.tint($0).interactive() } ?? .regular.interactive(),
-                                in: shape)
-        } else {
-            content
-                .background {
-                    shape.fill(.ultraThinMaterial)
-                    if let tint { shape.fill(tint) }
-                }
-                .overlay { shape.stroke(.white.opacity(0.5), lineWidth: 0.5) }
-        }
-    }
-}
-
-/// The sheet's press: a deeper squeeze than the rest of the app's buttons.
-private struct VoicePress: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .scaleEffect(configuration.isPressed ? 0.92 : 1)
-            .animation(Motion.press, value: configuration.isPressed)
     }
 }

@@ -2064,3 +2064,14 @@
   - 删掉 `#available(iOS 26, *)` 分支与 `ultraThinMaterial` 回退：target 是 26.0，else 不可达。
 - 验证：`xcodebuild build -scheme 'iOS Dev' -configuration DevDebug` 通过（0 error / 0 warning）。按要求未跑测试、未截图。
 - 关联：C0191、C0192、C0193。
+
+### C0191 · 2026-11-05 · 玻璃收口第 2 步：语音链路并入 `GlassSurface`，删掉 `VoiceGlass` / `VoicePress`
+
+- 原因：`VoiceGlass`（6 处）和 `GlassSurface` 是同一件事的两份实现——参数一一对应（`tint` 可选、`interactive()` 恒开）；`VoicePress`（5 处）也只是 `PressScale` 的 0.92 变体。
+- 变化：
+  - `Kit/Sources/CodyncKit/Design/Motion.swift`：`PressScale` 增加 `scale: CGFloat = Motion.pressScale` 参数——「更深的按压」从此有正规出口，不必每处手写 ButtonStyle。
+  - `Kit/Sources/CodyncUI/Voice/VoiceSheetView.swift`：4 处 `VoiceGlass(tint:shape:)` → `.glass(in:interactive: true, tint:)`；5 处 `.buttonStyle(VoicePress())` → `.buttonStyle(PressScale(scale: 0.92))`；删除 `VoiceGlass` 与 `VoicePress` 两个类型（24 行）。
+  - `Kit/Sources/CodyncUI/Voice/VoiceCamera.swift`：2 处 `VoiceGlass` → `.glass(in: Circle(), interactive: true, tint:)`——快门 `white 0.18`、返回/更多 `black 0.35`。
+  - 观感不变的理由：`VoiceGlass` 的 iOS 26 分支本来就是 `glassEffect(tint?.regular.tint(...).interactive() ?? .regular.interactive())`，与 `GlassSurface(interactive: true, tint:)` 逐项等价；0.92 的缩放只是搬进 `PressScale(scale:)`。
+- 验证：`xcodebuild build -scheme 'iOS Dev' -configuration DevDebug` 通过（0 error / 0 warning）。按要求未跑测试、未截图。
+- 关联：C0190、C0192、C0193。
