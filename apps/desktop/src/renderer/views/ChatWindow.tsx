@@ -17,7 +17,6 @@ import { useComputerRoster } from '../store/computer-roster'
 import { BotRoster } from './BotRoster'
 import { ExtensionsMovedTip } from './ExtensionsMovedTip'
 import { RailAccountNotice, SidebarFooter } from './SidebarFooter'
-import { UpdateBadge } from './UpdateButton'
 import { ComputerFilterHeader, computerSelection } from './ComputerFilterHeader'
 import { ThreadView } from './thread/ThreadView'
 import { queueVoiceKey } from './thread/voice-shortcut-keys'
@@ -412,7 +411,6 @@ function ChatSplitView() {
             <IconButton title="New" icon="plus" size={36} buttonRef={railNewButton} menuOpen={railNewMenu} disabled={!onlineStores.length} onClick={() => setRailNewMenu((o) => !o)} />
             <AnchoredMenu open={railNewMenu} onClose={() => setRailNewMenu(false)} anchor={railNewButton} items={newItems} />
             <IconButton title="Extensions" icon="square.grid.2x2" size={36} onClick={openMarketplace} />
-            <UpdateBadge size={32} />
             <RailAccountNotice onComputers={() => setSettings('computers')} />
             <button className={`rail-profile ${showAccount ? 'open' : ''}`} aria-label="Open account menu for Account" title="Account" onClick={() => setShowAccount((s) => !s)}>
               <ProfileAvatar />

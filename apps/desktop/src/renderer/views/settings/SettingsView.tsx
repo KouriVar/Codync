@@ -3,7 +3,7 @@ import type { Screen } from '@shared/analytics'
 import { APPEARANCES, type Appearance } from '@shared/appearance'
 import { islandLabel } from '@shared/island'
 import { VOICE_SHORTCUTS, type VoiceShortcut } from '@shared/voice-shortcut'
-import { Button, CardForm, CardSection, ChoicePicker, IconButton, ProgressBar, Switch, ValueRow } from '../../components/Controls'
+import { Button, CardForm, CardSection, ChoicePicker, IconButton, Switch, ValueRow } from '../../components/Controls'
 import { Icon } from '../../components/Icon'
 import { useDismiss } from '../../components/Overlay'
 import { HStack, IconSlot, VStack } from '../../components/Stack'
@@ -16,7 +16,6 @@ import { useAccount } from '../../store/account'
 import { useScreenViewed } from '../../store/analytics'
 import { StoreContext, useApp } from '../../store/context'
 import { ComputerBadge } from '../ComputerBadge'
-import { UpdateButton, useUpdates } from '../UpdateButton'
 import { ComputersView } from './ComputersView'
 import { NetworkView } from './NetworkView'
 import { errorText, isMac, thisMac } from './parts'
@@ -28,7 +27,7 @@ import { AnalyticsSheet } from './AnalyticsSheet'
 import { HiddenBotsSection } from './HiddenBotsSection'
 
 /** The chat window's Settings: pages in a sidebar, ChatGPT's settings layout. */
-export type SettingsPage = 'general' | 'computers' | 'network' | 'access' | 'voice' | 'usage' | 'updates'
+export type SettingsPage = 'general' | 'computers' | 'network' | 'access' | 'voice' | 'usage'
 
 const thisComputer = isMac ? 'This Mac' : 'This computer'
 const pages: { id: SettingsPage; title: string; label?: string; group: string; icon: string }[] = [
@@ -38,11 +37,10 @@ const pages: { id: SettingsPage; title: string; label?: string; group: string; i
   { id: 'access', title: 'Computer access', group: thisComputer, icon: 'hand.raised' },
   { id: 'voice', title: 'Voice chat', group: 'Personal', icon: 'waveform' },
   { id: 'usage', title: 'Usage', group: 'Personal', icon: 'gauge.with.dots.needle.33percent' },
-  { id: 'updates', title: 'Updates', group: thisComputer, icon: 'arrow.down.circle' },
 ]
 
 /** Each page as `screen_viewed` names it; Computer access and Voice chat report themselves. */
-const pageScreens: Record<SettingsPage, Screen | null> = { general: 'settings', updates: 'settings', computers: 'computers', network: 'settings', usage: 'usage', access: null, voice: null }
+const pageScreens: Record<SettingsPage, Screen | null> = { general: 'settings', computers: 'computers', network: 'settings', usage: 'usage', access: null, voice: null }
 
 /** `page` is the window's: a command (the menu bar's network rows) can turn the open sheet to another page. */
 export function SettingsView({ page, setPage }: { page: SettingsPage; setPage: (page: SettingsPage) => void }) {
@@ -116,8 +114,6 @@ function PageContent({ page }: { page: SettingsPage }) {
           <UsageLimitsList />
         </CardForm>
       )
-    case 'updates':
-      return <UpdateSettings />
   }
 }
 
@@ -278,52 +274,5 @@ function UsageLimitsList() {
         <UsageLimits key={store.computer.id} usage={store.usage} />,
       ])}
     </>
-  )
-}
-
-/** The app's update check and preferences, the same as the menu bar's Updates menu. */
-function UpdateSettings() {
-  const updates = useUpdates()
-  if (!updates) return null
-  const footer = updates.supported ? null : 'Updates are available in release builds.'
-  const lastChecked = updates.lastCheck
-    ? `Last checked ${new Date(updates.lastCheck).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}`
-    : null
-  return (
-    <CardForm>
-      <CardSection title="Codync" footer={footer}>
-        {[
-          <ValueRow key="version" label="Version" detail={lastChecked}>
-            <HStack as="span" gap={10}>
-              <span>{window.codync.appVersion}</span>
-              <UpdateButton updates={updates} />
-            </HStack>
-          </ValueRow>,
-          ...(updates.downloadPercent !== null
-            ? [
-                <div key="progress" className="settings-row settings-appear">
-                  <ProgressBar value={updates.downloadPercent / 100} label={`Downloading Codync ${updates.availableVersion ?? ''}`} />
-                </div>,
-              ]
-            : []),
-          <Switch key="check" on={updates.autoCheck} onChange={(on) => window.codync.updates.setAutoCheck(on)} disabled={!updates.supported}>
-            Automatically check for updates
-          </Switch>,
-          <Switch key="download" on={updates.autoDownload} onChange={(on) => window.codync.updates.setAutoDownload(on)} disabled={!updates.supported}>
-            Automatically download and install
-          </Switch>,
-          ...(updates.error
-            ? [
-                <div key="error" className="settings-row settings-appear">
-                  <Text tone="attention" grow>{updates.error}</Text>
-                  <Button kind="secondary" onClick={() => window.codync.updates.check()} disabled={updates.checking}>
-                    Retry
-                  </Button>
-                </div>,
-              ]
-            : []),
-        ]}
-      </CardSection>
-    </CardForm>
   )
 }

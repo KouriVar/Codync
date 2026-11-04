@@ -6,19 +6,17 @@ import { join } from 'node:path'
 import { app, BrowserWindow, ipcMain, powerMonitor, shell } from 'electron'
 import electronUpdater, { type UpdateInfo } from 'electron-updater'
 import type { UpdateState } from '../shared/ipc'
-import { isMainEnvironment } from './account'
 import { identity } from './environment'
 import { prefs, type HostController } from './host-controller'
 
 const { autoUpdater } = electronUpdater
 
 /**
- * The app's own updates (electron-updater, GitHub releases; packaged `main` builds only, so a
- * local `dev` build never replaces itself with a release). Codync
- * coordinates its background services before the installer replaces the app: the host is
- * stopped first, and a restart marker makes the next launch reinstall it from the new bundle.
+ * This fork ships without the app updater: a custom build must never be replaced by an official
+ * release. `false` keeps every check, download and install path inert (Settings and the menu bar
+ * no longer offer them either).
  */
-const enabled = app.isPackaged && isMainEnvironment()
+const enabled = false
 const shipIt = `${identity.appId}.ShipIt`
 
 const bundlePath = () => join(app.getPath('exe'), '../../..')
@@ -272,6 +270,7 @@ export class Updates extends EventEmitter<{ change: []; upToDate: []; setAutoChe
 
   /** `inFront`: the person chose to restart, so the relaunched app comes forward. */
   private async install(inFront: boolean) {
+    if (!enabled) return
     if (this.state.installing) return
     this.set({ installing: true })
     try {

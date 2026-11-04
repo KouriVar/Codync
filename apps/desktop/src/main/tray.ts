@@ -3,7 +3,6 @@ import { app, clipboard, Menu, nativeImage, shell, Tray as ElectronTray } from '
 import type { TrayImage, TraySummary, TraySymbol, WindowCommand } from '../shared/ipc'
 import type { HostController } from './host-controller'
 import type { Updates } from './updates'
-import { updateAction } from '../shared/update-action'
 import { setShowInDock, showInDock } from './dock'
 import { identity } from './environment'
 import { islandSupported, type Island } from './island'
@@ -154,7 +153,7 @@ export class Tray {
     }
 
     items.push({ type: 'separator' })
-    // Settings and Quit close the menu as a pair; the version lives in Settings → Updates.
+    // Settings and Quit close the menu as a pair.
     items.push({ label: this.tr('Settings'), icon: this.symbol('gearshape'), submenu: this.settingsMenu() })
     items.push({ label: this.tr('Quit {name}').replaceAll('{name}', app.getName()), icon: this.symbol('power'), accelerator: 'CmdOrCtrl+Q', click: () => app.quit() })
     this.tray.setContextMenu(Menu.buildFromTemplate(items))
@@ -187,25 +186,6 @@ export class Tray {
     }
     if (!networks.length) items.push({ label: this.tr('Connect your computers so bots on one can message bots on another.'), enabled: false })
     items.push({ type: 'separator' }, { label: this.tr('Network settings…'), click: open })
-    return items
-  }
-
-  private updatesMenu(): Electron.MenuItemConstructorOptions[] {
-    const { updates } = this.deps
-    const u = updates.state
-    const action = updateAction(u)
-    const items: Electron.MenuItemConstructorOptions[] = [
-      { label: this.tr(action.label), enabled: action.enabled, click: () => updates.check() },
-      { label: this.tr('Automatically check for updates'), type: 'checkbox', checked: u.autoCheck, enabled: u.supported, click: () => updates.emit('setAutoCheck', !u.autoCheck) },
-      { label: this.tr('Automatically download and install'), type: 'checkbox', checked: u.autoDownload, enabled: u.supported, click: () => updates.emit('setAutoDownload', !u.autoDownload) },
-    ]
-    if (!u.supported) items.push({ label: this.tr('Updates are available in release builds.'), enabled: false })
-    items.push({ label: this.tr('Version {version}').replaceAll('{version}', app.getVersion()), enabled: false })
-    if (u.lastCheck) items.push({ label: this.tr('Last checked {when}').replaceAll('{when}', new Date(u.lastCheck).toLocaleString()), enabled: false })
-    if (u.error) {
-      items.push({ label: this.tr(u.error), enabled: false })
-      items.push({ label: this.tr('Retry installing update'), click: () => updates.check() })
-    }
     return items
   }
 
@@ -242,8 +222,6 @@ export class Tray {
       },
       ...(process.platform === 'darwin' ? [{ label: this.tr('Show in Dock'), type: 'checkbox' as const, checked: showInDock(), click: () => { setShowInDock(!showInDock()); this.rebuild() } }] : []),
       ...(islandSupported ? [{ label: this.tr(islandLabel(process.platform)), type: 'checkbox' as const, checked: island.enabled, click: () => island.setEnabled(!island.enabled) }] : []),
-      { type: 'separator' },
-      { label: this.tr('Updates'), submenu: this.updatesMenu() },
       { type: 'separator' },
       { label: this.tr('Restart host'), click: () => host.restart() },
       { label: this.tr('Open log'), click: () => void shell.openPath(host.logPath) },
