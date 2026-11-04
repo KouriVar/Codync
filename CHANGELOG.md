@@ -1289,4 +1289,14 @@
 - 验证：按要求本轮只验证编译通过（DevDebug 真机构建）。
 - 限制/待办：COE 图标是 480 viewBox 的路径，缩到 18pt 后的清晰度未截图核对。
 - 关联：C0134。
+### C0141 · 2026-11-04 · 设置里来源图标统一为 22pt，设置标题加粗一档
+
+- 原因：COE 的 22pt 图标比 DSHB/DSHC 的 18pt 好看，希望三处一致；设置页标题希望更粗。
+- 变化：
+  - `HomeSourceIcon` 的容器仍是 22×22；COE 的矢量图按 22 绘制，Remix 的 `deepseek-line`、`chat-ai-line` 从 18 提到 22，三者视觉尺寸一致。
+  - 设置页导航标题改为自定义 principal 文本，`17pt bold`（比默认 inline 标题粗一档）。
+- 文件：`apps/ios/Views/SettingsView.swift`、`apps/ios/Views/AccountSwitcherView.swift`。
+- 验证：按要求本轮只验证编译通过（DevDebug 真机构建）。
+- 限制/待办：`bold`（700）比默认 semibold（600）粗一档；若还想更粗可换 heavy。
+- 关联：C0140。
 

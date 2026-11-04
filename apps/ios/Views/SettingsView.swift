@@ -242,9 +242,9 @@ private struct HomeSourceIcon: View {
                     .scaledToFit()
                     .foregroundStyle(.primary)
             case .dsBot:
-                RemixIcon("deepseek-line", size: 18).foregroundStyle(.primary)
+                RemixIcon("deepseek-line", size: 22).foregroundStyle(.primary)
             case .dsh:
-                RemixIcon("chat-ai-line", size: 18).foregroundStyle(.primary)
+                RemixIcon("chat-ai-line", size: 22).foregroundStyle(.primary)
             }
         }
         .frame(width: 22, height: 22)

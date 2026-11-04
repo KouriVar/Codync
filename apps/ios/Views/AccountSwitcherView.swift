@@ -124,6 +124,10 @@ struct AccountSwitcherView: View {
                         ProgressView().accessibilityLabel(L10n.tr("Signing in"))
                     }
                 }
+                ToolbarItem(placement: .principal) {
+                    Text(L10n.tr("Settings"))
+                        .font(.system(size: 17, weight: .bold))
+                }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button(action: {  dismiss()  }) { RemixImage("close-line", size: 24) }.accessibilityLabel(Text(L10n.tr("Close")))
                         .buttonBorderShape(.circle)
