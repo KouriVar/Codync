@@ -21,7 +21,7 @@ struct BotProfileEditView: View {
                     CharacterAvatar(shape: session.draft.avatarShape, color: session.draft.avatarColor, size: 88,
                                     customIcon: model.icons["bot:\(botId)"])
                         .overlay(alignment: .bottomTrailing) {
-                            GlassGlyph(glyph: .remix("pencil-line"), side: 38, glyphSize: 18)
+                            GlassGlyph(glyph: .remix("pencil-line"), size: .compact, glyphSize: 18)
                                 .offset(x: 8, y: 8)
                         }
                         .frame(maxWidth: .infinity)

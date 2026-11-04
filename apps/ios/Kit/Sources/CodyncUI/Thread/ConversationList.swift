@@ -404,6 +404,6 @@ struct JumpToLatest: View {
 
     private var jumpButton: some View {
         GlassButton(L10n.tr("Jump to latest"), glyph: .remix("arrow-down-line"),
-                    side: 44, glyphSize: 18) { action() }
+                    size: .icon, glyphSize: 18) { action() }
     }
 }

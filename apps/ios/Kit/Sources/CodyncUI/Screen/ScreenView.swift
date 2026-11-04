@@ -252,7 +252,7 @@ private struct OverlayButton: View {
     }
 
     var body: some View {
-        GlassButton(label, glyph: .symbol(icon), side: 36, glyphSize: 15, weight: .semibold,
+        GlassButton(label, glyph: .symbol(icon), size: .compact, glyphSize: 15, weight: .semibold,
                     ink: .white) { action() }
     }
 }
@@ -267,7 +267,7 @@ private struct IconLabel: View {
     }
 
     var body: some View {
-        GlassGlyph(glyph: .symbol(icon), side: 36, glyphSize: 15, weight: .semibold, ink: .white)
+        GlassGlyph(glyph: .symbol(icon), size: .compact, glyphSize: 15, weight: .semibold, ink: .white)
             .accessibilityLabel(label)
     }
 }

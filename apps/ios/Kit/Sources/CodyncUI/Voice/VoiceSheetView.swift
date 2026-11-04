@@ -9,7 +9,7 @@ public struct VoiceSheetView: View {
     /// The resting detent: 44pt buttons with 16pt of air on every side.
     public static let small: PresentationDetent = .height(76)
     /// Every circle's glyph, against the 44pt button.
-    private static let icon: CGFloat = 24
+    private static let icon: CGFloat = ControlMetrics.Size.icon.glyph
     /// The one spring the layout changes on.
     private static let settle = Animation.spring(response: 0.35, dampingFraction: 0.9)
 
@@ -174,7 +174,7 @@ public struct VoiceSheetView: View {
                 if session.canSend || session.sending {
                     sendButton
                 } else {
-                    Color.clear.frame(width: 44, height: 44)
+                    Color.clear.frame(width: ControlMetrics.Size.icon.side, height: ControlMetrics.Size.icon.side)
                 }
             }
         }
@@ -314,7 +314,7 @@ public struct VoiceSheetView: View {
                 Button { session.attach(nil) } label: {
                     RemixIcon("close-line", size: 14, weight: .bold)
                         .foregroundStyle(Palette.onAccent)
-                        .frame(width: 22, height: 22)
+                        .frame(width: ControlMetrics.Size.micro.side, height: ControlMetrics.Size.micro.side)
                         .background(Palette.accentFill, in: Circle())
                 }
                 .buttonStyle(PressScale(scale: 0.92))
@@ -389,7 +389,7 @@ public struct VoiceSheetView: View {
                         .rotationEffect(.degrees(-90))
                 }
             }
-            .frame(width: 44, height: 44)
+            .frame(width: ControlMetrics.Size.icon.side, height: ControlMetrics.Size.icon.side)
             .contentShape(Circle())
         }
         .buttonStyle(PressScale(scale: 0.92))
@@ -405,7 +405,7 @@ public struct VoiceSheetView: View {
     private func circleLabel(glyph: String, filled: Bool) -> some View {
         RemixIcon(glyph, size: Self.icon, weight: .medium)
             .foregroundStyle(filled ? Palette.onAccent : Palette.text)
-            .frame(width: 44, height: 44)
+            .frame(width: ControlMetrics.Size.icon.side, height: ControlMetrics.Size.icon.side)
             .contentShape(Circle())
     }
 
@@ -414,7 +414,7 @@ public struct VoiceSheetView: View {
         Button(action: action) {
             RemixIcon(icon, size: Self.icon, weight: .medium)
                 .foregroundStyle(glyph ?? Palette.text)
-                .frame(width: 44, height: 44)
+                .frame(width: ControlMetrics.Size.icon.side, height: ControlMetrics.Size.icon.side)
                 .contentShape(Circle())
         }
         .buttonStyle(PressScale(scale: 0.92))

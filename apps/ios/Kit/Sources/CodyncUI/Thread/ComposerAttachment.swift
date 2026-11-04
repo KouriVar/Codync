@@ -71,7 +71,7 @@ struct ComposerAttachment: View {
         Button(action: remove) {
             RemixIcon("close-line")
                 .font(.system(size: 11, weight: .bold))
-                .frame(width: 28, height: 28)
+                .frame(width: ControlMetrics.Size.micro.side, height: ControlMetrics.Size.micro.side)
                 .contentShape(Circle())
         }
         .buttonStyle(PressScale())

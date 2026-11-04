@@ -219,7 +219,7 @@ public struct VoiceCameraPage: View {
                 Circle().fill(.clear)
                 Circle().fill(.white).frame(width: 60, height: 60)
             }
-            .frame(width: 72, height: 72)
+            .frame(width: ControlMetrics.Size.large.side, height: ControlMetrics.Size.large.side)
             .contentShape(Circle())
         }
         .buttonStyle(ShutterPress())
@@ -228,13 +228,13 @@ public struct VoiceCameraPage: View {
         .accessibilityLabel(Text(L10n.tr("Take a photo")))
     }
 
-    /// A 44pt circle of dark glass with one white glyph in it.
+    /// A circle of dark glass with one white glyph in it.
     private func glassCircle(_ icon: String, label: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            RemixIcon(icon, size: 24, weight: .medium)
+            RemixIcon(icon, size: ControlMetrics.Size.icon.glyph, weight: .medium)
                 .foregroundStyle(.white)
-                .frame(width: 44, height: 44)
-                .contentShape(Circle())
+                .frame(width: ControlMetrics.Size.icon.side, height: ControlMetrics.Size.icon.side)
+                .contentShape(ControlMetrics.shape.anyShape(side: ControlMetrics.Size.icon.side))
         }
         .buttonStyle(CameraPress())
         .glass(in: Circle(), interactive: true, tint: .black.opacity(0.35))

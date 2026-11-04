@@ -1,6 +1,73 @@
 import CodyncKit
 import SwiftUI
 
+/// Every round control's geometry, in one place: four sizes, one shape, three press depths.
+/// Change a number here and every button in the app follows.
+public enum ControlMetrics {
+    /// The four circle sizes. `icon` is the toolbar/list default, `compact` the input-row and
+    /// floating-overlay one, `micro` the little remove badges, `large` only the camera shutters.
+    public enum Size: CaseIterable, Sendable {
+        case micro, compact, icon, large
+
+        /// The circle's diameter.
+        public var side: CGFloat {
+            switch self {
+            case .micro: 24
+            case .compact: 36
+            case .icon: 44
+            case .large: 64
+            }
+        }
+
+        /// The glyph that fills it when the caller does not name one.
+        public var glyph: CGFloat {
+            switch self {
+            case .micro: 14
+            case .compact: 18
+            case .icon: 24
+            case .large: 26
+            }
+        }
+
+        /// Apple's 44pt minimum: a smaller circle still gets a full-size tap target.
+        public var hitTarget: CGFloat { max(44, side) }
+    }
+
+    /// The shape round controls are drawn in (a circle, by 穗's call). The one place to change it.
+    public enum Shape: Sendable {
+        case circle
+        case roundedRectangle(CGFloat)
+
+        public func anyShape(side: CGFloat) -> AnyShape {
+            switch self {
+            case .circle: AnyShape(Circle())
+            case let .roundedRectangle(radius): AnyShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
+            }
+        }
+    }
+
+    /// The shape every round control uses.
+    public static let shape: Shape = .circle
+
+    /// How far a press squeezes.
+    public enum Press: Sendable {
+        /// The app's 0.98.
+        case standard
+        /// 0.92, the voice sheet's deeper squeeze.
+        case deep
+        /// No feedback at all (the buttons that never had any).
+        case none
+
+        public var scale: CGFloat? {
+            switch self {
+            case .standard: Motion.pressScale
+            case .deep: 0.92
+            case .none: nil
+            }
+        }
+    }
+}
+
 /// A glyph in a circle: the app's one round button.
 ///
 /// It exists because the same circle was hand-rolled in half a dozen places — glass on the camera
@@ -27,21 +94,22 @@ public struct GlassButton: View {
 
     let title: String
     let glyph: Glyph
-    var side: CGFloat
-    var glyphSize: CGFloat
+    var size: ControlMetrics.Size = .icon
+    /// Overrides `size.glyph` when the glyph is not the usual one for that circle.
+    var glyphSize: CGFloat?
     var weight: Font.Weight = .medium
     var ink: Color = Palette.text
     var style: Style = .glass()
-    var press: CGFloat? = Motion.pressScale
+    var press: ControlMetrics.Press = .standard
     let action: () -> Void
 
-    public init(_ title: String, glyph: Glyph, side: CGFloat, glyphSize: CGFloat,
-                weight: Font.Weight = .medium, ink: Color = Palette.text,
-                style: Style = .glass(), press: CGFloat? = Motion.pressScale,
+    public init(_ title: String, glyph: Glyph, size: ControlMetrics.Size = .icon,
+                glyphSize: CGFloat? = nil, weight: Font.Weight = .medium, ink: Color = Palette.text,
+                style: Style = .glass(), press: ControlMetrics.Press = .standard,
                 action: @escaping () -> Void) {
         self.title = title
         self.glyph = glyph
-        self.side = side
+        self.size = size
         self.glyphSize = glyphSize
         self.weight = weight
         self.ink = ink
@@ -51,8 +119,8 @@ public struct GlassButton: View {
     }
 
     public var body: some View {
-        if let press {
-            button.buttonStyle(PressScale(scale: press))
+        if let scale = press.scale {
+            button.buttonStyle(PressScale(scale: scale))
         } else {
             button.buttonStyle(.plain)
         }
@@ -60,7 +128,7 @@ public struct GlassButton: View {
 
     private var button: some View {
         Button(action: action) {
-            GlassGlyph(glyph: glyph, side: side, glyphSize: glyphSize, weight: weight, ink: ink, style: style)
+            GlassGlyph(glyph: glyph, size: size, glyphSize: glyphSize, weight: weight, ink: ink, style: style)
         }
         .accessibilityLabel(Text(title))
         .help(title)
@@ -71,17 +139,22 @@ public struct GlassButton: View {
 /// the avatars' edit pencil, a menu's label).
 public struct GlassGlyph: View {
     let glyph: GlassButton.Glyph
-    let side: CGFloat
-    let glyphSize: CGFloat
+    var size: ControlMetrics.Size = .icon
+    /// Overrides `size.glyph` when the glyph is not the usual one for that circle.
+    var glyphSize: CGFloat?
     var weight: Font.Weight = .medium
     var ink: Color = Palette.text
     var style: GlassButton.Style = .glass()
 
-    public init(glyph: GlassButton.Glyph, side: CGFloat, glyphSize: CGFloat,
+    /// The diameter (from `ControlMetrics`) and the glyph size (its usual one unless overridden).
+    private var side: CGFloat { size.side }
+    private var drawnSize: CGFloat { glyphSize ?? size.glyph }
+
+    public init(glyph: GlassButton.Glyph, size: ControlMetrics.Size = .icon, glyphSize: CGFloat? = nil,
                 weight: Font.Weight = .medium, ink: Color = Palette.text,
                 style: GlassButton.Style = .glass()) {
         self.glyph = glyph
-        self.side = side
+        self.size = size
         self.glyphSize = glyphSize
         self.weight = weight
         self.ink = ink
@@ -94,23 +167,23 @@ public struct GlassGlyph: View {
             glyphView
                 .foregroundStyle(ink)
                 .frame(width: side, height: side)
-                .contentShape(Circle())
-                .glass(in: Circle(), interactive: true, tint: tint)
+                .contentShape(ControlMetrics.shape.anyShape(side: side))
+                .glass(in: ControlMetrics.shape.anyShape(side: side), interactive: true, tint: tint)
         case let .filled(fill, fillInk):
             glyphView
                 .foregroundStyle(fillInk)
                 .frame(width: side, height: side)
-                .background(fill, in: Circle())
-                .contentShape(Circle())
+                .background(fill, in: ControlMetrics.shape.anyShape(side: side))
+                .contentShape(ControlMetrics.shape.anyShape(side: side))
         }
     }
 
     @ViewBuilder private var glyphView: some View {
         switch glyph {
         case let .remix(name):
-            RemixIcon(name, size: glyphSize, weight: weight)
+            RemixIcon(name, size: drawnSize, weight: weight)
         case let .symbol(name):
-            Image(systemName: name).font(.system(size: glyphSize, weight: weight))
+            Image(systemName: name).font(.system(size: drawnSize, weight: weight))
         }
     }
 }

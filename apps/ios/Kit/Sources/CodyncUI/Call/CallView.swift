@@ -247,7 +247,7 @@ struct CallView: View {
     }
 
     // The bar spans the screen.
-    private static let buttonSize: CGFloat = 46
+    private static let buttonSize: CGFloat = ControlMetrics.Size.icon.side
     private static let iconSize: CGFloat = 17
     private static let dotsHeight: CGFloat = 20
     private static let dotsWidth: CGFloat = 0

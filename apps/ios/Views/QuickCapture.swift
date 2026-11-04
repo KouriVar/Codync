@@ -171,8 +171,8 @@ struct QuickCaptureSheet: View {
             VStack {
                 Spacer()
                 HStack {
-                    GlassButton("返回", glyph: .remix("arrow-left-s-line"), side: 44, glyphSize: 24,
-                                ink: .white, press: nil) { dismiss() }
+                    GlassButton("返回", glyph: .remix("arrow-left-s-line"), size: .icon, glyphSize: 24,
+                                ink: .white, press: .none) { dismiss() }
 
                     Spacer(minLength: 24)
                     shutter
@@ -181,7 +181,7 @@ struct QuickCaptureSheet: View {
                     Menu {
                         // Placeholder for now; nothing in it yet.
                     } label: {
-                        GlassGlyph(glyph: .remix("more-line"), side: 44, glyphSize: 24, ink: .white)
+                        GlassGlyph(glyph: .remix("more-line"), size: .icon, glyphSize: 24, ink: .white)
                     }
                     .accessibilityLabel("更多")
                 }
@@ -205,10 +205,12 @@ struct QuickCaptureSheet: View {
             }
         } label: {
             ZStack {
-                Circle().glass(in: Circle(), interactive: true).frame(width: 64, height: 64)
-                Circle().fill(.white).frame(width: 54, height: 54)
+                Circle().glass(in: Circle(), interactive: true)
+                    .frame(width: ControlMetrics.Size.large.side, height: ControlMetrics.Size.large.side)
+                Circle().fill(.white).frame(width: ControlMetrics.Size.large.side - 10,
+                                            height: ControlMetrics.Size.large.side - 10)
             }
-            .frame(width: 64, height: 64)
+            .frame(width: ControlMetrics.Size.large.side, height: ControlMetrics.Size.large.side)
         }
         .buttonStyle(.plain)
         .disabled(busy)

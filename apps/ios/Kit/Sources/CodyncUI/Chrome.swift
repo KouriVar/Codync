@@ -24,7 +24,7 @@ public struct IconButton: View {
     public var body: some View {
         Button(action: action) {
             if let remix = RemixSymbolMap.remix(for: systemImage) {
-                RemixIcon(remix, size: 24)
+                RemixIcon(remix, size: ControlMetrics.Size.icon.glyph)
             } else {
                 Image(systemName: systemImage)
             }
@@ -36,7 +36,7 @@ public struct IconButton: View {
 }
 
 public struct IconButtonStyle: ButtonStyle {
-    private let size: CGFloat = 44
+    private let size: CGFloat = ControlMetrics.Size.icon.side
 
     public init() {}
 
@@ -57,7 +57,7 @@ public struct IconButtonStyle: ButtonStyle {
                 .frame(width: size, height: size)
                 .background(
                     Palette.text.opacity(configuration.isPressed ? 0.14 : hovering ? 0.08 : 0),
-                    in: RoundedRectangle(cornerRadius: size * 0.28, style: .continuous)
+                    in: ControlMetrics.shape.anyShape(side: size)
                 )
                 .opacity(isEnabled ? 1 : 0.35)
                 .scaleEffect(configuration.isPressed ? Motion.pressScale : 1)

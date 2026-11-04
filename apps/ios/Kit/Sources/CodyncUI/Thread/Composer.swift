@@ -111,9 +111,9 @@ struct Composer: View {
 
     private var fieldPadding: CGFloat { 6 }
     /// Send/stop circle inside the 48pt capsule.
-    private var buttonSize: CGFloat { 36 }
+    private var buttonSize: CGFloat { ControlMetrics.Size.compact.side }
     /// The row height, matching the home bar's 48pt search field and circles.
-    private var buttonHitSize: CGFloat { 48 }
+    private var buttonHitSize: CGFloat { ControlMetrics.Size.compact.hitTarget }
 
     private var field: some View {
         HStack(alignment: .bottom, spacing: 8) {
@@ -269,7 +269,9 @@ struct Composer: View {
     }
 
     private var addLabel: some View {
-        GlassGlyph(glyph: .remix("add-line"), side: buttonHitSize, glyphSize: 24, ink: Palette.text)
+        GlassGlyph(glyph: .remix("add-line"), size: .compact, glyphSize: 24, ink: Palette.text)
+            .frame(width: ControlMetrics.Size.compact.hitTarget, height: ControlMetrics.Size.compact.hitTarget)
+            .contentShape(Circle())
     }
 
     private var fileChips: some View {

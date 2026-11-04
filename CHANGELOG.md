@@ -2093,3 +2093,31 @@
 - 验证：`xcodebuild build -scheme 'iOS Dev' -configuration DevDebug` 通过（0 error）。按要求未跑测试、未截图。
 - 本次唯一的可见变化（其余尺寸全部保持原值，收档放在 C0193）：① 远屏页 5 处 material 首次变成 Liquid Glass；② “跳到最新”从系统 `.glass` 按钮（controlSize large）改为自绘 44pt 玻璃圆钮。
 - 关联：C0190、C0191、C0193。
+
+### C0193 · 2026-11-05 · 玻璃收口第 4 步：尺寸与形状收档（7 档 → 4 档），图标钮一律正圆
+
+- 原因：圆钮的尺寸散成 7 档（22/28/36/38/44/46/48，另有相机快门 64/72），形状也不统一——`IconButton` 是 44pt 圆角方形（r≈12.3），玻璃/实心圆钮却是正圆；改一个尺寸要满仓库找。
+- 变化：
+  - `Kit/Sources/CodyncUI/GlassButton.swift` 新增 `ControlMetrics`：`Size`（micro 24 / compact 36 / icon 44 / large 64，各带 `glyph` 默认图标尺寸与 `hitTarget` 命中区）、`Shape`（只有 `.circle`，全局常量 `ControlMetrics.shape`）、`Press`（standard 0.98 / deep 0.92 / none）。形状、尺寸、按压**只在这一个地方定义**。
+  - `GlassButton` / `GlassGlyph` 的 API 从 `side: CGFloat` 改成 `size: ControlMetrics.Size`，`press` 从 `CGFloat?` 改成 `ControlMetrics.Press`。
+  - `IconButton`（`Chrome.swift`）改用 `ControlMetrics.Size.icon.side` + `ControlMetrics.shape` → **32 处图标钮从圆角方形变成正圆**（穗已拍板）。
+- 逐条：旧尺寸 → 新尺寸（可见变化用 **加粗**）
+  | 位置 | 旧 | 新 |
+  |---|---|---|
+  | `IconButton`（32 处） | 44pt **圆角方形**（r≈12.3），图标 24 | `.icon` 44pt **正圆**，图标 24 |
+  | 语音 sheet `circle()` / `circleLabel` / 发送 / 占位 | 44 | `.icon` 44（不变） |
+  | 语音 sheet 附件 ✕ | 22 | `.micro` **24** |
+  | 语音相机 返回 / 更多 | 44 | `.icon` 44（不变） |
+  | 语音相机 快门 | 72 | `.large` **64** |
+  | 相机页 返回 / 更多 | 44 | `.icon` 44（不变） |
+  | 相机页 快门（玻璃环 64 / 白盘 54） | 64 / 54 | `.large` 64 / `side-10` 54（不变） |
+  | 远屏页 `OverlayButton`（6）/ `IconLabel`（2） | 36 | `.compact` 36（不变） |
+  | 「跳到最新」 | 44 | `.icon` 44（不变） |
+  | 输入框「＋」 | 48 圆 | `.compact` **36**（外层 48 命中区不变） |
+  | 输入框 发送 / 停止 | 36 可见 + 48 命中 | `.compact` 36 + `hitTarget` 48（不变） |
+  | 通话条 圆钮（设置 / 静音 / 挂断） | 46 | `.icon` **44** |
+  | 输入框附件 ✕ | 28 | `.micro` **24** |
+  | Bot 头像 铅笔角标 | 38 | `.compact` **36** |
+- 验证：`xcodebuild build -scheme 'iOS Dev' -configuration DevDebug` 通过（0 error）。按要求未跑测试、未截图。
+- 按你的要求**本次没有补按压反馈**的 5 处（维持原样，仅登记）：输入框「＋」、Bot 头像铅笔角标、相机页 返回、相机页 更多、相机页 快门（都是 `press: .none` / `.buttonStyle(.plain)`）。其余圆钮是 standard 0.98，语音 sheet 保持 deep 0.92。
+- 关联：C0190、C0191、C0192。
