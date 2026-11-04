@@ -12,6 +12,7 @@ struct SettingsView: View {
     @Binding var showComputersSheet: Bool
     @Binding var showDSHConnect: Bool
     @Binding var showHaptics: Bool
+    @Binding var showMainBot: Bool
     @Environment(AppStore.self) private var app
     @Environment(AccountSession.self) private var account
     @Environment(\.openURL) private var openURL
@@ -42,6 +43,13 @@ struct SettingsView: View {
 
                 Button { showDSHConnect = true } label: {
                     SettingsRow("link", title: "DSH 连接", value: dshStatus)
+                }
+                .buttonStyle(.plain)
+
+                // The bot the voice capsule and the shortcuts talk to: the same lead the roster's
+                // long-press menu picks.
+                Button { showMainBot = true } label: {
+                    SettingsRow("star-line", title: L10n.tr("Main bot"), value: LeadBotSummary.describe(app.accounts))
                 }
                 .buttonStyle(.plain)
 

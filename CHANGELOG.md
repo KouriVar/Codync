@@ -1358,3 +1358,15 @@
 - 限制/待办：没有真机录音自测；`Speech` 在模拟器上的行为未验证。
 - 关联：C0148。
 
+### C0146 · 2026-11-04 · 设置里可以选择或切换主 Bot
+
+- 原因：语音胶囊要发给「主 Bot」，此前只能在会话长按菜单里设置，没有一个能看见当前是谁的入口。
+- 变化：
+  - 设置首页第一组新增「主 Bot」行（Remix `star-line`，与其它设置行同一套 20pt/28pt 图标框），右侧显示「Bot 名 · 电脑名」。
+  - 点开是系统 sheet：按电脑分组列出所有 Bot（组聊不参与），当前主 Bot 打勾；点一行调用与长按菜单完全相同的 `store.setLead(bot)`，同一份数据。
+  - 行和 sheet 都挂在设置 sheet 的根视图上（C0035 的坑：挂在 Form 行上会被重建并带走整个设置页）。
+- 文件：`apps/ios/Kit/Sources/CodyncUI/Bots/LeadBotPickerView.swift`（新）、`apps/ios/Views/SettingsView.swift`、`apps/ios/Views/AccountSwitcherView.swift`。
+- 验证：按要求只验证编译通过。
+- 限制/待办：宿主低于 2.33.0 时 `setLead` 会被拒（与长按菜单一致），本轮没有按 `supportsLeadChoice` 隐藏这一行；多电脑时按电脑分组显示。
+- 关联：C0148。
+
