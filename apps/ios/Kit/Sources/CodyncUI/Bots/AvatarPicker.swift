@@ -3,11 +3,16 @@ import SwiftUI
 
 /// Every avatar shape in the chosen color, then every color, as wrapping, centered grids
 /// (the New bot dialog and the bot's Settings).
-struct AvatarPicker: View {
+public struct AvatarPicker: View {
     @Binding var shape: String
     @Binding var color: String
 
-    var body: some View {
+    public init(shape: Binding<String>, color: Binding<String>) {
+        _shape = shape
+        _color = color
+    }
+
+    public var body: some View {
         VStack(spacing: 16) {
             WrapLayout(spacing: 6) {
                 ForEach(AvatarPalette.shapes, id: \.self) { s in

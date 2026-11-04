@@ -327,11 +327,15 @@ public struct AvatarWithStatus: View {
     let bot: Bot
     let members: [Bot]
     let size: CGFloat
+    /// The source's dot, when the row's source has one: it takes the bottom-right corner, so the
+    /// lead badge steps up to the top-right.
+    let sourceDot: Color?
 
-    public init(bot: Bot, members: [Bot] = [], size: CGFloat = 44) {
+    public init(bot: Bot, members: [Bot] = [], size: CGFloat = 44, sourceDot: Color? = nil) {
         self.bot = bot
         self.members = members
         self.size = size
+        self.sourceDot = sourceDot
     }
 
     public var body: some View {
@@ -353,8 +357,17 @@ public struct AvatarWithStatus: View {
                         .overlay(Circle().stroke(Palette.background, lineWidth: 2))
                 }
             }
-            .overlay(alignment: .bottomTrailing) {
+            .overlay(alignment: sourceDot == nil ? .bottomTrailing : .topTrailing) {
                 if bot.lead { LeadAgentBadge(size: max(12, size * 0.34)) }
+            }
+            .overlay(alignment: .bottomTrailing) {
+                if let sourceDot {
+                    Circle()
+                        .fill(sourceDot)
+                        .frame(width: size < 32 ? 6 : 8, height: size < 32 ? 6 : 8)
+                        .overlay(Circle().stroke(Palette.background, lineWidth: 1.5))
+                        .accessibilityHidden(true)
+                }
             }
     }
 }

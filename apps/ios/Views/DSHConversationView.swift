@@ -55,7 +55,10 @@ struct DSHConversationView: View {
     }
 
     private var title: String {
-        gateway.sessions.first { $0.id == gateway.openSessionId }?.title ?? gateway.gatewayName
+        guard let session = gateway.sessions.first(where: { $0.id == gateway.openSessionId }) else {
+            return gateway.gatewayName
+        }
+        return gateway.displayTitle(for: session)
     }
 
     /// The adapter's rows (user/assistant + a folded summary) become Codync's chat entries; the
@@ -101,10 +104,7 @@ struct DSHConversationView: View {
     /// of its own, so this one only shows.
     private var profile: some View {
         HStack(spacing: 7) {
-            RemixIcon("chat-ai-line", size: 24)
-                .foregroundStyle(Palette.text)
-                .frame(width: 24, height: 24)
-                .clipShape(Circle())
+            SourceAvatar(.dsh, size: 24)
             Text(title)
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(Palette.text)

@@ -21,6 +21,8 @@ public final class DSHGateway: ObservableObject {
     /// The last message of a session, read lazily for the home's list rows (the `sessions` list
     /// itself carries only titles).
     @Published public private(set) var previews: [String: String] = [:]
+    /// The first thing the reader said in each session: what an unnamed session is called.
+    @Published public private(set) var firstUserMessages: [String: String] = [:]
     @Published public private(set) var messages: [DSHMessage] = []
     @Published public private(set) var openSessionId: String?
     @Published public private(set) var isStreaming = false
@@ -338,6 +340,7 @@ public final class DSHGateway: ObservableObject {
             // Skip DSH's injected sampled-time line: it is not the user's own message.
             if !text.isEmpty, !DSHSystemMessageFilter.isInjected(text), messages.last?.text != text {
                 messages.append(DSHMessage(role: .user, text: text))
+                rememberFirstMessage(text, for: sid)
             }
         case "turn/end":
             isStreaming = false
@@ -365,11 +368,20 @@ public final class DSHGateway: ObservableObject {
         }
         let events = frame.array("events") ?? []
         messages = Self.decodeHistory(events)
+        if let first = messages.first(where: { $0.role == .user })?.text {
+            rememberFirstMessage(first, for: sid)
+        }
     }
 
     /// Raw host events (`{type, time, data}`) to the messages the chat page shows. `assistant/message`
     /// carries the text, the reasoning and (in history records) the tool calls; `tool/call` and
     /// `tool/result` fill in the tools and their previews.
+    /// One session's first user message, kept for the rows that have no title of their own.
+    private func rememberFirstMessage(_ text: String, for sessionId: String) {
+        guard firstUserMessages[sessionId] == nil else { return }
+        firstUserMessages[sessionId] = text
+    }
+
     static func decodeHistory(_ events: [[String: Any]]) -> [DSHMessage] {
         var out: [DSHMessage] = []
         var tools: [DSHTool] = []
@@ -524,6 +536,18 @@ public final class DSHGateway: ObservableObject {
         send(["type": "sessions"])
     }
 
+    /// What a session is called: its own title, or — when the gateway hasn't named it yet — the
+    /// first 16 characters of the first thing the reader said in it.
+    public func displayTitle(for session: DSHSession) -> String {
+        let titled = session.title.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !titled.isEmpty, titled != "未命名会话" { return titled }
+        if let first = firstUserMessages[session.id] {
+            let trimmed = first.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmed.isEmpty { return String(trimmed.prefix(16)) }
+        }
+        return L10nSessionFallback.title
+    }
+
     // MARK: - Session previews
 
     /// `projection-baseline` (sent on connect) and `turn-outline-updated` carry each session's
@@ -664,4 +688,9 @@ public final class DSHGateway: ObservableObject {
         }
         return payload["text"] as? String
     }
+}
+
+/// The name an unnamed, unstarted session gets.
+private enum L10nSessionFallback {
+    static let title = "未命名会话"
 }

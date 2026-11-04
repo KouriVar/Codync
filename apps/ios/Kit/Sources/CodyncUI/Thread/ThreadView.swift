@@ -158,8 +158,8 @@ public struct ThreadView: View {
     var title: some View {
         HStack(spacing: 7) {
             if let bot {
-                let size: CGFloat = 24
-                if bot.isGroup { GroupAvatar(members: model.members(of: bot), size: size) } else { CharacterAvatar(bot: bot, size: size) }
+                // The app's one avatar component: a source with a dot would show it here too.
+                AvatarWithStatus(bot: bot, members: model.members(of: bot), size: 24)
             }
             Text(bot?.name ?? "")
                 .font(.system(size: 16, weight: .semibold))

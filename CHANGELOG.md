@@ -2792,3 +2792,43 @@
   ui-preview 覆盖、构建号 198）**编译通过，0 error**，改动文件 0 warning；`xcrun devicectl device install app`
   装到 iPhone 16 Pro（`com.suiyikou.codync.uipreview` 2.36.0 / 198）成功。按要求**不自测**。
 - 关联：C0208/C0209（会话页搬迁）、备份 tag `backup/before-status-line-c0210`（`191d5fbf`）。
+
+### C0211 · 2026-11-05 · 共用「头像 + 来源点」：Coe 无点 / DSHC 蓝点 / DSHB 橙点
+
+- 原因：会话行的来源一直靠头像角上的**来源徽章**（dsBot 绿、dsh 橙、coe 蓝）表示，颜色与新要求的点不一致；
+  DSH 会话用的是临时占位图标（`sparkles` 方块 / C0210 的 `chat-ai-line` 圆脸），也没有"每个来源一张脸"的概念。
+- 拍板后落地的四条决定：① 新增两个 Palette 来源色 token；② **来源徽章全部去掉，只留点**；③ 设置入口用方案 A
+  （Settings →「首页来源」下面一行「来源外观」→ 一个页面管两个来源）；④ 允许 `DSHGateway` 记录每个会话的首条用户消息。
+- 变化：
+  - `Kit/Sources/CodyncKit/Design/Theme.swift`：`Palette` 新增 `sourceBlue`（浅色 0x3D6DF2 / 深色 0x4C7DFF）与
+    `sourceOrange`（浅色 0xD97A12 / 深色 0xF0A030）两个 token。
+  - 新增 `Kit/Sources/CodyncUI/Bots/SourceAvatar.swift`：`SourceKind`（coe/dsBot/dsh，各自 `dot` 颜色与
+    `dotSize(beside:)`——24pt 脸旁 6pt、列表 48pt 脸旁 8pt）、`SourceAppearance`（每来源的 shape/color 本地键与默认值，
+    复用 `AvatarPalette`）、`SourceAvatar`（`CharacterAvatar(shape:color:)` + 右下角 `SourceDot`）、`SourceDot`
+    （8/6pt 圆点，`Palette.background` 1.5pt 描边）。
+  - `Kit/Sources/CodyncKit/Design/CharacterAvatar.swift`：`AvatarWithStatus` 增加可选 `sourceDot: Color?`；
+    有点时把领队星标从右下挪到右上，避免与点重叠。
+  - `Kit/Sources/CodyncUI/Bots/BotRow.swift`：新增 `source: SourceKind`（默认 `.coe`），把 `source.dot` 传给头像。
+  - `apps/ios/Views/HomeSource.swift`：删除 `badge` / `badgeColor` / `HomeBadge`，改为 `kind: SourceKind`。
+  - `apps/ios/Views/HomeSourcesView.swift`：会话行去掉 `SourceBadge` 叠加层、`BotRow` 传 `source:`；`DSHSessionRow`
+    的占位图标换成 `SourceAvatar(.dsh, size: 48)`，`SourceBadge` 与 `sourceBadge` 参数删除，行标题改由
+    `gateway.displayTitle(for:)` 传入。
+  - `Kit/Sources/CodyncUI/Thread/ThreadView.swift`：会话页顶部胶囊的头像改用 `AvatarWithStatus(size: 24)`（Coe 无点）。
+  - `apps/ios/Views/DSHConversationView.swift`：顶部胶囊头像 → `SourceAvatar(.dsh, size: 24)`；标题 → `displayTitle(for:)`。
+  - `Kit/Sources/CodyncUI/Thread/ChatTranscript.swift`：C0210 的临时 `chat-ai-line` 圆脸 → `SourceAvatar(.dsh, size: 24)`（点 6pt）。
+  - `apps/ios/DSHKit/Sources/DSHKit/DSHGateway.swift`：新增 `firstUserMessages`（每个会话首条用户消息，事件与历史两条路径都记录）
+    与 `displayTitle(for:)`——会话自己的标题优先，没有则取首条用户消息前 16 字，再没有显示「未命名会话」。
+  - 新增 `apps/ios/Views/SourceAppearanceView.swift`：「来源外观」页，两组（DSH 编程 / DS Bot），每组 `AvatarPicker`
+    （形状 + 颜色，复用现有色板）并带预览；`AccountRoute` 加 `.sourceAppearance`，Settings 里「首页来源」组下加一行入口。
+  - `Kit/Sources/CodyncUI/Bots/AvatarPicker.swift`：改为 `public`（供 app target 的来源外观页复用）。
+  - `apps/Codync.xcodeproj/project.pbxproj`：XcodeGen 重新生成（新增 app target 文件）。
+- 未做 / 需要你注意：
+  - 来源点与"未读/需要你"小点的位置冲突：有点时点占右下角、领队星标改到右上；未读/需要你仍在右下一侧（多数行不显示）。
+  - DSH 会话名只在**打开过该会话**（或收到过它的用户消息）之后才知道；纯列表、从未打开且网关没给标题的会话显示「未命名会话」。
+  - 头像与颜色存在 `UserDefaults`（`sourceShape.*` / `sourceColor.*`），不做 App Group 同步（widget 用不到来源头像）。
+- 文件：见上（`Palette`/`SourceAvatar`/`AvatarPicker`/`AvatarWithStatus`/`BotRow`/`ThreadView`/`ChatTranscript`/
+  `DSHGateway`/`HomeSource`/`HomeSourcesView`/`DSHConversationView`/`SourceAppearanceView`/`AccountSwitcherView`/`SettingsView`）。
+- 验证：`xcodebuild build -project apps/Codync.xcodeproj -scheme 'iOS Dev' -configuration DevDebug`（真机 destination、
+  ui-preview 覆盖、构建号 199）**编译通过，0 error**，改动文件 0 warning；`xcrun devicectl device install app`
+  装到 iPhone 16 Pro（`com.suiyikou.codync.uipreview` 2.36.0 / 199）成功。按要求**不自测**。
+- 关联：C0210（状态行头像）、C0208/C0209（会话页搬迁）、备份 tag `backup/before-avatar-dot-c0211`（`ab462079`）。

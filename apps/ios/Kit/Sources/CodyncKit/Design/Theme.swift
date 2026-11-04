@@ -45,6 +45,10 @@ public enum Palette {
     /// A bot that needs you, in widgets and Live Activities: readable amber in both modes.
     public static let attention = Color(light: 0x936000, dark: 0xECAF52)
     public static let codeBackground = Color(light: 0xF4F4F4, dark: 0x111111)
+    /// Which kind of source a conversation came from, as a dot on its avatar: DSH 编程 is blue,
+    /// DS Bot is orange. Coe's own bots carry none.
+    public static let sourceBlue = Color(light: 0x3D6DF2, dark: 0x4C7DFF)
+    public static let sourceOrange = Color(light: 0xD97A12, dark: 0xF0A030)
     public static let added = Color(light: 0x2E7D32, dark: 0x8FD18B)
     public static let removed = Color(light: 0xC62828, dark: 0xF0A7A7)
 }

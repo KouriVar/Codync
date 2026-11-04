@@ -28,6 +28,7 @@
 		35CFB641A4F10C0EBD21CB14 /* LaunchSplash.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6FC76D28AB02DF1427D530ED /* LaunchSplash.swift */; };
 		3BCC04815E5CA8953E0DDCAD /* WidgetPreviews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 305DDCC18BB8AA6CD9D19CEF /* WidgetPreviews.swift */; };
 		41BBBC5811EC8406D7BC866C /* HomeSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EFE467F7DCE50480B80E50A /* HomeSource.swift */; };
+		421651C75B7B0AF88CB5492B /* SourceAppearanceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 127F55BA6299EA6626719DEE /* SourceAppearanceView.swift */; };
 		48DAAA1384E5B8D0BA27C895 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1E47C60032C326157E0386B8 /* SwiftUI.framework */; };
 		4C9ADD8046382132129B1302 /* CodyncBot-squircle-Ink.ttf in Resources */ = {isa = PBXBuildFile; fileRef = CEF1A5792B9675FDA7E07740 /* CodyncBot-squircle-Ink.ttf */; };
 		4DDC38E58D673047B332FDD5 /* AccessRequestView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B97102DEC6029268332DF901 /* AccessRequestView.swift */; };
@@ -138,6 +139,7 @@
 		0A87B0091DAF0E4807D62017 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		0C44BCF971511A5E94D073D5 /* CodyncOrb-Dot.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "CodyncOrb-Dot.ttf"; sourceTree = "<group>"; };
 		120FD9DBA315A6DD543463D8 /* CodyncBot-tablet-Ink.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "CodyncBot-tablet-Ink.ttf"; sourceTree = "<group>"; };
+		127F55BA6299EA6626719DEE /* SourceAppearanceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SourceAppearanceView.swift; sourceTree = "<group>"; };
 		1318104275E5BEC47B7088AD /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		1BDF6A8F94A945065D4348F8 /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = AppIcon.icon; sourceTree = "<group>"; };
 		1CC287193FD50B9E97D3138A /* OrderingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrderingView.swift; sourceTree = "<group>"; };
@@ -374,6 +376,7 @@
 				0A87B0091DAF0E4807D62017 /* SettingsView.swift */,
 				6ABB70475ABEE88EFAFBA1BB /* ShortcutLeadSettings.swift */,
 				9AD0BD16672E128A4F26272B /* SignInButtons.swift */,
+				127F55BA6299EA6626719DEE /* SourceAppearanceView.swift */,
 				CFEBE2E6A9D0AF0A0D89FFE7 /* UsageView.swift */,
 				D57A7C09154869DD84BACE19 /* WelcomeView.swift */,
 				5B22589689593E0089118FDB /* WidgetGalleryView.swift */,
@@ -791,6 +794,7 @@
 				BF77DD7946621D8818EDAB9B /* SettingsView.swift in Sources */,
 				0137767F43A65AB592869ADD /* ShortcutLeadSettings.swift in Sources */,
 				76E77CC8A2B7C74213512FAB /* SignInButtons.swift in Sources */,
+				421651C75B7B0AF88CB5492B /* SourceAppearanceView.swift in Sources */,
 				684F7F77EECBA0BD95BDD658 /* UsageView.swift in Sources */,
 				501377099B6CF42761B230CB /* WelcomeView.swift in Sources */,
 				B3554D38F39916698E961A37 /* WidgetGalleryView.swift in Sources */,

@@ -58,6 +58,12 @@ struct SettingsView: View {
                                       isOn: Binding(get: { enabledSources.contains(source) },
                                                     set: { setSource(source, on: $0) }))
                 }
+
+                // The face each source's conversations show: one per source, kept on this device.
+                Button { path.append(.sourceAppearance) } label: {
+                    SettingsRow("account-circle-line", title: "来源外观", value: nil)
+                }
+                .buttonStyle(.plain)
             }
             .listRowSeparator(.hidden)
 

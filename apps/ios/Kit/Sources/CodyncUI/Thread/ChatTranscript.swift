@@ -101,11 +101,8 @@ public struct ChatTranscriptView: View {
         if working {
             out.append(ConversationRow("working") {
                 ConversationStatusLine(title: WorkingPhrase.generic) {
-                    // A DSH gateway has no bot: the same round face the page's title bar uses.
-                    RemixIcon("chat-ai-line", size: 24)
-                        .foregroundStyle(Palette.text)
-                        .frame(width: 24, height: 24)
-                        .clipShape(Circle())
+                    // A DSH gateway has no bot: the source's own face, dot and all.
+                    SourceAvatar(.dsh, size: 24)
                 }
                 .transition(.opacity)
             })

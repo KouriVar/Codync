@@ -120,6 +120,8 @@ struct AccountSwitcherView: View {
                     LanguagePage()
                         .navigationTitle("语言")
                         .navigationBarTitleDisplayMode(.inline)
+                case .sourceAppearance:
+                    SourceAppearanceView()
                 }
             }
             .toolbar {
@@ -148,7 +150,7 @@ struct AccountSwitcherView: View {
 }
 
 /// A pushed secondary page from the avatar sheet.
-enum AccountRoute: Hashable { case state, profile, ordering, appearance, language }
+enum AccountRoute: Hashable { case state, profile, ordering, appearance, language, sourceAppearance }
 
 private struct AccountProfileView: View {
     @Environment(AppStore.self) private var app

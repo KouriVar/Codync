@@ -4,11 +4,14 @@ import SwiftUI
 public struct BotRow: View {
     let bot: Bot
     let manuallyUnread: Bool
+    /// Which source it belongs to: only a source with a dot shows one.
+    let source: SourceKind
     @Environment(BotStore.self) private var model
 
-    public init(bot: Bot, manuallyUnread: Bool = false) {
+    public init(bot: Bot, manuallyUnread: Bool = false, source: SourceKind = .coe) {
         self.bot = bot
         self.manuallyUnread = manuallyUnread
+        self.source = source
     }
 
     // Reference proportions at the default text size: a 48 pt avatar in an 80 pt row.
@@ -21,7 +24,8 @@ public struct BotRow: View {
 
     public var body: some View {
         HStack(spacing: 14) {
-            AvatarWithStatus(bot: bot, members: model.members(of: bot), size: avatar)
+            AvatarWithStatus(bot: bot, members: model.members(of: bot), size: avatar,
+                             sourceDot: source.dot)
             VStack(alignment: .leading, spacing: lineSpacing) {
                 HStack(alignment: .firstTextBaseline) {
                     if bot.pinned {

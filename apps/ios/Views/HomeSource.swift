@@ -1,4 +1,5 @@
 import CodyncKit
+import CodyncUI
 import SwiftUI
 
 /// The three conversation sources the home mixes: Codync's own bots (Coe), bots whose non-empty
@@ -19,20 +20,13 @@ enum HomeSource: String, CaseIterable, Identifiable, Sendable {
         }
     }
 
-    /// The avatar badge: Coe shows none, DS Bot a "D", DSH a terminal glyph.
-    var badge: HomeBadge? {
+    /// What its avatars wear instead of the old badge: DSH 编程 a blue dot, DS Bot an orange one,
+    /// Coe none. (The badge that used to sit on the avatar is gone — the dot says it.)
+    var kind: SourceKind {
         switch self {
-        case .coe: return nil
-        case .dsBot: return .letter("D")
-        case .dsh: return .symbol("terminal")
-        }
-    }
-
-    var badgeColor: Color {
-        switch self {
-        case .coe: return Color(hex: 0x4C7DFF)
-        case .dsBot: return Color(hex: 0x22B573)
-        case .dsh: return Palette.warning
+        case .coe: return .coe
+        case .dsBot: return .dsBot
+        case .dsh: return .dsh
         }
     }
 
@@ -45,12 +39,6 @@ enum HomeSource: String, CaseIterable, Identifiable, Sendable {
         }
         return .coe
     }
-}
-
-/// What a source badge draws inside its circle.
-enum HomeBadge {
-    case letter(String)
-    case symbol(String)
 }
 
 /// `@AppStorage` keys and the default source selection. Stored as a comma-joined raw-value string;

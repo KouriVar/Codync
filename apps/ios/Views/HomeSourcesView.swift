@@ -893,8 +893,8 @@ struct HomeSourcesView: View {
                 botRow(item, store: store)
             }
         case .dsh(let session):
-            DSHSessionRow(session: session, preview: dsh.previews[session.id],
-                          sourceBadge: AnyView(SourceBadge(source: .dsh)))
+            DSHSessionRow(session: session, title: dsh.displayTitle(for: session),
+                          preview: dsh.previews[session.id])
                 .contentShape(Rectangle())
                 .onTapGesture { openDSH(session) }
                 .contentShape(.contextMenuPreview, RoundedRectangle(cornerRadius: 34, style: .continuous))
@@ -907,17 +907,8 @@ struct HomeSourcesView: View {
 
     private func botRow(_ item: RosterItem, store: BotStore) -> some View {
         let source = HomeSource.of(bot: item.bot)
-        return BotRow(bot: item.bot, manuallyUnread: manuallyUnread(item))
+        return BotRow(bot: item.bot, manuallyUnread: manuallyUnread(item), source: source.kind)
             .environment(store)
-            // Only DS Bot carries a badge; the source badge sits where the lead agent's star
-            // does (avatar is 48pt with 16pt vertical row padding).
-            .overlay(alignment: .topLeading) {
-                if source.badge != nil {
-                    SourceBadge(source: source)
-                        .offset(x: 31, y: 47)
-                        .allowsHitTesting(false)
-                }
-            }
             .contentShape(Rectangle())
             .onTapGesture { accounts.selection = item.ref }
             .contentShape(.contextMenuPreview, RoundedRectangle(cornerRadius: 34, style: .continuous))
@@ -1242,41 +1233,15 @@ struct DSHSessionMenuPreview: View {
     }
 }
 
-// MARK: - Source badge
-
-/// A tiny source mark at the avatar's bottom-right, matching the lead agent's star size/position.
-struct SourceBadge: View {
-    let source: HomeSource
-
-    var body: some View {
-        badgeContent
-            .foregroundStyle(.white)
-            .frame(width: 17, height: 17)
-            .background(source.badgeColor, in: Circle())
-            .overlay(Circle().stroke(Palette.background, lineWidth: 2))
-            .accessibilityLabel(source.title)
-    }
-
-    @ViewBuilder private var badgeContent: some View {
-        switch source.badge {
-        case .letter(let letter):
-            Text(letter).font(.system(size: 9, weight: .bold, design: .rounded))
-        case .symbol(let name):
-            Image(systemName: name).font(.system(size: 9, weight: .bold))
-        case nil:
-            EmptyView()
-        }
-    }
-}
-
 // MARK: - DSH session row
 
 /// A DSH conversation in the home list: styled like `BotRow` so the mixed list reads as one.
 struct DSHSessionRow: View {
     let session: DSHSession
+    /// What the row calls it: the session's own name, or the first thing said in it.
+    let title: String
     /// The last message in the session, when the gateway has given us one.
     let preview: String?
-    let sourceBadge: AnyView?
 
     @ScaledMetric(relativeTo: .body) private var avatar: CGFloat = 48
     @ScaledMetric(relativeTo: .body) private var rowPadding: CGFloat = 16
@@ -1286,20 +1251,10 @@ struct DSHSessionRow: View {
 
     var body: some View {
         HStack(spacing: 14) {
-            RoundedRectangle(cornerRadius: avatar * 0.34, style: .continuous)
-                .fill(Palette.surface)
-                .frame(width: avatar, height: avatar)
-                .overlay {
-                    Image(systemName: "sparkles")
-                        .font(.system(size: avatar * 0.42))
-                        .foregroundStyle(Palette.warning)
-                }
-                .overlay(alignment: .bottomTrailing) {
-                    if let sourceBadge { sourceBadge }
-                }
+            SourceAvatar(.dsh, size: avatar)
             VStack(alignment: .leading, spacing: 3) {
                 HStack(alignment: .firstTextBaseline) {
-                    Text(session.title)
+                    Text(title)
                         .font(.system(size: titleSize, weight: .semibold))
                         .foregroundStyle(Color(uiColor: .label))
                         .lineLimit(1)
