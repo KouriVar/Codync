@@ -1330,4 +1330,18 @@
 - 验证：按要求本轮只验证编译通过（DevDebug 真机构建）。
 - 限制/待办：多账户/登录/快捷指令 Picker 仍沿用原样；若需要也统一可另开一条。
 - 关联：C0133、C0141、C0142。
+### C0144 · 2026-11-04 · 例行任务新建/编辑页改为原生 Form 并汉化
+
+- 原因：两个例行任务 sheet 还是手写灰底输入框、描边胶囊按钮和英文文案。
+- 变化：
+  - 整页改为 `Form` + `Section`：名称 `TextField`、指令 `TextField(axis: .vertical)`；「何时运行 / 重复 / 时区」用原生 `Picker(.menu)`；「时间」用 `DatePicker(.hourAndMinute)`；Cron 用等宽 `TextField` 并关闭自动大写/纠错；「下次运行」放在定时 Section 的 footer。
+  - 顶部工具栏：左「关闭」、右「创建 / 保存」（原底部 Create routine / Save changes 移除）。
+  - 编辑页：删除放到最底部独立 Section，`role: .destructive` + 二次确认（原生 alert）；「立即运行」为普通一行。
+  - 图标全部 Remix（`time-line`、`settings-3-line`、`error-warning-line`、`wifi-off-line`、`play-circle-line`、`delete-bin-line`），按设置页 20pt/28pt 框渲染。
+  - 汉化：Edit routine→编辑例行任务、Instruction→指令、Schedule→定时、Repeat→重复、Daily→每天、Custom→自定义、At→时间、Create routine→创建、Save changes→保存、Next run→下次运行，以及 Picker 选项/星期/footer/提示文案；文案加在 `zh-Hans.json` / `zh-Hant.json`，代码用 `L10n.tr`。
+  - 保存、删除、立即运行、定时校验逻辑未改（仍走 `saveRoutine` / `routineAction` / `routineSchedule`）。
+- 文件：`apps/ios/Kit/Sources/CodyncUI/Routines/RoutineEditorView.swift`、`apps/ios/Kit/Sources/CodyncKit/Resources/Languages/zh-Hans.json`、`zh-Hant.json`。
+- 验证：按要求只验证编译；`generic/platform=iOS` 构建通过。真机安装本轮遇到设备隧道断开（`The tunnel connection failed`），待手机解锁/重连后重试。
+- 限制/待办：真机安装与界面观感未核对。
+- 关联：C0097。
 
