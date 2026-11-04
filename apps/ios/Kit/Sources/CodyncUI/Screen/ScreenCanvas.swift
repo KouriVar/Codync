@@ -236,7 +236,7 @@ final class ScreenCanvas: UIView, UIGestureRecognizerDelegate {
             let p = point(for: g)
             cursor = p
             dragging = true
-            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            Haptics.impact()
             send(["type": "down", "x": p.x, "y": p.y, "button": "left"])
             lastPress = g.location(in: self)
         case .changed:

@@ -304,7 +304,7 @@ private struct ConversationCollection: UIViewRepresentable {
             let distance = -(scrollView.contentOffset.y + scrollView.adjustedContentInset.top)
             let progress = min(max(distance / PullToRefresh.distance, 0), 1)
             guard progress != pull.progress else { return }
-            if progress == 1, scrollView.isTracking { UIImpactFeedbackGenerator(style: .light).impactOccurred() }
+            if progress == 1, scrollView.isTracking { Haptics.impact() }
             pull.progress = progress
         }
 

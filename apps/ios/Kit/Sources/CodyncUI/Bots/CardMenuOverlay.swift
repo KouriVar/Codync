@@ -80,7 +80,7 @@ public struct CardMenuOverlay: View {
     private func menuRow(_ item: MenuItem) -> some View {
         Button {
             if !item.submenu.isEmpty {
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                Haptics.impact()
                 withAnimation(.spring(response: 0.28, dampingFraction: 0.9)) { stack.append(item.submenu) }
             } else {
                 UISelectionFeedbackGenerator().selectionChanged()
@@ -111,7 +111,7 @@ public struct CardMenuOverlay: View {
 
     private var backRow: some View {
         Button {
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            Haptics.impact()
             withAnimation(.spring(response: 0.28, dampingFraction: 0.9)) { _ = stack.popLast() }
         } label: {
             HStack(spacing: 14) {

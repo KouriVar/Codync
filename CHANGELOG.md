@@ -1187,3 +1187,20 @@
 - 限制/待办：未截图；若栏底仍有硬边，下一步把 overlay 提到 `NavigationStack` 外层（覆盖导航栏层）。
 - 关联：C0128。
 
+### C0133 · 2026-11-04 · 设置页重新分组，新增触感档位
+
+- 原因：设置页分组混乱；App 内震动强弱不可调。
+- 变化：
+  - 分组（从上到下）：
+    1. 个人资料、状态、排序、凭证、连接应用（合并成一张卡）。
+    2. 电脑、DSH 连接、Coe、DS Bot、DSH 对话（无组标题；后三个是原「首页来源」开关，保留「至少保留一项」与说明）。
+    3. 通知、主题、应用语言、触感、思考细节。
+    4. 退出登录、删除账户、重新开始（最底部；默认隐藏，连续点 10 次版本号显示；三者都保留二次确认）。
+  - 新增「触感」：sheet 五档单选（关/轻/中/强/很强），选中立即 `Haptics.preview` 震一下；`@AppStorage("hapticsLevel")` 持久化。
+  - 新增 `CodyncKit/Design/Haptics.swift` 统一入口；CodyncUI 里原来的 `UIImpactFeedbackGenerator`（CardMenuOverlay、ScreenCanvas、ConversationList）改为 `Haptics.impact()`，选「关」全部不震。
+  - 未提及项的放置：多账户/登录按钮/添加账户/错误提示仍在账户卡之后；`ShortcutLeadSettings`（快捷指令默认主 Bot）放在组 2 之后；版本号区块保持独立且始终可见（10 连击触发器），放在组 3 与组 4 之间。
+- 文件：`apps/ios/Kit/Sources/CodyncKit/Design/Haptics.swift`（新）、`apps/ios/Views/SettingsView.swift`、`apps/ios/Views/AccountSwitcherView.swift`、`apps/ios/Kit/Sources/CodyncUI/Bots/CardMenuOverlay.swift`、`Screen/ScreenCanvas.swift`、`Thread/ConversationList.swift`。
+- 验证：按要求本轮只验证编译通过（DevDebug 真机构建）。
+- 限制/待办：`BotListView.swift` 里还有一处直接 `UIImpactFeedbackGenerator`，它属于工作树里未提交的 20 项，本轮未改；等那批改动落地后再统一。触感「很强」映射到 `.rigid`，可再调。
+- 关联：C0125。
+

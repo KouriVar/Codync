@@ -63,8 +63,8 @@ struct AccountSwitcherView: View {
     var body: some View {
         NavigationStack(path: $path) {
             Form {
-                AccountProfileView(path: $path, showPairing: $showPairing, showVault: $showVault, showExtensions: $showExtensions, showComputersSheet: $showComputersSheet)
-                SettingsView(path: $path)
+                AccountProfileView(path: $path, showPairing: $showPairing, showVault: $showVault, showExtensions: $showExtensions)
+                SettingsView(path: $path, showComputersSheet: $showComputersSheet)
             }
             // No separators between rows: each row hides its own.
             .listRowSeparator(.hidden)
@@ -140,13 +140,10 @@ private struct AccountProfileView: View {
     @Environment(AccountStore.self) private var accounts
     @AppStorage(LocalProfile.nameKey) private var profileName = ""
     @AppStorage(LocalProfile.bioKey) private var profileBio = ""
-    @State private var confirmSignOut = false
-    @State private var confirmDelete = false
     @Binding var path: [AccountRoute]
     @Binding var showPairing: Bool
     @Binding var showVault: Bool
     @Binding var showExtensions: Bool
-    @Binding var showComputersSheet: Bool
     @State private var addingAccount = false
     @State private var avatarImage: UIImage?
 
@@ -167,11 +164,6 @@ private struct AccountProfileView: View {
                 }
                 .listRowSeparator(.hidden)
 
-                Button { showComputersSheet = true } label: {
-                    SettingsRow("computer-line", title: "电脑",
-                                value: accounts.computers.isEmpty ? nil : "\(accounts.computers.count) 台已连接")
-                }
-
                 Button { path.append(.state) } label: {
                     SettingsRow("pulse-line", title: "状态")
                 }
@@ -179,11 +171,7 @@ private struct AccountProfileView: View {
                 Button { path.append(.ordering) } label: {
                     SettingsRow("arrow-up-down-line", title: "排序")
                 }
-            }
-            .listRowSeparator(.hidden)
 
-            // The connection group: this iPhone's credentials and its connected apps.
-            Section {
                 Button { showVault = true } label: {
                     SettingsRow("shield-keyhole-line", title: "凭证")
                 }
@@ -225,15 +213,6 @@ private struct AccountProfileView: View {
                 }
             .listRowSeparator(.hidden)
             }
-            if account.isSignedIn {
-                Section {
-                    Button(L10n.tr("Sign out"), role: .destructive) { confirmSignOut = true }
-                        .disabled(account.isBusy)
-                    Button(L10n.tr("Delete account"), role: .destructive) { confirmDelete = true }
-                        .disabled(account.isBusy)
-                }
-            .listRowSeparator(.hidden)
-            }
             if let message = account.errorMessage {
                 Section {
                     Label { Text(L10n.tr(message)) } icon: { RemixIcon("alert-fill") }
@@ -244,18 +223,6 @@ private struct AccountProfileView: View {
         }
         .onAppear { avatarImage = LocalProfile.loadAvatar() }
         .onChange(of: account.userID) { _, _ in addingAccount = false }
-        .confirmationDialog(L10n.tr("Sign out of \(account.email ?? "this account")?"), isPresented: $confirmSignOut, titleVisibility: .visible) {
-            Button(L10n.tr("Sign out"), role: .destructive) { Task { await app.signOut() } }
-            Button(L10n.tr("Cancel"), role: .cancel) {}
-        } message: {
-            Text(L10n.tr("This iPhone stops getting the account's notifications and keeps its computers, so signing back in needs no scan. To take it off them, use Start over in Settings instead."))
-        }
-        .alert(L10n.tr("Delete your Codync account?"), isPresented: $confirmDelete) {
-            Button(L10n.tr("Delete account"), role: .destructive) { Task { await app.deleteAccount() } }
-            Button(L10n.tr("Cancel"), role: .cancel) {}
-        } message: {
-            Text(L10n.tr("Your account, its list of computers and every device's access through it are deleted. Your computers keep their bots and chats. This can't be undone."))
-        }
     }
 
     private var displayName: String {
