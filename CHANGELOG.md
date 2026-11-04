@@ -2036,3 +2036,21 @@
 - 验证：`xcodebuild build -scheme 'iOS Dev' -configuration DevDebug` 通过（0 error / 0 warning）。按要求未跑测试、未截图。
 - 限制/待办：iOS 不允许 App 自行重启，"重启生效"只能靠这行提示，没有其它手段。
 - 关联：C0114。
+
+### C0189 · 2026-11-05 · 删掉整个死岛：旧的自绘 roster 与它的底部栏
+
+- 原因：C0184 只清了“确定死、零引用”的单文件，最大的一块还留着——`ui/native-tabbar` 用 `HomeSourcesView` 重写首页后，旧的自绘 roster（拖拽分组、底部浮动栏、卡片长按菜单）整套仍在编译，却没有任何挂载点；986 行，而且 C0111 还在改它。
+- 变化：
+  - 整文件删除 6 个（986 行）：`Views/BotListView.swift`(534)、`Views/HomeBottomBar.swift`(118)、`Views/RosterSectionHeader.swift`(85)、`Views/ComputerSection.swift`(88)、`Views/EmptyRoster.swift`(32)、`Kit/Sources/CodyncUI/Bots/CardMenuOverlay.swift`(129)。删前逐个确认只互相引用：`BotListView` / `HomeBottomBar` / `RosterSectionHeader` / `RosterBotsLabel` / `ComputerSection` / `EmptyRoster` / `CardMenuOverlay` / `CardMenuState` / `PluginGlyph` 在死岛以外均 0 命中。
+  - `Views/BotListView.swift:222` 的 `CODYNC_QUICKCAPTURE` 环境开关随文件消失（全仓唯一读取点）；`QuickCaptureOverlay` C0184 已删，活的 `QuickCaptureSheet` 不受影响。
+  - `App/CodyncApp.swift`：`AppTab` 去掉 `test`（全仓没有任何 `switch` 为它分支，只有这一处枚举声明）。
+  - 死岛删除后新产生的 Swift 孤儿（确认零引用后删）：`Views/ComputerStatus.swift` 的 `RouteIcon`（17 行）、`Views/BotRosterLine.swift` 的 `LiftItem` 与 `RosterLine`（56 行）。同文件的 `NewTarget` / `GroupTarget` / `EditTarget` 仍被 `HomeSourcesView` 使用，保留。
+  - `apps/Codync.xcodeproj/project.pbxproj` 由 `xcodegen generate --spec apps/project.yml` 重新生成，减少 20 行（5 个 Views 文件各自的 FileReference/BuildFile/group/Sources 条目），无其它改动。
+  - 合计：10 个文件，+1 / −1080。
+- 验证：`xcodebuild build -scheme 'iOS Dev' -configuration DevDebug` 通过（0 error）。按要求未跑测试、未截图。
+- 未删，只登记（等你决定）：
+  - L10n 孤儿 key（本次不动 json，全仓已无任何字符串引用）：`Create your first bot`、`Double-tap to fold or expand.`、`Double-tap to fold or expand. Touch and hold to rename or remove the section.`、`{name}, 1 bot`、`{name}, 1 bot, {unread} unread`、`{name}, {count} bots`、`{name}, {count} bots, {unread} unread` —— 共 7 条。
+  - asset：无。死岛只用 Remix 字体图标（`RemixIcon` / `RemixImage` 的字形名），不涉及 xcassets。
+  - 只被死岛调用、但仍被**测试**引用的 Swift 符号（删了会破测试，保留）：`Store/ComputerSelection.swift`（`ComputerSelection` / `ConnectionSummary`，测试 17 处）、`Store/RosterSectionOrder.swift`（测试 3 处）、`Store/RosterSection.swift` 的 `RosterSection.lines` 与 `RosterSectionLine`（测试 5 处）。
+  - 与本次无关的孤儿（清单外，未动）：`Views/QuickCapture.swift` 的 `QuickCaptureModel`（C0184 删 `QuickCaptureOverlay` 后零引用）、`CodyncKit/Models/Cloud.swift` 的 `CloudClaim`（C0186 删 `createClaim()` 后零引用）、`Controls.swift` 的 `CardForm` / `ChoiceList`。
+- 关联：C0111、C0184、C0186。

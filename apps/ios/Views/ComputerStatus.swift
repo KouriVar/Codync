@@ -25,20 +25,3 @@ extension AccountStore {
         return isStale(store.computer.id) ? "Older copy of this computer · \(store.statusText)" : store.statusText
     }
 }
-
-/// How the phone reaches a computer right now: a subtle icon, direct Wi-Fi/LAN or the encrypted relay.
-struct RouteIcon: View {
-    let route: HostRoute?
-    var cloud: URL?
-
-    var body: some View {
-        switch route {
-        case .direct:
-            RemixIcon("wifi-line").accessibilityLabel("Wi-Fi or Tailscale")
-        case .relay:
-            RemixIcon("cloud-line").accessibilityLabel(L10n.tr(RelayCopy.through(cloud: cloud)))
-        case nil:
-            EmptyView()
-        }
-    }
-}
