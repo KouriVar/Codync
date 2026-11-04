@@ -1,3 +1,4 @@
+
 # Fork 改动记录
 
 本文件记录本 fork 的定制与修复；上游发布说明仍在原有文档中维护。
@@ -1871,3 +1872,20 @@
 - 验证：`xcodebuild build -scheme 'iOS Dev' -configuration DevDebug` 通过；已装到 iPhone 16 Pro（2.36.0 / 179）并启动。按要求未自测、未截图。
 - 限制/待办：**系统卸载/挂载附属栏是否自带动画、是否吃这个 `withAnimation` 事务，我无法自测**。若真机上变成「瞬间消失/出现」（没有过渡），说明系统这部分不参与动画——按你的要求我先停在这里，请告知现象（「卸掉是瞬时的」即可），我不再自行改用 overlay 或其它方案。
 - 关联：C0178、C0180。
+### C0182 · 2026-11-05 · 关闭 sheet 后两个 bar 闪一下、没有入场动画：附属栏常驻、只换内容
+
+- 原因（排查结论）：
+  - 关闭链「直接出现、突然亮」：C0181 把 `accessoryLeaving`（offset 40 / opacity 0 → 0 / 1）整块删掉了，`onDismiss` 只在 `withAnimation` 里置 `accessoryMounted = true`，而 `HomeVoiceAccessory` 身上没有任何 offset / opacity，挂载那一帧初始值就等于终值，没有可插值的属性差 → 没有动画可播。
+  - 进场链「看着正常」：点语音条那一帧就把附属栏从视图树里删掉（`withAnimation` 里 `accessoryMounted = false`），0.3s 后 sheet 从底部升起把这一帧盖住了。
+  - 「闪一下」主因：`VoiceBar` 的 `body` 用 `if shown { content.tabViewBottomAccessory { … } } else { content }` 返回**两种不同的视图类型**，`shown` 一翻 SwiftUI 就把这个位置整棵子树销毁重建——重建的是整个 `TabView`（5 个 NavigationStack + 全部列表），不只是附属栏；重建那一帧没有旧视图可过渡，全屏重排就闪一下。
+- 变化（方案 2）：
+  - `VoiceBar` 改为**始终**对 `content` 应用 `.tabViewBottomAccessory { … }`：`shown` 时放 `HomeVoiceAccessory`，否则放 `EmptyView()`。视图类型不再变化 → `TabView` 不再重建。
+  - `VoiceBar` 恢复 `leaving` 参数；`HomeVoiceAccessory` 上重新加 `.offset(y: leaving ? 40 : 0)` 与 `.opacity(leaving ? 0 : 1)`。
+  - 进场：`beginVoice()` 里 `withAnimation(.easeInOut(duration: 0.3))` 同时置 `accessoryLeaving = true`（内容下移 40pt + 渐隐）与 `tabBarHidden = true`；300ms 后才 `accessoryMounted = false`（此时已不可见、且马上被 sheet 盖住）并弹 sheet——时序与 C0181 一致。
+  - 关闭：`onDismiss` 先 `accessoryMounted = true; accessoryLeaving = true`（内容以 offset 40 / opacity 0 挂上），下一帧 `DispatchQueue.main.async` 再在同一个 `withAnimation(.easeInOut(duration: 0.3))` 里 `accessoryLeaving = false`（回到 0 / 1）与 `tabBarHidden = false`。
+  - 页面内容仍然没有任何位移或透明度变化。
+- 文件：`apps/ios/Views/HomeSourcesView.swift`。
+- 验证：`xcodebuild build -scheme 'iOS Dev' -configuration DevDebug` 通过；已装到 iPhone 16 Pro（2.36.0 / 180）并启动。按要求未自测、未截图。
+- 限制/待办（按你的要求先停在这里，等你报现象）：**附属栏常驻后、内容为 `EmptyView` 时系统是否仍留一条空白玻璃胶囊，我无法自测**。需要看三种静止状态：① 置顶 / Coe 正常显示；② DS Bot / DSH / 搜索 tab（这三处原本完全不挂 accessory）；③ 会话页、设置页等二级页。任一处仍留空玻璃条，就说明空内容不塌缩——请告诉我，我不自行换方案（overlay / 隐藏 slot 等）。
+- 另一处按你的要求未动：状态变量仍叫 `accessoryMounted`，语义已变成「附属栏是否画内容」；要不要改名成 `accessoryShown`，你说了我再改。
+- 关联：C0178、C0180、C0181。

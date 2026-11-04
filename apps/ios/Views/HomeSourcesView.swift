@@ -91,9 +91,15 @@ struct HomeSourcesView: View {
                 voice.discard()
                 voiceDetent = VoiceSheetView.small
                 isTransitioning = true
-                withAnimation(Self.barFade) {
-                    accessoryMounted = true
-                    tabBarHidden = false
+                // Back in exactly the state it left in — down 40 and invisible — and only on the next
+                // frame does it climb home, so the first layout is not folded into the animation.
+                accessoryMounted = true
+                accessoryLeaving = true
+                DispatchQueue.main.async {
+                    withAnimation(Self.barFade) {
+                        accessoryLeaving = false
+                        tabBarHidden = false
+                    }
                 }
                 Task { @MainActor in
                     try? await Task.sleep(for: .milliseconds(320))
@@ -184,6 +190,7 @@ struct HomeSourcesView: View {
         .tabBarMinimizeBehavior(.onScrollDown)
         // Only the two tabs that talk to Coe carry the bar; the others leave the screen to their list.
         .modifier(VoiceBar(shown: (selection == .pinned || selection == .coe) && isTabRoot && accessoryMounted,
+                           leaving: accessoryLeaving,
                            lead: leadBot?.bot, onTap: beginVoice))
         .tint(Palette.text)
         .onChange(of: enabledSources) { _, sources in
@@ -216,9 +223,12 @@ struct HomeSourcesView: View {
     /// whichever tab is on screen.
     /// The system bar is hidden while the voice sheet is up.
     @State private var tabBarHidden = false
-    /// The accessory is mounted. It goes as a whole: fading just its content leaves the system's
-    /// glass capsule sitting there empty.
+    /// Whether the accessory draws its content. The accessory itself is mounted for the life of the
+    /// tab view (see `VoiceBar`): swapping the modifier in and out changes the tab view's view type
+    /// and rebuilds the whole tab view, which flashed the screen and killed the entrance animation.
     @State private var accessoryMounted = true
+    /// The accessory's content is down 40pt and invisible: on its way out, or waiting to come back.
+    @State private var accessoryLeaving = false
     /// One transition at a time: the bar and the sheet can't be summoned twice.
     @State private var isTransitioning = false
     /// The bar's exit and entrance: one ease, both ways.
@@ -323,14 +333,16 @@ struct HomeSourcesView: View {
             return
         }
         isTransitioning = true
-        // The accessory leaves whole — content and the system's glass with it — in the same
-        // animation that hides the tab bar. The page underneath never moves.
+        // The content slides down 40pt and fades on one ease while the tab bar hides. The accessory
+        // itself stays mounted, so the tab view is never rebuilt and the page underneath never moves.
         withAnimation(Self.barFade) {
-            accessoryMounted = false
+            accessoryLeaving = true
             tabBarHidden = true
         }
         Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(300))
+            // By now it is invisible and about to be covered: the slot can go empty.
+            accessoryMounted = false
             voiceDetent = VoiceSheetView.small
             showVoice = true
             await voice.begin()
@@ -925,19 +937,26 @@ struct DSHSessionRow: View {
     }
 }
 
-/// Mounts the bottom accessory only on the tabs that carry it, and only at their root.
+/// Keeps the accessory mounted for the whole life of the tab view and swaps only its content, so
+/// showing and hiding the bar never changes the tab view's view type. An `if` around
+/// `.tabViewBottomAccessory` rebuilt the entire tab view on every change, which is what flashed the
+/// screen and left the bar with no entrance.
 private struct VoiceBar: ViewModifier {
     let shown: Bool
+    /// Down 40pt and invisible: on the way out, or waiting to slide back in.
+    let leaving: Bool
     let lead: Bot?
     let onTap: () -> Void
 
-    @ViewBuilder func body(content: Content) -> some View {
-        if shown {
-            content.tabViewBottomAccessory {
+    func body(content: Content) -> some View {
+        content.tabViewBottomAccessory {
+            if shown {
                 HomeVoiceAccessory(lead: lead, onTap: onTap)
+                    .offset(y: leaving ? 40 : 0)
+                    .opacity(leaving ? 0 : 1)
+            } else {
+                EmptyView()
             }
-        } else {
-            content
         }
     }
 }
