@@ -2634,3 +2634,49 @@
     需要重新展开一次首页才会更新。
   - 卡片尾部仍带 1.5pt 玻璃边，放大到整屏的最后几帧可见，随即被交接盖掉。
 - 关联：C0205、C0204、C0203、C0202。备份 tag：`backup/before-pinch-sync`（`060d7c25`）。
+
+### C0207 · 2026-11-05 · 消息正文换成 MarkdownUI：表格可横滚、代码块高亮 + 复制
+
+- 原因：消息正文一直是自研的 `MarkdownBlocks` 解析 + 手写视图，表格没有明显表头、代码块无高亮/无复制、
+  公式和复杂 GFM 都不支持。盘点（C0206 前那份只读报告）里 dsh-mobile 的 Markdown 这套是最容易变现的一块。
+- 依赖：新增 **MarkdownUI 官方正式版**（`https://github.com/gonzalezreal/swift-markdown-ui`，`from: "2.0.0"`，
+  解析结果 **2.4.1**），连带 `swift-cmark 0.9.0`、`NetworkImage 6.0.1`；**没有**用 dsh-mobile 里那份改过的 fork，
+  也**没有**引入 SwiftMath（不做公式）。
+- 变化：
+  - `Kit/Sources/CodyncUI/Thread/MarkdownText.swift`：正文改为 `Markdown(source).markdownTheme(.codync(...))`，
+    保留 `Equatable`（只比 `source`，`nonisolated`）、保留 `.textSelection(.enabled)`；正文字号与代码字号改用
+    `@ScaledMetric`（body 17 / footnote 13），标题与代码块都从它们派生，继续跟随动态字体。
+  - 新增 `Kit/Sources/CodyncUI/Thread/MarkdownTheme.swift`：`Theme.codync(body:code:)` 用**现有 token** 定制
+    —— 正文/标题字号与 `Palette.text` 取自原渲染器同一套（h1 ≈ 20 粗、h2 = 正文 semibold、h3 ≈ 15 粗）；
+    行内代码 monospaced 0.9em + `Palette.text.opacity(0.08)` 底（与原实现同值）；链接保持单色 + 下划线；
+    引用 `Palette.secondary` + 左侧 3pt `Palette.border`；分隔线 1pt `Palette.border`；无序列表统一 `.disc`。
+    - 表格：`ScrollView(.horizontal)` + 内容 `fixedSize`，表头行铺 `Palette.surface`、行间 1pt `Palette.border` 细线，
+      单元格内边距 12/7、表头 semibold。
+    - 代码块：自定义 `MarkdownCodeBlock`——横向滚动不换行、`Palette.codeBackground` + 圆角 8、右上角复制按钮
+      （`ControlMetrics.Size.micro` 24 + 14pt 图标，`PressScale` 反馈，复制后 `Palette.added` 勾 1.2 秒）。
+  - 新增 `Kit/Sources/CodyncUI/Thread/CodeHighlighter.swift`：无依赖的小型高亮器，按语言（swift/json/js/ts/python/
+    shell/sql/go/rust/yaml）着色注释、字符串、数字、关键字；**颜色全部映射到现有 token**（关键字 `Palette.text`
+    semibold、字符串 `Palette.added`、数字 `Palette.warning`、注释 `Palette.tertiary`）；未知语言保持纯色。
+    流式半截文本安全：未闭合的字符串/注释只会把剩余部分着色，不崩不闪。
+  - Swift 6 严格并发：`BlockStyle` 的 body 是非 isolated 的逃逸闭包，而 SwiftUI 只在主 actor 渲染时调用它，
+    因此用 `@preconcurrency import MarkdownUI` + `rendered { }`（`MainActor.assumeIsolated` + `@unchecked Sendable`
+    的 `AnyView` 盒子）把「这一定在主线程渲染」告诉类型系统，没有用 `nonisolated(unsafe)` 硬关检查。
+- 未动：气泡、列表行、输入框、顶部栏、`DSHConversationView`/`ThreadView` 的结构；Coe 与 DSH 共用同一份
+  `MarkdownText`，所以两边自动一起换。
+- 文件：`apps/ios/Kit/Package.swift`、`apps/Codync.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved`、
+  `Kit/Sources/CodyncUI/Thread/MarkdownText.swift`、`…/Thread/MarkdownTheme.swift`（新）、
+  `…/Thread/CodeHighlighter.swift`（新）。
+- 验证：`xcodebuild build -project apps/Codync.xcodeproj -scheme 'iOS Dev' -configuration DevDebug`
+  （真机 destination、ui-preview 覆盖、构建号 195）**编译通过，0 error**，新增/改动文件 0 warning；
+  `xcrun devicectl device install app` 装到 iPhone 16 Pro（`com.suiyikou.codync.uipreview` 2.36.0 / 195）成功。
+  按要求**不自测**：不写测试、不截图、不用 CDP；表格/代码块/流式表现均未在真机确认。
+- 限制/待办（本次**没做**、需要你定的）：
+  - `MarkdownBlocks`（自研块解析）现在只有测试还在用，正文已不经过它；建议单独一单删掉解析器与它的测试。
+  - **图片**：MarkdownUI 默认会渲染 `![](...)`（走 NetworkImage 拉远端图），而旧渲染器把图片语法当纯文本显示。
+    这是一处未点名的行为变化；若要保持旧行为，需要把 `Theme.image` 置空。
+  - 语法高亮**没有专用 token**：用的是语义色（added/warning/tertiary/text）映射；若要真正的代码配色，需要新增
+    `Palette.syntax*` 一组 token。
+  - 项目里没有**圆角 token**：代码块沿用旧渲染器的 8pt，表格不加圆角。
+  - `Copy code` / `Copied` 两条 a11y 文案没有 zh-Hans 词条（回退英文）；块间距改用 MarkdownUI 默认，
+    与旧实现的 VStack spacing 8 不完全一致。
+- 关联：C0206（只读盘点报告 `/tmp/codync-audit/dsh-mobile-inventory.md`）。备份 tag：`backup/before-markdown-c0207`。

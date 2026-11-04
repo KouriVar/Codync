@@ -14,6 +14,9 @@ let package = Package(
         // Terminal emulator for agent install and sign-in. 1.19+ adds a build-tool
         // plugin every Xcode build would have to trust.
         .package(url: "https://github.com/migueldeicaza/SwiftTerm.git", exact: "1.18.0"),
+        // Message-body Markdown (tables, fenced code): the official release, not the fork the old
+        // dsh-mobile app carried.
+        .package(url: "https://github.com/gonzalezreal/swift-markdown-ui.git", from: "2.0.0"),
     ],
     targets: [
         .target(name: "CodyncKit", resources: [
@@ -33,6 +36,7 @@ let package = Package(
                 "CodyncKit",
                 .product(name: "WebRTC", package: "WebRTC"),
                 .product(name: "SwiftTerm", package: "SwiftTerm"),
+                .product(name: "MarkdownUI", package: "swift-markdown-ui"),
             ],
             resources: [.process("Resources")]
         ),
