@@ -20,6 +20,9 @@ public struct GlassToastItem: Identifiable, Equatable {
 }
 
 /// iOS's own "Pasted from Safari" pill: the capsule itself, without any placement.
+///
+/// Its height is the toolbar row's — the same 44pt as the buttons at either end of the navigation bar,
+/// so a pill placed on that row lines up with them. Long text truncates rather than growing the pill.
 public struct GlassToast: View {
     let item: GlassToastItem
 
@@ -35,15 +38,16 @@ public struct GlassToast: View {
         }
         .foregroundStyle(Palette.text)
         .padding(.horizontal, 18)
-        .frame(height: 46)
+        .frame(height: ControlMetrics.Size.icon.side)
         .glass(in: Capsule())
         .shadow(color: .black.opacity(0.12), radius: 12, y: 4)
     }
 }
 
 public extension View {
-    /// Shows `item` as a pill at the top until it is tapped or two seconds pass.
-    func glassToast(_ item: Binding<GlassToastItem?>, topPadding: CGFloat = 10) -> some View {
+    /// Shows `item` as a pill on the navigation bar's row — level with the buttons at either end of it
+    /// — until it is tapped or two seconds pass. `topPadding` is measured from that row's top.
+    func glassToast(_ item: Binding<GlassToastItem?>, topPadding: CGFloat = 0) -> some View {
         modifier(GlassToastPresenter(item: item, topPadding: topPadding))
     }
 }
@@ -52,16 +56,28 @@ private struct GlassToastPresenter: ViewModifier {
     @Binding var item: GlassToastItem?
     let topPadding: CGFloat
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// How wide the row is: what the pill may use without reaching the toolbar's buttons.
+    @State private var width: CGFloat = 0
+
+    /// 16pt at each edge, then the 44pt button and 8pt of air on both sides: the pill stays between
+    /// the avatar on the left and the "+" on the right, and truncates whatever doesn't fit.
+    private var maxPillWidth: CGFloat? {
+        guard width > 0 else { return nil }
+        return max(0, width - 2 * (16 + ControlMetrics.Size.icon.side + 8))
+    }
 
     func body(content: Content) -> some View {
         content
-            // The overlay's frame already stops at the safe area, so the pill drops below the status bar.
+            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
+            // The overlay's frame already stops at the safe area, so the pill drops below the status
+            // bar — the very row the navigation bar's own buttons are laid out in.
             .overlay(alignment: .top) {
                 if let toast = item {
                     // The Spacer below takes the rest of the height without drawing, so only the
                     // pill itself takes touches and the screen under it stays usable.
                     VStack(spacing: 0) {
                         GlassToast(toast)
+                            .frame(maxWidth: maxPillWidth)
                             .contentShape(Capsule())
                             .onTapGesture { tap(toast) }
                             .accessibilityElement(children: .ignore)

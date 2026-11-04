@@ -2402,3 +2402,34 @@
   本次只按需求改了收起态与底部栏。会话页顶部胶囊宽了一点点（头像 +2、字号 +3），若在窄机型上挤压标题，
   需要再调内边距——未实测。
 - 关联：C0197、C0198、C0200。
+
+### C0199 · 2026-11-04 · 语音发送吐司改成 44pt 高，与顶部头像 / ＋ 同排居中
+
+- 原因：语音转文字发送后的吐司（「✓ 已发送给 XXX」，以及「先设置主 Bot」那一条）原来是 46 高、距顶部
+  安全区 6pt，跟顶部左边 44pt 头像按钮、右边 44pt「＋」按钮既不同高也不同排，看着发飘。
+- 先确认共用范围：吐司是 CodyncUI 里的共用组件（`Toast/GlassToast.swift`，`public struct GlassToast` +
+  `.glassToast(...)`），全仓库当时**只有首页在用**（`Views/HomeSourcesView.swift:128`，消息源 `:422`、`:486`）。
+  按穗确认，直接改共用组件，因此以后别处再用也是 44 高 / 正胶囊。
+- 变化（`Kit/Sources/CodyncUI/Toast/GlassToast.swift`）：
+  - `GlassToast` 高度 `.frame(height: 46)` → **`ControlMetrics.Size.icon.side`（44）**，与顶部两个导航栏按钮
+    同高；圆角原本就是 `Capsule()`（= 高度一半），未改；图标 20、字号 subheadline、玻璃、阴影、
+    出现/消失动画、2 秒停留全部未动。
+  - 定位基准：`.glassToast` 的 `topPadding` 默认值 10 → **0**，首页调用改为 `.glassToast($toast)`。0 表示
+    「贴顶部安全区上沿」——导航栏正是从这条线开始排它那一行 44pt 按钮的，所以吐司与头像、「＋」自动
+    落在同一行并垂直居中；**没有任何写死的 y 值**，灵动岛/刘海机型都跟着安全区走。
+  - 横向：新增 `@State width`（`onGeometryChange` 量容器宽度）与 `maxPillWidth =
+    容器宽 − 2 × (16 边距 + 44 按钮 + 8 间隙)`，套在胶囊上 `.frame(maxWidth:)`。文字仍然
+    `lineLimit(1)` + `truncationMode(.tail)`，所以文字过长是省略号截断，胶囊本身宽度随文字自适应，
+    左右永远压不到头像和「＋」。
+- 变化（`Views/HomeSourcesView.swift:128`）：`.glassToast($toast, topPadding: 6)` → `.glassToast($toast)`，
+  并在旁边注明它落在导航栏那一行。
+- 未动：顶部按钮、底部语音栏、语音胶囊与变形动画、吐司的转场动画与停留时长。
+- 文件：`apps/ios/Kit/Sources/CodyncUI/Toast/GlassToast.swift`、`apps/ios/Views/HomeSourcesView.swift`。
+- 验证：`xcodebuild build -project apps/Codync.xcodeproj -scheme 'iOS Dev' -configuration DevDebug`
+  （真机 destination、ui-preview 覆盖、构建号 189）**编译通过，0 error**，改动文件 0 warning；
+  `xcrun devicectl device install app` 装到 iPhone 16 Pro（`com.suiyikou.codync.uipreview` 2.36.0 / 189）成功。
+  按要求**不自测**：不跑测试、不截图、不用 CDP，对齐与截断效果未实测。
+- 限制/待办：吐司与导航栏按钮同排的前提是导航栏从顶部安全区上沿开始（标准 inline 工具栏），首页当前
+  就是这个形态；若以后首页改成大标题或自定义导航栏，这个基准需要跟着调整。极窄机型上
+  `maxPillWidth` 会很小，长文字会更早截断（这是设计要求，未实测具体宽度）。
+- 关联：C0197（语音发送链路）、C0201（底部 48pt token）。

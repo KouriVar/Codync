@@ -125,7 +125,8 @@ struct HomeSourcesView: View {
                     .presentationDragIndicator(.visible)
                     .environment(\.dismissModal, DismissModalAction { showVoiceSettings = false })
             }
-            .glassToast($toast, topPadding: 6)
+            // On the navigation bar's own row: level with the avatar and the "+" at its ends.
+            .glassToast($toast)
             .onChange(of: voiceDetent) { _, _ in Haptics.selection() }
             .confirmationDialog(L10n.tr("Discard this voice message?"), isPresented: $confirmDiscardVoice,
                                 titleVisibility: .visible) {
