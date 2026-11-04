@@ -2520,3 +2520,43 @@
   - 卡片里仍是 N 个真实 `List`（每个 `.scrollDisabled`），来源多时开销随之增加；卡片背景为纯色 `Palette.background`。
   - 捏合过程中页面整体缩放，圆角不变形；圆角只在卡片态呈现（`clipShape` 在卡片上）。
 - 关联：C0202、C0199、C0201。
+
+### C0204 · 2026-11-05 · 捏合卡片显示 bug：灰条、内容偏移、双层边框、露边过窄
+
+- 原因（真机截图）：四个现象都源自「卡片内容与卡片的几何来自两处不同的测量」，加上玻璃边框太厚。
+  1. 卡片顶部/底部灰带：卡片的页面按 `screenSize/screenInsets`（在首页 `navigationStack` 上量）布局，
+     而卡片尺寸按切换态自己的 `GeometryReader`（`.ignoresSafeArea()` 下的整屏）计算；两者如果对不上，
+     缩放后的页面填不满卡片的矩形，露出的就是卡片的玻璃底（深色底上的 Liquid Glass 呈灰），
+     于是状态栏区和 home 指示条区各出现一条灰带。
+  2. 内容整体下偏：卡片里用 `Color.clear.frame(height: screenInsets.top)` 顶出状态栏高度，但量到的
+     `safeAreaInsets` 与真实窗口安全区不一致（多算了导航栏那一行），头像/「+」被推低、底部栏位置随之错。
+  3. 双层边框：卡片是 `padding(4)` + `.glass(...)`（4pt 玻璃带）+ 内侧 0.5pt 实色描边，读起来是
+     「粗灰框 + 里面一条边」两层。
+  4. 右邻卡片露太少且错位：卡宽 = 屏宽 × 0.70 且卡片间距 12，实际可见的邻卡只有约 48pt（先被 16pt 页边距
+     吃掉），加上几何不一致导致邻卡内容和卡片框没对齐，看起来只剩一列头像；首尾卡片的 `contentMargins`
+     也是按另一处量到的宽度算的，左右不对称。
+- 变化（`apps/ios/Views/HomeSourceSwitcher.swift`）：
+  - **一处几何来源**：新增 `@State window` / `insets`，`onAppear` 用 `windowMetrics()` 直接读 key window 的
+    `bounds.size` 与 `safeAreaInsets`（只读窗口几何，不新建样式）；分页器、卡片尺寸、`contentMargins`、
+    卡片页面布局**全部**用这同一份数值。`card` 闭包改为 `(HomeFace, CGSize, EdgeInsets) -> AnyView`。
+  - `cardScale` 0.70 → **0.66**，卡片间距 12 → **10**：左右露边从约 48pt 提到约 **58pt** 且严格对称
+    （`contentMargins` 按同一窗口宽度算），邻卡能看出是完整的一张缩小首页。
+  - 玻璃边：`rim` 4 → **1.5**，去掉内侧 0.5pt 实色描边，只留 `.glass(in: RoundedRectangle(圆角 + 1.5))` 一层细边
+    （仍是项目现有 `glass(in:)` / `GlassSurface`）。
+- 变化（`Views/HomeSourcesView.swift`）：
+  - 删掉 `screenSize` / `screenInsets` 两个状态与对应的 `onGeometryChange`（不再重复测量）。
+  - `miniHome(_:window:insets:)`：顶部状态栏条用 **`Palette.background`**（页面本来的底色，不再用透明占位），
+    底部栏之下补一条同样颜色的 **28pt** 条（与真实页面「栏底距屏幕底 28」一致），页面 `VStack` 的高度
+    正好等于窗口高度，整块 `background(Palette.background)`——卡片从上到下都是首页背景色，安全区不再单独上色。
+  - 卡片页面 = 窗口尺寸的完整首页（`insets.top` + 导航行 + 列表 + 底栏 + 28），按 `cardWidth / window.width`
+    等比缩放，因此缩放后的宽高与卡片矩形**严格相等**，不再有填空/裁切。
+- 保持不变：4 张卡片（置顶 + 三个来源）、捏合进入、左右滑与吸附、翻页轻触感、点卡片进入、向外张开退出、
+  记住上次选择、`UIPageControl` 原生分页点。
+- 文件：`apps/ios/Views/HomeSourceSwitcher.swift`、`apps/ios/Views/HomeSourcesView.swift`。
+- 验证：`xcodebuild build -project apps/Codync.xcodeproj -scheme 'iOS Dev' -configuration DevDebug`
+  （真机 destination、ui-preview 覆盖、构建号 192）**编译通过，0 error**，改动文件 0 warning；
+  `xcrun devicectl device install app` 装到 iPhone 16 Pro（`com.suiyikou.codync.uipreview` 2.36.0 / 192）成功。
+  按要求**不自测**：不跑测试、不截图、不用 CDP，四个现象是否消失未在真机确认。
+- 限制/待办：窗口几何改为读 key window，多窗口/外接屏场景未考虑（本 App 单窗口）；`screenCorner = 55` 仍是
+  当前 iPhone 屏幕圆角的常数；卡片里依旧是 N 个真实 `List`。
+- 关联：C0203、C0202。

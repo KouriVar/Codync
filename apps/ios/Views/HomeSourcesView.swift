@@ -27,9 +27,6 @@ struct HomeSourcesView: View {
     @State private var switcherFace = HomeFace.pinned
     /// The page's own scale while two fingers close on it: 1 is the page, `cardScale` is a card.
     @State private var pinchScale: CGFloat = 1
-    /// The window's size and insets: a card is the whole screen shrunk, so it needs both.
-    @State private var screenSize = CGSize.zero
-    @State private var screenInsets = EdgeInsets()
 
     @State private var searchText = ""
     /// The field in the bottom bar has the keyboard.
@@ -93,15 +90,14 @@ struct HomeSourcesView: View {
 
     var body: some View {
         navigationStack
-            // The window, for the cards: each one is the whole screen at the screen's own aspect.
-            .onGeometryChange(for: CGSize.self) { $0.size } action: { screenSize = $0 }
-            .onGeometryChange(for: EdgeInsets.self) { $0.safeAreaInsets } action: { screenInsets = $0 }
             // The pages, over everything the home draws: the toolbar's buttons step out of the way
             // (they fade below), and the cards take the screen.
             .overlay {
                 if switcherShown {
                     SourceSwitcher(faces: faces, centered: $switcherFace,
-                                   card: { AnyView(miniHome($0)) },
+                                   card: { face, window, insets in
+                                       AnyView(miniHome(face, window: window, insets: insets))
+                                   },
                                    commit: { pick($0) })
                         .ignoresSafeArea()
                         .transition(.opacity)
@@ -325,15 +321,17 @@ struct HomeSourcesView: View {
     /// One card's content: the home exactly as it looks full screen — the navigation row, the list and
     /// the bar, at the window's own size — so the switcher only has to shrink it. Nothing in it takes
     /// a touch: the card itself answers, and it only picks the face.
-    private func miniHome(_ face: HomeFace) -> some View {
+    private func miniHome(_ face: HomeFace, window: CGSize, insets: EdgeInsets) -> some View {
         VStack(spacing: 0) {
-            Color.clear.frame(height: screenInsets.top)
+            // The status bar's strip: the page's own background, not a colour of its own.
+            Palette.background.frame(height: insets.top)
             miniNavRow
             faceList(face)
             miniBar
-                .padding(.bottom, 28)
+            // Below the bar, exactly the 28pt the real page keeps to the screen's edge.
+            Palette.background.frame(height: 28)
         }
-        .frame(width: screenSize.width, height: screenSize.height)
+        .frame(width: window.width, height: window.height)
         .background(Palette.background)
         .allowsHitTesting(false)
     }
