@@ -1011,3 +1011,13 @@
 - 验证：`npm run typecheck` 通过；`npm test` 348/349（唯一失败是既有的 catalogs 键不一致，与本次无关，见 C0115）。重编 arm64 ad-hoc 安装到真机后，CDP 检查 `#root.children=1`、页面有真实内容、无控制台异常、「新建 Bot」弹窗可打开；底部栏在 cloud off 时不再渲染账号按钮/提示且不崩。
 - 已知未处理：cloud off 时「设置」在 UI 上没有入口（唯一入口在账号面板，被 C0115 一并隐藏），另见 C0120。
 - 关联：C0115。
+
+### C0121 · 2026-11-04 · 主进程 `app:openSettings` 收到空值时不再抛错
+
+- 原因：`apps/desktop/src/main/index.ts` 的 `ipcMain.on('app:openSettings', (_e, url) => url.startsWith(...))` 假定 `url` 一定是字符串。渲染端 `store/computer-access.ts` 按权限名查表取值，权限不在表里时传 `undefined`；主进程随即抛 `TypeError: Cannot read properties of undefined (reading 'startsWith')`（打包后 `out/main/index.js` 的 handler 处）。
+- 变化：
+  - 新增 `apps/desktop/src/shared/open-settings.ts`：`systemSettingsURL(value: unknown)`，非字符串或非 `x-apple.systempreferences:` 前缀一律返回 null。
+  - `src/main/index.ts`：改用该函数，拿到 pane 才 `shell.openExternal`。
+- 测试：`apps/desktop/src/shared/open-settings.test.ts`：正常 pane URL 透传；`undefined / null / '' / https / 数字 / 伪对象` 全部返回 null 而不抛。
+- 验证：`npm run typecheck` 通过；`npm test` 350/351（唯一失败仍是既有 catalogs 键不一致）。重编后从渲染端发一次无参 `openSettings()`，主进程不再打印该 TypeError。
+- 关联：无。

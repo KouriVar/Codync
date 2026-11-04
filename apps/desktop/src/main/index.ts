@@ -5,6 +5,7 @@ import { hostname } from 'node:os'
 import { join } from 'node:path'
 import { app, autoUpdater, BrowserWindow, clipboard, dialog, ipcMain, Menu, nativeTheme, session, shell, type IpcMainInvokeEvent, type OpenDialogOptions } from 'electron'
 import type { HostSnapshot, WindowCommand } from '../shared/ipc'
+import { systemSettingsURL } from '../shared/open-settings'
 import { devPort, HostController } from './host-controller'
 import { registerFileSaves } from './file-saves'
 import { keepArtifactsInFrame, registerArtifacts, registerArtifactScheme } from './artifacts'
@@ -170,8 +171,11 @@ function registerIPC(tray: Tray) {
   ipcMain.on('app:openExternal', (_e, url: string) => {
     if (/^(https?|mailto|x-apple\.systempreferences):/.test(url)) void shell.openExternal(url)
   })
-  ipcMain.on('app:openSettings', (_e, url: string) => {
-    if (url.startsWith('x-apple.systempreferences:')) void shell.openExternal(url)
+  ipcMain.on('app:openSettings', (_e, url?: unknown) => {
+    // A renderer that asks without a target (or for a permission the map has no URL for) sends
+    // undefined; calling startsWith on it threw inside the main process (see shared/open-settings).
+    const pane = systemSettingsURL(url)
+    if (pane) void shell.openExternal(pane)
   })
   ipcMain.on('app:copy', (_e, text: string) => clipboard.writeText(text))
   ipcMain.handle('app:pickFiles', async (e) => {
