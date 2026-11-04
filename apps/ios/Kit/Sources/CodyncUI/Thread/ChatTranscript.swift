@@ -189,9 +189,10 @@ public struct ProgressiveTopBlur: View {
         colorScheme == .dark ? .thickMaterial : .ultraThinMaterial
     }
 
-    /// The page's own colour at the very top, thinning out as the blur takes over.
+    /// The page's own colour at the very top, thinning out as the blur takes over. The same 0.85 in
+    /// both schemes: it is what keeps the material from reading as a grey mist rather than the page.
     private var tint: Color {
-        Color(uiColor: .systemBackground).opacity(colorScheme == .dark ? 0.85 : 0.5)
+        Color(uiColor: .systemBackground).opacity(0.85)
     }
 
     public var body: some View {

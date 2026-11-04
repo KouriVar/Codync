@@ -18,8 +18,6 @@ struct HomeSourcesView: View {
 
     @AppStorage(HomeSourcePrefs.sourcesKey) private var sourcesRaw = HomeSourcePrefs.defaultRaw
     @AppStorage(HomeSourcePrefs.pinnedKey) private var pinnedRaw = ""
-    /// Which capsule above the list is on: everything, the pinned ones, or one source.
-    @AppStorage(HomeFilter.storageKey) private var filterRaw = HomeFilter.all.rawValue
 
     @State private var searchText = ""
     @State private var creating: NewTarget?
@@ -163,12 +161,11 @@ struct HomeSourcesView: View {
             .toolbar { toolbarContent }
     }
 
-    /// One list: the filter capsules, then the sessions they let through. The list reaches under the
-    /// navigation bar and carries the same top fade the chat page does.
+    /// One list for the home: the pinned sessions, then everything else by when it last spoke. It
+    /// reaches under the navigation bar and carries the same top fade the chat page does.
     private var baseView: some View {
         List {
-            filterRow
-            if let hint = dshHint, filter == .all || filter == .dsh {
+            if let hint = dshHint {
                 dshHintRow(hint)
             }
             if rows.isEmpty {
@@ -176,83 +173,25 @@ struct HomeSourcesView: View {
             }
             ForEach(rows) { entry in
                 entryRow(entry)
-                    // A capsule change fades the list rather than shuffling it about.
-                    .transition(.opacity)
             }
         }
         .plainRosterList(topInset: topBarInset)
-        .animation(Motion.reduced(.easeInOut(duration: 0.2), reduceMotion), value: filterRaw)
         .background(Palette.background)
         .ignoresSafeArea(edges: .top)
+        // The chat page's fade: what scrolls under the bar is blurred away, while the avatar and the
+        // "+" stay crisp above it.
         .overlay(alignment: .top) { ProgressiveTopBlur() }
         .safeAreaInset(edge: .bottom, spacing: 0) { bottomBar }
-        .onChange(of: sourcesRaw) { _, raw in
-            // A capsule whose source was switched off in Settings has nothing to show: back to all.
-            if let source = filter.source, !HomeSourcePrefs.enabled(from: raw).contains(source) {
-                filterRaw = HomeFilter.all.rawValue
-            }
-        }
     }
 
-    // MARK: - The filter capsules
+    // MARK: - Rows
 
-    private var filter: HomeFilter { HomeFilter(rawValue: filterRaw) ?? .all }
-
-    private var offeredFilters: [HomeFilter] { HomeFilter.offered(sources: enabledOrdered) }
-
-    /// 32pt capsules that scroll sideways, the chosen one filled with `.primary` and the rest on
-    /// `secondarySystemFill`. They are the list's first row, so they leave with the list.
-    private var filterRow: some View {
-        ScrollView(.horizontal) {
-            HStack(spacing: 8) {
-                ForEach(offeredFilters) { option in
-                    Button { choose(option) } label: {
-                        Text(L10n.tr(option.title))
-                            .font(.system(size: 15, weight: .medium))
-                            .foregroundStyle(option == filter ? Color(uiColor: .systemBackground) : Palette.text)
-                            .padding(.horizontal, 14)
-                            .frame(height: 32)
-                            .background {
-                                Capsule().fill(option == filter
-                                               ? AnyShapeStyle(Color.primary)
-                                               : AnyShapeStyle(Color(uiColor: .secondarySystemFill)))
-                            }
-                            .contentShape(Capsule())
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityAddTraits(option == filter ? .isSelected : [])
-                }
-            }
-            .padding(.horizontal, 16)
-            .padding(.bottom, 10)
-        }
-        .scrollIndicators(.hidden)
-        .listRowInsets(EdgeInsets())
-        .listRowSeparator(.hidden)
-        .listRowBackground(Color.clear)
-    }
-
-    private func choose(_ option: HomeFilter) {
-        guard option != filter else { return }
-        Haptics.impact()
-        withAnimation(Motion.reduced(.easeInOut(duration: 0.2), reduceMotion)) {
-            filterRaw = option.rawValue
-        }
-    }
-
-    /// What the chosen capsule lets through.
+    /// The pinned sessions in the order they were pinned, then everything else by the last thing it
+    /// said.
     private var rows: [HomeEntry] {
-        switch filter {
-        case .all:
-            let pinned = pinnedEntries
-            let pinnedIDs = Set(pinned.map(\.id))
-            return pinned + otherEntries.filter { !pinnedIDs.contains($0.id) }.sorted { stamp($0) > stamp($1) }
-        case .pinned:
-            return pinnedEntries
-        case .coe, .dsBot, .dsh:
-            guard let source = filter.source else { return [] }
-            return source == .dsh ? dshEntries : botEntries(for: source)
-        }
+        let pinned = pinnedEntries
+        let pinnedIDs = Set(pinned.map(\.id))
+        return pinned + otherEntries.filter { !pinnedIDs.contains($0.id) }.sorted { stamp($0) > stamp($1) }
     }
 
     /// Every session the home may show, pinning aside.
@@ -273,17 +212,13 @@ struct HomeSourcesView: View {
         }
     }
 
-    @ViewBuilder private var emptyRow: some View {
-        if filter == .pinned {
-            pinnedEmptyState
-        } else {
-            Text(filter == .dsh ? "还没有 DSH 会话" : "没有会话")
-                .font(.footnote)
-                .foregroundStyle(Palette.secondary)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 40)
-                .rosterRow()
-        }
+    private var emptyRow: some View {
+        Text("没有会话")
+            .font(.footnote)
+            .foregroundStyle(Palette.secondary)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 40)
+            .rosterRow()
     }
 
     /// Status bar + inline navigation bar height: the list scrolls under the bar, but its first

@@ -1567,3 +1567,14 @@
 - 验证：`xcodebuild build -scheme 'iOS Dev' -configuration DevDebug` 通过；已装到 iPhone 16 Pro（2.36.0 / 157）并启动。按要求未自测、未截图。
 - 限制/待办：列表切换用行级淡入淡出（List 的插入/移除动画），不是整页交叉淡变；若观感不够，可换成 `ScrollView` + `LazyVStack` 自己控透明度。
 - 关联：C0139、C0156。
+### C0160 · 2026-11-04 · 撤掉首页顶部胶囊筛选，只保留渐进模糊
+
+- 原因：C0159 加的「全部 / 置顶 / COE / DSHB / DSHC」胶囊行不需要了；首页要回到一条不再分类的列表，顶部模糊则要做得更干净。
+- 变化：
+  - 撤掉胶囊：整行 `filterRow`、`HomeFilter` 模型、`@AppStorage("homeFilter")`、切换动画与「来源被关掉回退到全部」的逻辑全部删除；首页仍是一条竖向 `List`（不恢复横向分页、不加任何新分类入口），内容与排序维持 C0159 的「全部」形态——钉住的按钉的先后在最上面，其余按最后消息时间倒序混排；DSH 未连接的提示行、空态「没有会话」保留。
+  - 顶部渐进模糊按聊天页那套重做：`ProgressiveTopBlur` 叠在列表上并 `ignoresSafeArea(edges: .top)`，从状态栏一直盖到头像和 + 那一行下面（默认 110pt），垂直渐变蒙版淡出，无硬边；材质跟随 `colorScheme`（深色 `.thickMaterial`、浅色 `.ultraThinMaterial`），上面再叠一层 `Color(.systemBackground)` 渐变（顶部 0.85 → 0，深浅色同一套），不再出现灰白雾；`.toolbarBackground(.hidden, for: .navigationBar)` 保留，导航栏不会盖住模糊上半段。
+  - 设置里「首页来源」三个开关、长按菜单、DSH 二级页、来源角标均未改动。
+- 文件：`apps/ios/Views/HomeSourcesView.swift`、`apps/ios/Views/HomeSource.swift`（删除 `HomeFilter`）、`apps/ios/Kit/Sources/CodyncUI/Thread/ChatTranscript.swift`（`ProgressiveTopBlur` 浅色也用 0.85 渐变）。
+- 验证：`xcodebuild build -scheme 'iOS Dev' -configuration DevDebug` 通过；已装到 iPhone 16 Pro（2.36.0 / 158）并启动。按要求未自测、未截图。
+- 限制/待办：模糊高度沿用 110pt 常量，换机型如觉得覆盖不够可调 `ProgressiveTopBlur(height:)`。
+- 关联：C0159。
