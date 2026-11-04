@@ -1655,3 +1655,17 @@
 - 验证：`xcodebuild build -scheme 'iOS Dev' -configuration DevDebug` 通过；已装到 iPhone 16 Pro（2.36.0 / 162）并启动。按要求未自测、未截图。
 - 限制/待办：无。
 - 关联：C0163。
+### C0165 · 2026-11-04 · 搜索 tab 改成系统默认写法，单独浮在右侧
+
+- 原因：C0164 的搜索 tab 虽然用了 `Tab(value:, role: .search)`，但额外传了自定义 `label:`（`Label("搜索", systemImage: "magnifyingglass")`）。一旦给了自定义 label，系统就把它当普通 tab 画，不进入「右侧独立圆形玻璃钮」的形态。
+- 排查结论（逐项）：
+  1. `HomeSourcesView.swift:170-174`（改动前）：`Tab(value: HomeTab.search, role: .search)` 确实直接写在 `TabView` 第一层，没有包在 `TabSection`/`ForEach`/自定义 wrapper 里——**但带了自定义 `label:`**，命中第 5 项的问题。
+  2. `apps/ios/Resources/Info.plist`、`apps/project.yml`、`apps/shared/Config/*.plist`：**没有** `UIDesignRequiresCompatibility`，不存在退回旧版样式的可能。
+  3. 全仓无 `UITabBar.appearance()`、`UITabBarAppearance`、`.tabViewStyle(...)`、`.toolbarBackground(for: .tabBar)`；只有 `HomeSourcesView.swift:177` 的 `.tabBarMinimizeBehavior(.onScrollDown)`（本轮保留）。
+  4. `xcodebuild -showsdks` → `iphoneos27.1`；`apps/project.yml` 的 `deploymentTarget.iOS = 26.0`，满足 iOS 26 要求。
+  5. **问题就在这里**：给了 `Label` 自定义 label。改为系统默认写法 `Tab(value: HomeTab.search, role: .search) { … }`，不传 label。
+- 变化：删除搜索 tab 的自定义 `label:`，改用默认 label（标题由系统提供和本地化）；左侧四个普通 tab（置顶、Coe、DS Bot、DSH）仍作为一组玻璃 tab，搜索由系统画成右侧独立的圆形玻璃钮。附属栏、置顶 tab 内容以及其余功能未改动。
+- 文件：`apps/ios/Views/HomeSourcesView.swift`。
+- 验证：`xcodebuild build -scheme 'iOS Dev' -configuration DevDebug` 通过；已装到 iPhone 16 Pro（2.36.0 / 163）并启动。按要求未自测、未截图。
+- 限制/待办：搜索 tab 的标题取自系统本地化（跟随设备/App 语言），不再是 App 自己的文案。
+- 关联：C0163、C0164。

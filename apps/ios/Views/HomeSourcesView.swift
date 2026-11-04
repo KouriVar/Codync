@@ -167,10 +167,10 @@ struct HomeSourcesView: View {
                     stack { rosterList(dshEntries, hint: dshHint) }
                 }
             }
+            // No label of our own: with role .search and the system's default label, iOS draws this
+            // as the separate round button on the right instead of a fifth tab.
             Tab(value: HomeTab.search, role: .search) {
                 stack { searchList }
-            } label: {
-                Label(HomeTab.search.title, systemImage: HomeTab.search.symbol)
             }
         }
         // Scrolling down shrinks the bar to the tab you are on and folds the accessory into it.
