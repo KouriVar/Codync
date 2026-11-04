@@ -1299,4 +1299,15 @@
 - 验证：按要求本轮只验证编译通过（DevDebug 真机构建）。
 - 限制/待办：`bold`（700）比默认 semibold（600）粗一档；若还想更粗可换 heavy。
 - 关联：C0140。
+### C0142 · 2026-11-04 · 回退 C0141 的加粗标题与 22pt 图标，COE 改用 ghost-4-line
+
+- 原因：C0141 的加粗标题和 22pt 图标观感不好；COE 不想再用给定的 SVG。
+- 变化：
+  - 设置页标题回退为系统默认 inline 标题（去掉自定义 principal 文本）。
+  - 三个来源图标回到 18pt（COE/DSHB/DSHC 一致，容器仍 22×22）。
+  - COE 图标改用 Remix `ghost-4-line`；删除 `coe-agent.imageset` 及其 SVG。
+- 文件：`apps/ios/Views/AccountSwitcherView.swift`、`apps/ios/Views/SettingsView.swift`、删除 `apps/ios/Resources/Assets.xcassets/coe-agent.imageset`。
+- 验证：按要求本轮只验证编译通过（DevDebug 真机构建）。
+- 限制/待办：无已知新增限制。
+- 关联：C0140、C0141。
 
