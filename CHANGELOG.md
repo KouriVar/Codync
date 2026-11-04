@@ -1019,3 +1019,19 @@
 - 保留：codync 自身的配对扫码、Bot 列表与拖动排序、Coe/DS Bot 的现有行为都未改；KMP 共享层本轮不链接。
 - 验证：`xcodebuild` DevDebug 对真机（`generic/platform=iOS`）与模拟器均构建通过；真机安装后，配对、会话列表、发消息、流式回复均实测正常。旧网关的兼容路径未改。
 - 已知待办（未在本条处理）：DSH 注入的「Time sampled…」系统时间消息会被显示成用户气泡；Coe 的后台会话（`<bot-profile>` / `You keep the memory` 开头或「未命名」）应隐藏；首页 DSH 分组样式待改为「会话切换菜单 + 混排列表」。
+
+### C0118 · 2026-11-04 · iOS 首页：来源切换、混排/分页、隐藏后台会话
+
+- 原因：三种来源（Coe / DS Bot / DSH）要能在同一个首页按需显示；首页原先的 DSH 状态区占位且把连接细节暴露在首页；Coe 的后台会话与 DSH 注入的时间消息是噪音。
+- 变化：
+  - 首页改为统一的 `HomeSourcesView`（`apps/ios/Views/HomeSourcesView.swift`，新）；移除 `DSHHomeSection` 状态区，DSH 配对状态移到设置「DSH 连接」，连不上时只在 DSH 行前显示一行小字。
+  - 右上角「+」左边新增漏斗按钮（SF Symbol `line.3.horizontal.decrease.circle`），复用「+」同款系统菜单；Coe / DS Bot / DSH 三行多选、右侧 checkmark，分隔线后「全部显示 / 恢复默认」；默认只 Coe，至少保留一项；`@AppStorage("homeEnabledSources")` 记忆；未勾来源不渲染，DSH 未勾时 `dsh.disconnect()`，不建 WebSocket。
+  - 来源归类（`HomeSource.of(bot:)`）：分组与无 `command` 的 bot 是 Coe，`command` 非空是 DS Bot，DSHKit 会话是 DSH。
+  - 设置「调试」区新增「首页布局：混排 / 分页」（`@AppStorage("homeLayout")`）；混排按最近时间倒序、头像右下角显示来源角标，分页每个来源一页、顶部圆点 + 当前页名。
+  - `HomeSessionVisibility.isHidden(title:isDSH:)` 集中隐藏 `<bot-profile>` / `You keep the memory` 开头与未命名 DSH 会话（只隐藏不删除）；`DSHSystemMessageFilter.isInjected` 过滤 DSH 注入的「Time sampled while preparing turn…」，实时事件与 `session-snapshot` 回放都跳过。
+  - DSH 网关改为共享单例 `DSHGateway.shared`；`DSHConnectSheet` / `DSHChatScreen` 补公开 init，供设置页复用。
+  - `BotRow` 未改（当时在别的未提交改动里），来源角标用行级 overlay 叠在头像右下角。
+- 文件：`apps/ios/Views/HomeSourcesView.swift`、`apps/ios/Views/HomeSource.swift`（均新）、`apps/ios/Views/RootView.swift`、`apps/ios/Views/SettingsView.swift`、`apps/ios/DSHKit/Sources/DSHKit/DSHGateway.swift`、`DSHModels.swift`、`DSHViews.swift`、`apps/Codync.xcodeproj/project.pbxproj`（XcodeGen 重新生成）。
+- 验证：DevDebug 模拟器与 `generic/platform=iOS` 真机构建通过；签名安装并启动到 iPhone 16 Pro（`com.suiyikou.codync.uipreview`），首页混排列表、来源角标、DSH 状态区移除均实测可见。
+- 限制/待办：分页布局与来源菜单弹层尚未截图；「未连接」小字要网关失败时才出现；角标按 48pt 头像 + 16pt 行内边距固定偏移，超大字号下会偏。
+- 关联：C0117。编号说明：桌面端已占用 C0119–C0121，本条把原 C0118–C0121 合并为 C0118；iOS 后续从 C0122 起。

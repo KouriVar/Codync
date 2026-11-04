@@ -136,6 +136,10 @@ public struct DSHChatScreen: View {
     @Environment(\.dismiss) private var dismiss
     @State private var draft = ""
 
+    public init(gateway: DSHGateway) {
+        self.gateway = gateway
+    }
+
     public var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
@@ -219,14 +223,20 @@ public struct DSHChatScreen: View {
 
 // MARK: - Connect
 
-struct DSHConnectSheet: View {
+public struct DSHConnectSheet: View {
     @ObservedObject var gateway: DSHGateway
     @Environment(\.dismiss) private var dismiss
     let scan: (@escaping (String) -> Void) -> AnyView?
     @State private var message: String?
     @State private var pasted = ""
 
-    var body: some View {
+    /// Public so the host's Settings can offer pairing (the home no longer shows the status area).
+    public init(gateway: DSHGateway, scan: @escaping (@escaping (String) -> Void) -> AnyView?) {
+        self.gateway = gateway
+        self.scan = scan
+    }
+
+    public var body: some View {
         NavigationStack {
             Form {
                 Section {

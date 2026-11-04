@@ -89,6 +89,24 @@ struct DSHFrame {
     func array(_ key: String) -> [[String: Any]]? { json[key] as? [[String: Any]] }
 }
 
+// MARK: - Injected system messages
+
+/// DSH prepends a sampled-time system line to a turn's user message (for example
+/// "Time sampled while preparing turn 6, step 1: …"). It is not something the user typed, so the
+/// chat must not draw it as a bubble. One place to grow the rule if DSH adds more such lines.
+public enum DSHSystemMessageFilter {
+    private static let injectedPrefixes = [
+        "time sampled while preparing turn",
+        "time sampled",
+    ]
+
+    public static func isInjected(_ text: String) -> Bool {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !trimmed.isEmpty else { return false }
+        return injectedPrefixes.contains { trimmed.hasPrefix($0) }
+    }
+}
+
 // MARK: - Errors
 
 public enum DSHError: LocalizedError {

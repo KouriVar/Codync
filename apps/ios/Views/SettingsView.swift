@@ -1,5 +1,6 @@
 import CodyncKit
 import CodyncUI
+import DSHKit
 import SwiftUI
 import UIKit
 
@@ -17,6 +18,8 @@ struct SettingsView: View {
     @State private var versionTaps = 0
     @State private var lastVersionTap = Date.distantPast
     @State private var showStartOver = false
+    /// 首页布局：混排 / 分页（先放在调试区）。
+    @AppStorage(HomeSourcePrefs.layoutKey) private var layoutRaw = HomeLayout.mixed.rawValue
 
     var body: some View {
         Group {
@@ -30,6 +33,21 @@ struct SettingsView: View {
             .listRowSeparator(.hidden)
 
             ShortcutLeadSettings()
+
+            // 调试：首页布局先放在这里，方便对比混排和分页。
+            Section {
+                Picker(L10n.tr("首页布局"), selection: $layoutRaw) {
+                    Text("混排").tag(HomeLayout.mixed.rawValue)
+                    Text("分页").tag(HomeLayout.paged.rawValue)
+                }
+                .pickerStyle(.segmented)
+            } header: {
+                Text("调试")
+            }
+            .listRowSeparator(.hidden)
+
+            // DSH 配对状态搬到这里：首页不再显示状态区。
+            DSHSettingsSection()
 
             // The app mark, name and version: the hidden trigger for Start over.
             Section {
@@ -107,5 +125,40 @@ struct SettingsView: View {
                         value: L10n.tr(notificationsAllowed == true ? "On" : notificationsAllowed == false ? "Off in Settings" : "Turn on"))
         }
         .buttonStyle(.plain)
+    }
+}
+
+/// DSH 配对状态与入口。首页移除状态区后，配对状态在这里显示，需要时打开配对页。
+@MainActor
+private struct DSHSettingsSection: View {
+    @ObservedObject private var gateway = DSHGateway.shared
+    @State private var showConnect = false
+
+    var body: some View {
+        Section {
+            Button {
+                showConnect = true
+            } label: {
+                SettingsRow("link", title: "DSH 连接", value: statusText)
+            }
+            .buttonStyle(.plain)
+            .sheet(isPresented: $showConnect) {
+                DSHConnectSheet(gateway: gateway, scan: { onCode in
+                    AnyView(QRScanner(onCode: onCode, onError: { _ in }, acceptedPrefixes: nil))
+                })
+            }
+        } header: {
+            Text("DSH")
+        }
+        .listRowSeparator(.hidden)
+    }
+
+    private var statusText: String {
+        switch gateway.phase {
+        case .idle: return "未连接"
+        case .connecting: return "连接中…"
+        case .ready: return "已连接（\(gateway.gatewayName)）"
+        case .failed: return "连接失败"
+        }
     }
 }

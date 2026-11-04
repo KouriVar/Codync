@@ -31,6 +31,10 @@ public final class DSHGateway: ObservableObject {
     private var pendingPairing: CheckedContinuation<DSHGatewayProfile, Error>?
     private var pairingTimeoutTask: Task<Void, Never>?
 
+    /// One connection shared by the home list and Settings, so pairing (or disconnect) in one place
+    /// drives the other. The home owns whether it connects; Settings only shows its state.
+    public static let shared = DSHGateway()
+
     public init() {
         let config = URLSessionConfiguration.default
         config.waitsForConnectivity = false
@@ -265,7 +269,8 @@ public final class DSHGateway: ObservableObject {
             refreshSession(sid)
         case "user/message":
             let text = Self.text(of: event)
-            if !text.isEmpty, messages.last?.text != text {
+            // Skip DSH's injected sampled-time line: it is not the user's own message.
+            if !text.isEmpty, !DSHSystemMessageFilter.isInjected(text), messages.last?.text != text {
                 messages.append(DSHMessage(role: .user, text: text))
             }
         case "turn/end":
@@ -285,7 +290,9 @@ public final class DSHGateway: ObservableObject {
             guard let type = event["type"] as? String else { continue }
             if type == "user/message" {
                 let text = Self.text(of: event)
-                if !text.isEmpty { seeded.append(DSHMessage(role: .user, text: text)) }
+                if !text.isEmpty, !DSHSystemMessageFilter.isInjected(text) {
+                    seeded.append(DSHMessage(role: .user, text: text))
+                }
             } else if type == "assistant/message" {
                 let text = Self.text(of: event)
                 if !text.isEmpty { seeded.append(DSHMessage(role: .assistant, text: text)) }

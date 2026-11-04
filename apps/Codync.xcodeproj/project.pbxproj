@@ -29,6 +29,7 @@
 		353468006F23544D00819A8A /* AppMark.png in Resources */ = {isa = PBXBuildFile; fileRef = 8AAD255F1E3E92316C5A8F38 /* AppMark.png */; };
 		35CFB641A4F10C0EBD21CB14 /* LaunchSplash.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6FC76D28AB02DF1427D530ED /* LaunchSplash.swift */; };
 		3BCC04815E5CA8953E0DDCAD /* WidgetPreviews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 305DDCC18BB8AA6CD9D19CEF /* WidgetPreviews.swift */; };
+		41BBBC5811EC8406D7BC866C /* HomeSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EFE467F7DCE50480B80E50A /* HomeSource.swift */; };
 		48DAAA1384E5B8D0BA27C895 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1E47C60032C326157E0386B8 /* SwiftUI.framework */; };
 		4C9ADD8046382132129B1302 /* CodyncBot-squircle-Ink.ttf in Resources */ = {isa = PBXBuildFile; fileRef = CEF1A5792B9675FDA7E07740 /* CodyncBot-squircle-Ink.ttf */; };
 		4DDC38E58D673047B332FDD5 /* AccessRequestView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B97102DEC6029268332DF901 /* AccessRequestView.swift */; };
@@ -37,6 +38,7 @@
 		518BD325D0FE6D7AAE973588 /* BotRosterLine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70093609851E57B883D23DB9 /* BotRosterLine.swift */; };
 		52CF04B855C6AAEC47B75B8F /* CodyncKit in Frameworks */ = {isa = PBXBuildFile; productRef = 1285DDFA0390A76ECDAAD6C0 /* CodyncKit */; };
 		54CEEA0734C2940E2D9FAC7D /* AXTree.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4D13418ABB5FD7CFC087677 /* AXTree.swift */; };
+		5849B65F697A599EF4E71453 /* HomeSourcesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B293175C9E85107FF1223923 /* HomeSourcesView.swift */; };
 		5A56EF5D36D12ACCEA100642 /* LanguageSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73D324231A9BCE79C84C0403 /* LanguageSettings.swift */; };
 		5C9AE497DA83EB32AEC9057C /* OpenBotIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C4EB0DBA2F08CD7C0E25E30 /* OpenBotIntent.swift */; };
 		5CF8180C760CFAE49CF4B8C6 /* CodyncBot-cloud-Tint.ttf in Resources */ = {isa = PBXBuildFile; fileRef = AAD970B8394F4EDFB85A8936 /* CodyncBot-cloud-Tint.ttf */; };
@@ -158,6 +160,7 @@
 		365F24B61AEDCFE6C389E904 /* CustomActivityIcon.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomActivityIcon.swift; sourceTree = "<group>"; };
 		36C62636FD789C49762696A3 /* RosterSectionHeader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RosterSectionHeader.swift; sourceTree = "<group>"; };
 		37E3F2B3C6804BEE61208E0C /* remixicon.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = remixicon.ttf; sourceTree = "<group>"; };
+		3EFE467F7DCE50480B80E50A /* HomeSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeSource.swift; sourceTree = "<group>"; };
 		3F4C4D3B64C608AEF2F85F91 /* Kit */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Kit; path = ios/Kit; sourceTree = SOURCE_ROOT; };
 		445DB0A03CFBB5CC7A830139 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		46538A6E6E6B7C5E212F5CDF /* SessionCandidates.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionCandidates.swift; sourceTree = "<group>"; };
@@ -195,6 +198,7 @@
 		AAD970B8394F4EDFB85A8936 /* CodyncBot-cloud-Tint.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "CodyncBot-cloud-Tint.ttf"; sourceTree = "<group>"; };
 		AD18A04CD014230F1B7B0535 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		B274A0195CB3B2409EA4C194 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
+		B293175C9E85107FF1223923 /* HomeSourcesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeSourcesView.swift; sourceTree = "<group>"; };
 		B420CA27D85030C55874A296 /* TestTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestTabView.swift; sourceTree = "<group>"; };
 		B6E13F8EA6C7B0DA4D899FEE /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		B708DF60FB00E1724260BCD2 /* RowLabel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RowLabel.swift; sourceTree = "<group>"; };
@@ -368,6 +372,8 @@
 				E3E35BCE6E7037B78D22F927 /* ComputersView.swift */,
 				531BFEBACA116F08530E289F /* EmptyRoster.swift */,
 				7EE1650956F689AF85F136C1 /* HomeBottomBar.swift */,
+				3EFE467F7DCE50480B80E50A /* HomeSource.swift */,
+				B293175C9E85107FF1223923 /* HomeSourcesView.swift */,
 				73D324231A9BCE79C84C0403 /* LanguageSettings.swift */,
 				6FC76D28AB02DF1427D530ED /* LaunchSplash.swift */,
 				1CC287193FD50B9E97D3138A /* OrderingView.swift */,
@@ -786,6 +792,8 @@
 				AC044B31C0B4A68463B9024E /* ComputersView.swift in Sources */,
 				FABB0D19F485A2B9DC16A446 /* EmptyRoster.swift in Sources */,
 				4FAB4697D645027E1330039D /* HomeBottomBar.swift in Sources */,
+				41BBBC5811EC8406D7BC866C /* HomeSource.swift in Sources */,
+				5849B65F697A599EF4E71453 /* HomeSourcesView.swift in Sources */,
 				5A56EF5D36D12ACCEA100642 /* LanguageSettings.swift in Sources */,
 				35CFB641A4F10C0EBD21CB14 /* LaunchSplash.swift in Sources */,
 				E695251CFD06AC6F4E3396B7 /* OpenBotIntent.swift in Sources */,
