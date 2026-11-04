@@ -226,11 +226,6 @@ public extension HostClient {
         try await call("setComposioKey", ["key": key], timeout: 60)
     }
 
-    func composioApps(search: String) async throws -> [ComposioApp] {
-        let res: Items<ComposioApp> = try await call("composioToolkits", ["search": search], timeout: 60)
-        return res.items
-    }
-
     func composioConnect(_ app: String) async throws -> ComposioConnect {
         try await call("composioConnect", ["toolkit": app], timeout: 60)
     }

@@ -63,7 +63,6 @@ struct AccountSwitcherView: View {
     @State private var showDSHConnect = false
     @State private var showHaptics = false
     @State private var showMainBot = false
-    @State private var showTabBarProbe = false
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -71,7 +70,7 @@ struct AccountSwitcherView: View {
                 AccountProfileView(path: $path, showPairing: $showPairing, showVault: $showVault, showExtensions: $showExtensions)
                 SettingsView(path: $path, showComputersSheet: $showComputersSheet,
                              showDSHConnect: $showDSHConnect, showHaptics: $showHaptics,
-                             showMainBot: $showMainBot, showTabBarProbe: $showTabBarProbe)
+                             showMainBot: $showMainBot)
             }
             // No separators between rows: each row hides its own.
             .listRowSeparator(.hidden)
@@ -97,7 +96,6 @@ struct AccountSwitcherView: View {
             .sheet(isPresented: $showHaptics) { HapticsSettingsView() }
             // Also at the sheet root: the main bot is picked from a Settings row (C0035).
             .codyncSheet(isPresented: $showMainBot) { LeadBotPickerView() }
-            .fullScreenCover(isPresented: $showTabBarProbe) { TabBarProbeView() }
             .navigationTitle(L10n.tr("Settings"))
             .navigationBarTitleDisplayMode(.inline)
             .navigationDestination(for: AccountRoute.self) { route in

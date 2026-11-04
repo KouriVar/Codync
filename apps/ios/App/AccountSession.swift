@@ -89,11 +89,6 @@ final class AccountSession {
         return token
     }
 
-    /// Kept for callers that still ask for a session token: it is the Google ID token now.
-    func sessionToken() async throws -> String {
-        try await googleIDToken()
-    }
-
     /// No Codync cloud in this build.
     func cloudClient(for userID: String?, identity: DeviceIdentity?) -> CloudClient? { nil }
 

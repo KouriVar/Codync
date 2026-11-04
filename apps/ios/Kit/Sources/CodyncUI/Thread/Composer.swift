@@ -318,12 +318,6 @@ struct Composer: View {
         }
     }
 
-    /// Images (or files) on the clipboard become attachments.
-    private func pasteFiles() {
-        let providers = UIPasteboard.general.itemProviders
-        Task { append(await PickedFile.load(providers)) }
-    }
-
         /// Photos go out as JPEG: HEIC isn't something every agent can read.
         private func addPhotos(_ items: [PhotosPickerItem]) async {
             let stamp = Int(Date.now.timeIntervalSince1970)

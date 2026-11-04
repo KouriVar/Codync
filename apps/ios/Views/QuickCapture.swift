@@ -123,10 +123,6 @@ final class QuickCaptureModel {
         }
     }
 
-    func endPull() {
-        if !isOpen { pullDistance = 0 }
-    }
-
     func open() {
         isOpen = true
         Task { await camera.requestAccess(); camera.start() }
@@ -145,84 +141,6 @@ final class QuickCaptureModel {
         if !camera.authorized { _ = await camera.requestAccess() }
         guard camera.authorized else { return nil }
         return await camera.capturePhoto()
-    }
-}
-
-/// A compact Dynamic-Island style card that grows out of the top while pulling down.
-struct QuickCaptureOverlay: View {
-    @Bindable var model: QuickCaptureModel
-    var onAttach: (UIImage) -> Void
-
-    private let cardWidth: CGFloat = 208
-    private let openHeight: CGFloat = 236
-
-    var body: some View {
-        VStack {
-            card
-                .padding(.top, 8)
-            Spacer(minLength: 0)
-        }
-        .frame(maxWidth: .infinity, alignment: .top)
-        .allowsHitTesting(model.isOpen)
-    }
-
-    private var card: some View {
-        let height = model.isOpen ? openHeight : max(52, 52 + (openHeight - 52) * model.expand)
-        return ZStack(alignment: .topTrailing) {
-            RoundedRectangle(cornerRadius: 30, style: .continuous).fill(Color.black)
-            content
-                .clipShape(RoundedRectangle(cornerRadius: 30, style: .continuous))
-            Button { withAnimation(.easeOut(duration: 0.2)) { model.close() } } label: {
-                RemixIcon("close-line")
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(.white)
-                    .padding(7)
-                    .background(.ultraThinMaterial, in: Circle())
-            }
-            .padding(8)
-        }
-        .frame(width: cardWidth, height: height)
-        .opacity(model.isOpen ? 1 : max(model.expand, 0.25))
-        .animation(.spring(response: 0.34, dampingFraction: 0.84), value: model.isOpen)
-        .animation(.interactiveSpring(response: 0.3, dampingFraction: 0.9), value: model.expand)
-    }
-
-    @ViewBuilder private var content: some View {
-        if model.camera.authorized {
-            ZStack(alignment: .bottom) {
-                QuickCameraPreview(session: model.camera.session)
-                attachButton.padding(.bottom, 10)
-            }
-        } else {
-            VStack(spacing: 10) {
-                RemixIcon("camera-fill").font(.title).foregroundStyle(.white)
-                Text("需要相机权限").font(.footnote).foregroundStyle(.white.opacity(0.85))
-                Button("打开设置") {
-                    if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
-                }
-                .font(.footnote.weight(.semibold))
-                .buttonStyle(.bordered)
-                .tint(.white)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-        }
-    }
-
-    private var attachButton: some View {
-        Button {
-            Task {
-                if let image = await model.capture() { onAttach(image); model.close() }
-            }
-        } label: {
-            Label { Text("贴图") } icon: { RemixIcon("attachment-line") }
-                .font(.subheadline.weight(.semibold))
-                .padding(.horizontal, 16)
-                .padding(.vertical, 8)
-                .background(.white, in: Capsule())
-                .foregroundStyle(.black)
-        }
-        .buttonStyle(.plain)
-        .disabled(model.busy)
     }
 }
 

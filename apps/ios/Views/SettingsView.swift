@@ -13,8 +13,6 @@ struct SettingsView: View {
     @Binding var showDSHConnect: Bool
     @Binding var showHaptics: Bool
     @Binding var showMainBot: Bool
-    /// The TabBar probe, for the search tab's layout: debug only, behind the ten taps.
-    @Binding var showTabBarProbe: Bool
     @Environment(AppStore.self) private var app
     @Environment(AccountSession.self) private var account
     @Environment(\.openURL) private var openURL
@@ -100,9 +98,6 @@ struct SettingsView: View {
 
             if showAdvanced {
                 Section {
-                    Button { showTabBarProbe = true } label: {
-                        SettingsRow("window-line", title: L10n.tr("TabBar 对照"), chevron: false)
-                    }
                     if account.isSignedIn {
                         Button(role: .destructive) { confirmSignOut = true } label: {
                             SettingsRow("logout-box-line", title: L10n.tr("Sign out"), destructive: true, chevron: false)

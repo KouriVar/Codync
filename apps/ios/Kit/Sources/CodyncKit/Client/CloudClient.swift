@@ -184,10 +184,6 @@ public struct CloudClient: Sendable {
 
     // MARK: claims (§4.2 A)
 
-    public func createClaim() async throws -> CloudClaim {
-        try await request("POST", "v1/claims")
-    }
-
     /// `claim`: the JSON object the computer signed while pairing, sent as it came.
     public func completeClaim(claimId: String, claim: Data) async throws {
         let _: Ignored = try await request("POST", "v1/claims/\(claimId)/complete", json: claim, signed: false)

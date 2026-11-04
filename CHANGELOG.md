@@ -1911,3 +1911,17 @@
   - 胶囊几何是按 app 现有约定推的，没有真机核对：横向 16pt（与列表行/工具栏同一侧距）、纵向 `tabBarInset + 8`、胶囊高 44（24pt 头像 + 上下各 10）。
   - `tabBarInset` 取自 tab 内容自身的 `safeAreaInsets.bottom`（应为 tab bar 总高，含 Home 指示条）。若它读到 0 或偏小，胶囊会贴到屏幕底边甚至压住 tab bar——真机上位置一偏就报我，我不自己调这个数。
 - 关联：C0178、C0180、C0181、C0182。
+
+### C0184 · 2026-11-05 · 清理确定死代码、移除 TabBar 对照页
+
+- 原因：`ui/native-tabbar` 的底部栏改造完成后，仓库里留下一批“编译了没人调”的死代码（依据本轮只读审计，全仓约 4%）；其中 `TabBarProbeView` 仍会编进 Release，真机上“版本号十连击 → TabBar 对照”十二次点击即可打开。
+- 变化（只删不改，共 22 个文件、748 行删除、1 行新增）：
+  - 整文件删 7 个 Swift 文件 + 1 个图片集（411 行）：`Views/TestTabView.swift`(32)、`Views/RowLabel.swift`(51)、`Thread/RecordingPill.swift`(44)、`Thread/DictationEngineMenu.swift`(27)、`Routines/TimeZonePicker.swift`(60)、`AnalyticsSheet.swift`(64)、`Debug/TabBarProbeView.swift`(127)、`Resources/Assets.xcassets/github.imageset`(6；全仓无 `Image("github")` 引用)。`TimeZones.swift` 按清单保留（测试在用）。
+  - 文件内删符号（285 行）：`Dialog.swift` 的 `DialogCard` + `DialogButtonStyle`(91，`codyncDialog` 早已改成原生 alert)；`Bots/ComputerFilterHeader.swift` 的 `ComputerFilterHeader`(88，同文件 `BotStore.connectionLabel` 保留)；`Views/LanguageSettings.swift` 的 `LanguageSettings`(24，`LanguageRow`/`LanguagePage` 保留)；`Views/QuickCapture.swift` 的 `QuickCaptureOverlay` 与 `endPull()`(82)。
+  - 零引用函数 6 个（36 行）：`AccountSession.sessionToken()`(5)、`AccountStore.joinAccount(claimId:signed:cloud:)`(12)、`Composer.pasteFiles()`(6)、`CloudClient.createClaim()`(4)、`Market.composioApps(search:)`(5)、`VoiceSession.dismissNotice()`(4)。
+  - 移除 TabBar 对照页入口（净 8 行）：`Views/SettingsView.swift` 的 `showTabBarProbe` 绑定与“TabBar 对照”按钮(5)、`Views/AccountSwitcherView.swift` 的状态/传参/`.fullScreenCover`(−3/+1)。版本号十连击、`showAdvanced` 及其下的 Sign out / Delete account / Start over 全部保留不动。
+  - `apps/Codync.xcodeproj/project.pbxproj` 由 `xcodegen generate --spec apps/project.yml` 重新生成，只减少 8 行（两个 Views 文件的 PBXFileReference/PBXBuildFile/group/Sources 条目），没有其它改动。
+- 文件：上列 21 个，加 `apps/Codync.xcodeproj/project.pbxproj`。
+- 验证：`xcodebuild build -scheme iOS -configuration Release -destination 'platform=iOS,id=<iPhone 16 Pro>' CODE_SIGNING_ALLOWED=NO` 通过（0 error）。签名步骤在环境层面受限：Release 配置用 `ios/Resources/iOS.entitlements`（含 `aps-environment`、`com.apple.developer.usernotifications.communication`），而当前签名身份“穗 许”是 Personal Team，不支持这两个能力，故 iOS scheme 的签名构建失败，与本次改动无关。改用可签名的 `iOS Dev`/`DevDebug`（`UIPreview.entitlements`）构建通过，已装到 iPhone 16 Pro（2.36.0 / build 24）并启动成功。按要求未自测、未截图。
+- 限制/待办：清单外的一律没动——`BotListView` 死岛（连带 `HomeBottomBar`/`RosterSectionHeader`/`ComputerSection`/`EmptyRoster`/`CardMenuOverlay`，约 1 千行）、`AppTab.test`、`CODYNC_QUICKCAPTURE`、L10n json 与孤儿 key、`ChoiceList`/`CardForm`、DSHKit 的 `DSHHomeSection`、Analytics 明文 key、`relayDisabled`/`relayTasks`/`canEditKey` 均留待后续。
+- 关联：C0183。

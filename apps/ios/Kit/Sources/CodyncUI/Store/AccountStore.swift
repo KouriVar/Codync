@@ -150,18 +150,6 @@ public final class AccountStore {
         }
     }
 
-    /// The computer signed this account's claim while letting this phone in: the phone, which holds the
-    /// account's session, completes it. Best effort: without it the computer stays paired, outside the account.
-    private func joinAccount(claimId: String, signed: Data, cloud: CloudClient) async {
-        do {
-            try await cloud.completeClaim(claimId: claimId, claim: signed)
-        } catch {
-            log.error("paired computer didn't join the account: \(error.localizedDescription, privacy: .public)")
-            return
-        }
-        await refreshCloud()
-    }
-
     public func forget(_ id: ComputerID) {
         saved.removeAll { $0.id == id }
         persist()

@@ -255,10 +255,6 @@ public final class VoiceSession {
         phase = .idle
     }
 
-    public func dismissNotice() {
-        discard()
-    }
-
     // MARK: internals
 
     /// Pausing with words is the moment they become sendable; pausing without any says so instead.
