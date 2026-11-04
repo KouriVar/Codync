@@ -92,14 +92,23 @@ public struct ChatTranscriptView: View {
                                            revision: Self.revision(of: entry)) {
                     ChatEntryRow(entry: entry)
                 })
-            case .summary(let summary):
-                out.append(ConversationRow(item.id) {
-                    TurnSummaryRow(summary: summary) { onOpenSummary(summary) }
-                })
+            case .summary:
+                // A folded "thinking for 12s · ran 3 commands" line is a step, not the bot talking:
+                // it is not drawn and there is nothing to open.
+                continue
             }
         }
         if working {
-            out.append(ConversationRow("working") { typing })
+            out.append(ConversationRow("working") {
+                ConversationStatusLine(title: WorkingPhrase.generic) {
+                    // A DSH gateway has no bot: the same round face the page's title bar uses.
+                    RemixIcon("chat-ai-line", size: 24)
+                        .foregroundStyle(Palette.text)
+                        .frame(width: 24, height: 24)
+                        .clipShape(Circle())
+                }
+                .transition(.opacity)
+            })
         }
         return out
     }

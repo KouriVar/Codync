@@ -318,7 +318,8 @@ extension ThreadView {
     /// revealed steadily as it's written.
     var transcript: some View {
         // What voice calls carried shows in each call's conversation, not in the chat.
-        let items = ChatItem.build(model.chat(botId).hidingCalls())
+        // Working steps stay in the data but are not drawn: only what the bot said is content.
+        let items = ChatItem.build(model.chat(botId).hidingCalls().filter { !WorkingPhrase.isStepOnly($0) })
         var rows: [ConversationRow] = []
         if moreOnComputer {
             rows.append(ConversationRow("earlier") {
@@ -343,10 +344,13 @@ extension ThreadView {
         // Offline, "working" is only what the computer last said; don't show it as live.
         if let bot, working {
             rows.append(ConversationRow("working", revision: workingRevision) {
-                // Each turn starts folded.
-                WorkingIndicator(bot: bot, steps: Entry.workingSteps(model.chat(botId)))
-                    .id(bot.startedAt)
-                    .padding(.top, 12)
+                // One line, no steps and nothing to open: what kind of work is under way, swept.
+                ConversationStatusLine(
+                    bot: bot,
+                    title: WorkingPhrase.title(for: Entry.workingSteps(model.chat(botId)))
+                )
+                .padding(.top, 12)
+                .transition(.opacity)
             })
         }
         // Pull to refresh reconnects, like Reconnect in the computer menu, until the link is back.

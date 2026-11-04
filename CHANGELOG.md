@@ -2752,3 +2752,43 @@
   ui-preview 覆盖、构建号 197）**编译通过，0 error**，改动文件 0 warning；`xcrun devicectl device install app`
   装到 iPhone 16 Pro（`com.suiyikou.codync.uipreview` 2.36.0 / 197）成功。按要求**不自测**。
 - 关联：C0208（共用件）、C0207（Markdown）、备份 tag `backup/before-chat-port-c0209`（`2fb92685`）。
+
+### C0210 · 2026-11-05 · 会话页只留一行扫光状态行，步骤行全部不显示
+
+- 原因：跑到一半时消息列表底部会堆出「思考了 xx 秒」「运行了 x 个命令」这类步骤行，还能展开；
+  穗要求只留一行状态（bot 头像 + 一句会扫光的短标题），步骤行既不显示也不留展开入口，运行结束即消失。
+- 类型对照表（数据来自两页现有的行数据，不新增取数）：
+  | 数据源 | 值 | 状态行短标题 |
+  |---|---|---|
+  | Coe `Entry.kind` | `thought` | 在想 |
+  | Coe `Entry.kind == "tool"` + `toolKind` | `think` | 在想 |
+  | 同上 | `execute` | 在跑命令 |
+  | 同上 | `read` | 在看文件 |
+  | 同上 | `edit` / `move` / `delete` | 在改代码 |
+  | 同上 | `search` / `fetch` / 其他 / nil | 在处理 |
+  | Coe `Entry.kind` | `plan` | 在处理 |
+  | Coe `Entry.kind` | `agent`（含非 final 的叙述） | 不映射到状态行——那是 bot 说的话，仍作为消息显示 |
+  | DSH 运行中的步骤 | **没有实时数据**（`DSHGateway` 只在完成的消息里带 `tools`，运行中只有 `isStreaming`） | 一律「在处理」 |
+  | DSH 的 `DSHSummary`（思考了 X 秒 · 运行了 X 个命令） | 有，但整行不再显示 | — |
+- 变化：
+  - 新增 `Kit/Sources/CodyncUI/Thread/ConversationStatusLine.swift`：`ConversationStatusLine`（头像 24 正圆 + footnote 标题、
+    `Palette.secondary`、固定 24 高 + 上下 6 / 左右 16，`ShimmeringText` 的 1.6s 扫光、Reduce Motion 时静止），
+    以及 `WorkingPhrase`（类型 → 中文短语的固定映射，与 `isStepOnly`）。
+  - `Thread/ChatTranscript.swift`：DSH 的折叠摘要行（`TurnSummaryRow`）不再加入列表（数据没删，只是不画，也没有展开入口）；
+    运行中原来的三点 typing 行换成 `ConversationStatusLine`（DSH 无 bot，用 `chat-ai-line` 的 24pt 圆脸）。
+  - `Thread/ThreadView.swift`：Coe 的 transcript 过滤掉 `thought`/`tool`/`plan` 三类只属于步骤的条目；
+    底部原来可展开的 `WorkingIndicator` 换成一行 `ConversationStatusLine`，标题由当前步骤类型映射。
+  - `Thread/ThinkingStatus.swift`：`ShimmeringText` 由 private 改为模块内可见并支持传入字体（状态行用 footnote 复用同一段扫光）。
+- 未做 / 需要你定：
+  - DSH 的细分短语（在想 / 在跑命令 / 在看文件 / 在改代码）**拿不到实时类型**，目前一律「在处理」。要细分必须让 `DSHGateway`
+    把运行中的当前 step 暴露出来（新增取数，未做）。
+  - `WorkingIndicator` / `WorkingSteps` / `ThinkingStatusRow` / `TurnSummaryRow` 现在没有任何入口调用（展开入口随之消失），
+    属于死代码；建议单独一单清理，本条没有删。
+  - 状态行作为列表里的一行出现/消失，所以它下面**不会有输入框跳动**（输入框是 safeAreaInset，独立于列表），
+    但列表内容会随行的增删整体位移一次；淡入淡出用 `.transition(.opacity)` + 列表自身动画。
+- 文件：`apps/ios/Kit/Sources/CodyncUI/Thread/ConversationStatusLine.swift`（新）、`…/Thread/ChatTranscript.swift`、
+  `…/Thread/ThreadView.swift`、`…/Thread/ThinkingStatus.swift`。
+- 验证：`xcodebuild build -project apps/Codync.xcodeproj -scheme 'iOS Dev' -configuration DevDebug`（真机 destination、
+  ui-preview 覆盖、构建号 198）**编译通过，0 error**，改动文件 0 warning；`xcrun devicectl device install app`
+  装到 iPhone 16 Pro（`com.suiyikou.codync.uipreview` 2.36.0 / 198）成功。按要求**不自测**。
+- 关联：C0208/C0209（会话页搬迁）、备份 tag `backup/before-status-line-c0210`（`191d5fbf`）。

@@ -111,26 +111,27 @@ private struct StatusText: View {
 }
 
 /// The words in the secondary grey, with a brighter band sweeping left to right.
-private struct ShimmeringText: View {
+struct ShimmeringText: View {
     let text: String
     let startedAt: Date
+    /// 17pt for the working line; the status line asks for footnote.
+    var font = Font.system(size: 17)
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     /// 1.6s across, then a 0.3s rest before the next pass.
     private static let sweep: TimeInterval = 1.6
     private static let rest: TimeInterval = 0.3
-    private static let font = Font.system(size: 17)
 
     var body: some View {
         ZStack(alignment: .leading) {
             Text(text)
-                .font(Self.font)
+                .font(font)
                 .foregroundStyle(Palette.secondary)
                 .lineLimit(1)
                 .truncationMode(.tail)
             if !reduceMotion {
                 Text(text)
-                    .font(Self.font)
+                    .font(font)
                     .foregroundStyle(Palette.text.opacity(0.95))
                     .lineLimit(1)
                     .truncationMode(.tail)
