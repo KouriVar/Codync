@@ -1219,3 +1219,17 @@
 - 限制/待办：通知开关关闭时只能跳系统设置，回来后才反映真实状态。
 - 关联：C0133。
 
+### C0135 · 2026-11-04 · 降低 DSH 会话打开时的断线概率
+
+- 原因：DSH 连接经常失败。
+- 排查：
+  - 网关开着 Cloudflare 命名隧道（`~/.dsh/mobile-gateway-devices.json.cloudflare.json`: enabled, mode=named），手机保存的 endpoint 很可能是隧道地址；隧道对空闲和大帧都更敏感。
+  - 打开会话时的 `history` 原来请求 60 条且无 `maxBytes`，大历史会生成很大的 WebSocket 帧；之前的日志显示 history 之后容易掉线。现在改为 30 条并 `maxBytes: 262_144`。
+  - 认证失效（`authentication-required`）会删除本地凭证并停在「连接失败」，必须重新配对；设备文件里当前有 2 台设备。
+  - 已在上轮修掉：旧 socket 取消回响导致的重连循环、非幂等 `connectLastPaired`、无心跳；本轮再把握手成功（收到 `sessions`）时清零退避计数。
+- 变化：`open`/重连恢复会话的 `history` 请求改为 `maxMessages: 30`、`maxBytes: 256KB`；`sessions` 成功时 `reconnectAttempt = 0`。
+- 文件：`apps/ios/DSHKit/Sources/DSHKit/DSHGateway.swift`。
+- 验证：按要求本轮只验证编译通过（DevDebug 真机构建）。
+- 限制/待办：若仍频繁失败，看 Console 里 `com.suiyikou.codync.dsh-gateway` 的 `DSH socket dropped`：`NSURLErrorDomain/-1005/1006` 多为隧道/网络；网关 `authentication-required` 则需要重新配对。需要你在网络侧确认 Cloudflare 隧道稳定性。
+- 关联：C0130、C0124。
+

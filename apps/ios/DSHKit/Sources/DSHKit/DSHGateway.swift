@@ -223,6 +223,7 @@ public final class DSHGateway: ObservableObject {
             handlePaired(frame)
         case "sessions":
             sessions = Self.decodeSessions(frame)
+            reconnectAttempt = 0
             if phase != .ready { phase = .ready }
         case "history":
             handleHistory(frame)
@@ -268,7 +269,7 @@ public final class DSHGateway: ObservableObject {
             send(["type": "subscribe", "sessionId": sessionId, "assistantStream": true])
             let requestId = "reopen-history-\(sessionId)"
             openHistoryRequestId = requestId
-            send(["type": "history", "sessionId": sessionId, "maxMessages": 60,
+            send(["type": "history", "sessionId": sessionId, "maxMessages": 30, "maxBytes": 262_144,
                   "view": "conversation", "requestId": requestId])
         }
     }
@@ -463,7 +464,7 @@ public final class DSHGateway: ObservableObject {
         // (the live snapshot only covers what happens after subscribing).
         let requestId = "open-history-\(sessionId)"
         openHistoryRequestId = requestId
-        send(["type": "history", "sessionId": sessionId, "maxMessages": 60,
+        send(["type": "history", "sessionId": sessionId, "maxMessages": 30, "maxBytes": 262_144,
               "view": "conversation", "requestId": requestId])
     }
 
