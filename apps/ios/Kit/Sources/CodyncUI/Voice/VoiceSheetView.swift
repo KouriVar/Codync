@@ -1,47 +1,45 @@
 import CodyncKit
 import SwiftUI
 
-/// The voice sheet: the system's own sheet at three detents — a 76pt pill, half height and full —
-/// with the lead bot, the waveform and the microphone inside. Recording, recognition and sending
-/// stay in `VoiceSession`; this view only draws them. Closing the sheet is what ends a recording:
-/// there is no close button anywhere, because pulling the sheet down is the way out.
+/// The voice sheet: the system's own sheet at two detents — half height and full — with the lead bot,
+/// the words and the microphone inside. The 76pt face is no longer a detent: it is `VoicePill`, which
+/// the home's bottom bar grows into. Recording, recognition and sending stay in `VoiceSession`; this
+/// view only draws them. Closing the sheet is what ends a recording: there is no close button at
+/// half height on purpose, and pulling the sheet down is the way out.
 public struct VoiceSheetView: View {
-    /// The resting detent: 44pt buttons with 16pt of air on every side.
-    public static let small: PresentationDetent = .height(76)
     /// Every circle's glyph, against the 44pt button.
     private static let icon: CGFloat = ControlMetrics.Size.icon.glyph
-    /// The one spring the layout changes on.
-    private static let settle = Animation.spring(response: 0.35, dampingFraction: 0.9)
+    /// The one spring the layout changes on. Public: the home's capsule grows on the same curve, so
+    /// the bar and the sheet read as one move.
+    public static let settle = Animation.spring(response: 0.35, dampingFraction: 0.9)
 
     private let lead: Bot?
     private let session: VoiceSession
-    @Binding private var detent: PresentationDetent
     let openSystemSettings: () -> Void
+    /// The voice settings. They are a sheet, and a page presents one at a time: the page that owns
+    /// this sheet owns them, which is the home while the sheet is down and this sheet while it is up.
+    let openSettings: () -> Void
 
     @Bindable private var bound: VoiceSession
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @FocusState private var typing: Bool
-    @State private var breathing = false
     /// Pulling down with words to lose asks first.
     @State private var confirmDiscard = false
-    /// The voice settings open as a second sheet on top of this one: one presenter shows one sheet.
-    @State private var showSettings = false
     /// The words page has flipped round to the camera, and where the flip is.
     @State private var showingCamera = false
     @State private var flip: Double = 0
     @State private var camera = VoiceCamera()
 
-    public init(lead: Bot?, session: VoiceSession, detent: Binding<PresentationDetent>,
-                openSystemSettings: @escaping () -> Void) {
+    public init(lead: Bot?, session: VoiceSession,
+                openSystemSettings: @escaping () -> Void,
+                openSettings: @escaping () -> Void) {
         self.lead = lead
         self.session = session
-        self._detent = detent
         self._bound = Bindable(session)
         self.openSystemSettings = openSystemSettings
+        self.openSettings = openSettings
     }
-
-    private var isSmall: Bool { detent == Self.small }
 
     public var body: some View {
         Group {
@@ -55,20 +53,16 @@ public struct VoiceSheetView: View {
                 .rotation3DEffect(.degrees(flip), axis: (x: 0, y: 1, z: 0))
                 // Nothing between the camera and the sheet's bottom edge: no safe-area inset to stop it.
                 .ignoresSafeArea(edges: .bottom)
-            } else if isSmall {
-                pill
-                    .rotation3DEffect(.degrees(flip), axis: (x: 0, y: 1, z: 0))
             } else {
                 tall
                     .rotation3DEffect(.degrees(flip), axis: (x: 0, y: 1, z: 0))
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: isSmall ? .center : .top)
-        // The camera page is the only face that runs to the bottom edge; the voice faces keep their
-        // safe-area insets, so their buttons stay above the Home indicator.
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        // The camera page is the only face that runs to the bottom edge; the voice face keeps its
+        // safe-area insets, so its buttons stay above the Home indicator.
         .ignoresSafeArea(edges: showingCamera ? .bottom : [])
-        // One spring for the change between detents: nothing else animates the layout.
-        .animation(Motion.reduced(Self.settle, reduceMotion), value: isSmall)
+        // One spring for the layout changes: nothing else animates the layout.
         .animation(Motion.reduced(Self.settle, reduceMotion), value: session.sendFailed)
         // Pulling the sheet down is the way out; with words on screen it asks first.
         .simultaneousGesture(DragGesture(minimumDistance: 24).onEnded { value in
@@ -79,35 +73,9 @@ public struct VoiceSheetView: View {
             Button(L10n.tr("Discard"), role: .destructive) { dismiss() }
             Button(L10n.tr("Keep editing"), role: .cancel) {}
         }
-        .onChange(of: session.phase) { _, phase in
-            breathing = phase == .recording && !reduceMotion
-        }
         .onChange(of: session.editing) { _, editing in typing = editing }
         // Tapping anywhere that isn't a control puts the keyboard away.
         .onTapGesture { if typing { typing = false } }
-        .onAppear { breathing = session.phase == .recording && !reduceMotion }
-        .sheet(isPresented: $showSettings) {
-            VoiceLanguageSheet()
-                .presentationDetents([.medium])
-                .presentationDragIndicator(.visible)
-                .environment(\.dismissModal, DismissModalAction { showSettings = false })
-        }
-    }
-
-    // MARK: the 76pt pill
-
-    /// Avatar, waveform, settings, pause: no send, and no close — the sheet itself is the exit.
-    private var pill: some View {
-        HStack(spacing: 12) {
-            avatar(36)
-            waveColumn
-            settingsButton
-            micButton
-        }
-        .padding(.horizontal, 16)
-        // No vertical padding: the row centres in whatever the 76pt detent leaves after the system
-        // grabber, which is the 16pt of air the measurement asked for.
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
     }
 
     // MARK: half and full
@@ -129,11 +97,11 @@ public struct VoiceSheetView: View {
         // return to the bottom when it goes. The title and the photo keep their places either way.
         .safeAreaInset(edge: .bottom, spacing: 0) {
             HStack(spacing: 12) {
-                waveColumn
+                VoiceWaveColumn(session: session)
                 cameraButton
                 keyboardButton
-                settingsButton
-                micButton
+                VoiceSettingsButton(action: openSettings)
+                VoiceMicButton(session: session)
             }
             .padding(.horizontal, 16)
             .padding(.top, 8)
@@ -141,28 +109,12 @@ public struct VoiceSheetView: View {
         }
     }
 
-    /// The line, with the "a little quiet" hint under it — inside the waveform's own space, so the
-    /// pill's row never moves.
-    private var waveColumn: some View {
-        VStack(spacing: 2) {
-            VoiceWaveform(level: session.level, paused: session.phase != .recording)
-                .frame(maxWidth: .infinity)
-            if session.lowVolume {
-                Text(L10n.tr("A little quiet"))
-                    .font(.system(size: 13))
-                    .foregroundStyle(Palette.secondary)
-                    .transition(.opacity)
-            }
-        }
-        .animation(Motion.reduced(.easeInOut(duration: 0.25), reduceMotion), value: session.lowVolume)
-    }
-
     /// A system sheet's title bar: close on the left, the bot centred, send on the right. The send
     /// side keeps its 44pt when empty, so the title never drifts off centre.
     private var titleBar: some View {
         ZStack {
             HStack(spacing: 6) {
-                avatar(24)
+                VoiceAvatar(lead: lead, size: 24, recording: session.phase == .recording)
                 Text(lead?.name ?? L10n.tr("Voice"))
                     .font(.system(size: 17, weight: .semibold))
                     .foregroundStyle(Palette.text)
@@ -266,32 +218,6 @@ public struct VoiceSheetView: View {
 
     // MARK: pieces
 
-    /// 32 or 36pt. Breathing 1.0 → 1.06 inside a halo of the bot's own colour while it hears; frozen
-    /// and unlit while it is paused, so the sheet reads as silent at a glance.
-    private func avatar(_ size: CGFloat) -> some View {
-        let tint = lead.map { AvatarPalette.color($0.avatarColor) } ?? Palette.secondary
-        return ZStack {
-            Circle()
-                .fill(tint.opacity(0.5))
-                .frame(width: size, height: size)
-                .blur(radius: breathing ? 8 : 5)
-                .scaleEffect(breathing ? 1.22 : 1.05)
-                .opacity(breathing ? 0.55 : 0)
-            Group {
-                if let lead {
-                    CharacterAvatar(bot: lead, size: size, animated: false)
-                } else {
-                    Circle().fill(Palette.bubbleAgent)
-                }
-            }
-            .scaleEffect(breathing ? 1.06 : 1)
-        }
-        .frame(width: size, height: size)
-        .animation(breathing ? .easeInOut(duration: 1.1).repeatForever(autoreverses: true) : Motion.fade,
-                   value: breathing)
-        .accessibilityHidden(true)
-    }
-
     /// The ✕: plain glass, no red — and the way out, asking first when there are words to lose.
     private var closeButton: some View {
         circle("close-line", label: "Close", tint: nil) {
@@ -352,27 +278,6 @@ public struct VoiceSheetView: View {
         }
     }
 
-    private var settingsButton: some View {
-        circle("settings-3-line", label: "Voice settings", tint: nil) {
-            Haptics.impact()
-            showSettings = true
-        }
-    }
-
-    /// Pause while hearing, continue while paused. Accent glass while it is the live control.
-    private var micButton: some View {
-        Button {
-            session.toggleMicrophone()
-        } label: {
-            circleLabel(glyph: micGlyph, filled: session.phase == .recording)
-                // A play triangle reads left-heavy; nudge it into the circle's optical middle.
-                .offset(x: session.phase == .recording ? 0 : 1.5)
-        }
-        .buttonStyle(PressScale(scale: 0.92))
-        .glass(in: Circle(), interactive: true, tint: session.phase == .recording ? Palette.accentFill : nil)
-        .accessibilityLabel(Text(L10n.tr(session.phase == .recording ? "Pause recording" : "Continue recording")))
-    }
-
     /// Sends the words. In automatic mode its rim is the countdown.
     private var sendButton: some View {
         Button {
@@ -395,10 +300,6 @@ public struct VoiceSheetView: View {
         .buttonStyle(PressScale(scale: 0.92))
         .glass(in: Circle(), interactive: true, tint: Palette.accentFill)
         .accessibilityLabel(Text(L10n.tr("Send")))
-    }
-
-    private var micGlyph: String {
-        session.phase == .recording ? "pause-line" : "play-line"
     }
 
     /// One 44pt glyph: 24pt of Remix, the same weight everywhere.

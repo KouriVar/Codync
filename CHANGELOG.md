@@ -2227,3 +2227,64 @@
 - 限制/待办：圆钮 44 比会话页「＋」的 36 大一号，两边不再等大——这是本次明确要的效果；
   首页栏高度 44 仍与输入栏一致，只有右侧圆钮比会话页的大。
 - 关联：C0194、C0195。
+
+### C0197 · 2026-11-04 · 首页底部栏：语音钮变形为 76pt 语音胶囊（自绘，不再用 sheet 的小档）
+
+- 原因：76pt 小档一直是系统 sheet 的一档，语音钮和它之间隔着一次 sheet 弹出，形不成「按钮把搜索栏挤掉、
+  自己长成输入条」的连续动作。穗要的是：点语音钮，搜索栏原地收窄让位，语音钮自己长成 76pt 胶囊；
+  再从胶囊上推进入系统半屏 sheet。评估见 `/tmp/codync-audit/voice-morph.md`，按评估推荐的
+  「frame 动画 + `GlassEffectContainer(spacing:)` 融合」实现，没有用 `glassEffectID`。
+- 变化（`Kit/Sources/CodyncUI/Voice/VoicePill.swift`，新增）：
+  - `VoicePill`：76pt 高的自绘胶囊，内容与顺序与原来的 76pt 档逐项相同——36pt 头像、波形、
+    44pt 设置圆钮、44pt 麦克风圆钮，44pt 行 + 上下各 16pt 空白；没有发送、没有关闭。
+  - 从 `VoiceSheetView` 抽出两档共用的件并改为模块内共享：`VoiceAvatar`（呼吸由 `recording` 派生，
+    Reduce Motion 不呼吸）、`VoiceWaveColumn`、`VoiceSettingsButton`、`VoiceMicButton`。
+- 变化（`Kit/Sources/CodyncUI/Voice/VoiceSheetView.swift`）：
+  - 删掉 76pt 那一档：`small` 常量、`isSmall`、`pill`、body 里的 `isSmall` 分支与居中判断，
+    以及它的 `breathing` / `showSettings` 两个状态和设置 sheet。
+  - `settle` 改为 `public`（首页的胶囊用同一条曲线）；`detent` 绑定不再需要，从 init 去掉；
+    新增 `openSettings` 回调（语音设置交给当前页面的 presenter）。
+  - `avatar` / `waveColumn` / `settingsButton` / `micButton` / `micGlyph` 删除，改用共用的四个件。
+- 变化（`Views/HomeSourcesView.swift`）：
+  - 底部栏重写：`GlassEffectContainer(spacing: 12)` 里一个 `HStack`，间距在变形时 12 → 0，搜索框宽度
+    自适应为「行宽 − 44 − 12」→ 0、透明度 → 0，圆钮的 frame 从 44×44 → 行宽×76，内容用 `Capsule()`
+    裁剪；行宽用 `onGeometryChange` 量（`barWidth`），两边宽度之和始终等于行宽，右边缘与搜索框左边缘
+    都不动。变形完成后搜索框整体移出视图树（`searchCollapsed`），零宽度不留玻璃残线。
+  - 圆钮的玻璃上移到槽位（`.glass(in: Capsule())`），两个图标改成不带自身玻璃的 24pt 字形按钮，
+    这样形状可以从圆长成胶囊；关闭时行为与 C0196 相同（44pt 圆、24pt 图标、两态淡入淡出）。
+  - 手势：胶囊上短上推（< −30pt）→ `voiceDetent = .medium; showVoice = true`（方案 A）；短下推
+    （> +30pt）→ 反向收回，有词/有照片时先用现有文案「Discard this voice message?」确认。
+  - 语音流程：`beginVoice()` 先把搜索框键盘收起，再 `withAnimation` 展开胶囊，然后 `voice.begin()`
+    （`VoiceSession` 在首页，变形与 sheet 之间录音不中断）；`raiseSheet()` 删除——最小的档就是半屏，
+    改为 `openVoiceSheet()`，`.confirming` / `.notice` / `.paused 且没听到` 时从胶囊升到半屏。
+  - 语音设置：胶囊里的设置打开首页这一层的 `VoiceLanguageSheet`；半屏/全屏里的设置仍由 sheet 自己弹
+    （一个页面同时只能弹一个 sheet，从首页弹会在 sheet 已呈现时被拒），两条路径不会同时出现。
+  - 动画曲线：选 `VoiceSheetView.settle`（`.spring(response: 0.35, dampingFraction: 0.9)`），因为
+    sheet 自己的档位变化就是这条曲线，胶囊长出来和 sheet 变化读起来是一次动作；它不是过冲型弹簧，
+    末尾稳定、不会把胶囊撑过行宽。Reduce Motion 时 `Motion.reduced(...)` 退化为 `Motion.fade`。
+- 76pt 档原来的 6 处引用，逐条改掉：
+  1. `voiceDetent` 初值 `VoiceSheetView.small` → `.medium`
+  2. sheet `onDismiss` 里的复位 → `.medium`
+  3. `presentationDetents([small, .medium, .large])` → `([.medium, .large])`
+  4. `presentationBackgroundInteraction(.enabled(upThrough: small))` → 删除（最小档已是半屏，背景应锁住）
+  5. `beginVoice()` 里的 `voiceDetent = VoiceSheetView.small` → 不再设档，改成展开胶囊；
+     开 sheet 时由 `openVoiceSheet()` 设 `.medium`
+  6. `raiseSheet()` 里 `voiceDetent == VoiceSheetView.small` 的前置判断 → 整个函数删除，
+     由 `openVoiceSheet()` 取代
+- 文件：`apps/ios/Kit/Sources/CodyncUI/Voice/VoicePill.swift`（新）、
+  `apps/ios/Kit/Sources/CodyncUI/Voice/VoiceSheetView.swift`、`apps/ios/Views/HomeSourcesView.swift`。
+  新文件在本地 Swift package `apps/ios/Kit` 里，已按要求执行 `xcodegen generate --spec apps/project.yml`；
+  该 package 是目录型 target，`project.pbxproj` 因此没有变化（没有手改生成文件）。
+- 验证：`xcodebuild build -project apps/Codync.xcodeproj -scheme 'iOS Dev' -configuration DevDebug`
+  （真机 destination、ui-preview 覆盖、构建号 185）**编译通过，0 error**；`xcrun devicectl device install app`
+  装到 iPhone 16 Pro（`com.suiyikou.codync.uipreview` 2.36.0 / 185）成功。按你的要求**不自测**：
+  不跑测试、不截图、不用 CDP，变形、反向、上推衔接、设置、减弱动态均未实测。
+- 限制/待办：
+  - 从胶囊上推到半屏是「松手后弹 sheet」（方案 A），系统 sheet 的进场无法从 76pt 起，切换瞬间会有
+    一次「胶囊 → sheet」的交接；录音不中断，但视觉衔接未实测。
+  - 76pt 已不是 sheet 的一档，`presentationBackgroundInteraction` 随之去掉：半屏时首页不可交互（原来
+    在 76pt 时可交互）。
+  - 语音设置仍有两个 presenter：胶囊的在首页、半屏的在 sheet 内。这是「一个页面一次只能弹一个 sheet」
+    的限制；若要求严格单一 presenter，只能把语音设置改成 sheet 内的一页（push）而不是第二个 sheet。
+  - 变形期间栏高 44 → 76，首页列表会随安全区上移 32pt（`safeAreaInset` 的正常行为）。
+- 关联：C0194、C0195、C0196；评估：`/tmp/codync-audit/voice-morph.md`。

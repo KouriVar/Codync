@@ -29,10 +29,20 @@ struct HomeSourcesView: View {
     @State private var confirmDelete: RosterItem?
     /// The voice sheet's session and what it says to the lead bot.
     @State private var voice = VoiceSession()
-    /// The voice sheet is up (it opens on the round button).
+    /// The bar has grown into the voice capsule: the search field has given it its width.
+    @State private var voiceOpen = false
+    /// The field has folded away completely and left the tree, so none of its glass is left behind.
+    @State private var searchCollapsed = false
+    /// The row's width inside the bar's 16pt sides: what the capsule grows to.
+    @State private var barWidth: CGFloat = 0
+    /// The voice sheet is up (a pull up on the capsule opens it).
     @State private var showVoice = false
-    /// Which height it rests at: the 76pt pill, half, or full.
-    @State private var voiceDetent: PresentationDetent = VoiceSheetView.small
+    /// Which height it rests at: half or full.
+    @State private var voiceDetent: PresentationDetent = .medium
+    /// The capsule's voice settings: the sheet that page opens for itself.
+    @State private var showVoiceSettings = false
+    /// A pull down on the capsule with words to lose asks first, as the sheet does.
+    @State private var confirmDiscardVoice = false
     /// The glass pill that says what was just sent.
     @State private var toast: GlassToastItem?
     @State private var openDSHSession: DSHSession?
@@ -90,31 +100,40 @@ struct HomeSourcesView: View {
             // The voice sheet: on the home's root view, never from a list row — a rebuilt anchor
             // there takes the sheet, and the home with it (C0035, C0136).
             .sheet(isPresented: $showVoice, onDismiss: {
-                // Pulled down or sent: the recording is over.
+                // Pulled down or sent: the recording is over, and the capsule shrinks back into the
+                // round button the way it grew out of it.
                 voice.discard()
-                voiceDetent = VoiceSheetView.small
+                voiceDetent = .medium
+                closeCapsule()
             }) {
-                VoiceSheetView(lead: leadBot?.bot, session: voice, detent: $voiceDetent,
-                               openSystemSettings: { openSystemVoiceSettings() })
-                    .presentationDetents([VoiceSheetView.small, .medium, .large], selection: $voiceDetent)
+                VoiceSheetView(lead: leadBot?.bot, session: voice,
+                               openSystemSettings: { openSystemVoiceSettings() },
+                               openSettings: { showVoiceSettings = true })
+                    .presentationDetents([.medium, .large], selection: $voiceDetent)
                     // The system's grabber, glass and dismissal are the whole point: no hand-drawn
                     // handle, no custom transition, so it leaves exactly the way it came in.
                     .presentationDragIndicator(.visible)
-                    // At the pill the home stays live; halfway and up it dims and locks itself.
-                    .presentationBackgroundInteraction(.enabled(upThrough: VoiceSheetView.small))
                     // Pulling down closes the sheet — unless there are words to lose, in which case
                     // the sheet asks first (the gesture in the sheet is what asks).
                     .interactiveDismissDisabled(voice.hasWords)
             }
+            // The capsule's own settings. One page presents one sheet, so this lives here rather than
+            // inside the sheet above: while the sheet is up, its own settings button opens them.
+            .sheet(isPresented: $showVoiceSettings) {
+                VoiceLanguageSheet()
+                    .presentationDetents([.medium])
+                    .presentationDragIndicator(.visible)
+                    .environment(\.dismissModal, DismissModalAction { showVoiceSettings = false })
+            }
             .glassToast($toast, topPadding: 6)
             .onChange(of: voice.phase) { _, phase in
                 switch phase {
-                // The words are read at half height: come up if the pill is where it still sits.
+                // The words (or a refusal) are read at half height: come up from the capsule.
                 case .confirming, .notice:
-                    raiseSheet()
+                    openVoiceSheet()
                 case .paused where voice.notHeard:
                     // Nothing heard: the hint only lives in the taller sheet.
-                    raiseSheet()
+                    openVoiceSheet()
                 // Sent or cancelled: the sheet has done its work.
                 case .idle:
                     if showVoice { showVoice = false }
@@ -122,6 +141,11 @@ struct HomeSourcesView: View {
                 }
             }
             .onChange(of: voiceDetent) { _, _ in Haptics.selection() }
+            .confirmationDialog(L10n.tr("Discard this voice message?"), isPresented: $confirmDiscardVoice,
+                                titleVisibility: .visible) {
+                Button(L10n.tr("Discard"), role: .destructive) { dismissVoice() }
+                Button(L10n.tr("Keep editing"), role: .cancel) {}
+            }
             // The bar climbs back the moment the sheet starts down, not after it has gone.
             .onAppear { voice.onSend = { words, files in await sendToLeadBot(words, files: files) } }
             .sheet(isPresented: $showDSHConnect, content: dshConnectSheet)
@@ -264,24 +288,50 @@ struct HomeSourcesView: View {
         accounts.roster.first { $0.bot.lead && !$0.bot.isGroup }
     }
 
+    /// The one curve the bar morphs on: the sheet's own settle, so the capsule growing and the
+    /// sheet's detents changing read as one move. Reduce Motion swaps the spring for a short fade.
+    private static let morph = VoiceSheetView.settle
+    private var morphAnimation: Animation { Motion.reduced(Self.morph, reduceMotion) ?? Motion.fade }
+
     /// The home's one bar, at the conversation page's composer numbers: 16pt at the screen's edges,
     /// 12pt between the field and the round button, 6pt above, and 28pt — or the composer's 12pt
-    /// while the keyboard is up — below.
+    /// while the keyboard is up — below. The field and the button are one row whose spacing closes as
+    /// the button takes the field's width: a search capsule and a growing voice capsule in one glass
+    /// container, so their surfaces blend while they cross.
     private var bottomBar: some View {
-        HStack(spacing: 12) {
-            searchBox
-            circleButton
+        GlassEffectContainer(spacing: 12) {
+            HStack(spacing: voiceOpen ? 0 : 12) {
+                if !(voiceOpen && searchCollapsed) {
+                    searchBox
+                        .frame(width: searchWidth)
+                        .opacity(voiceOpen ? 0 : 1)
+                }
+                voiceSlot
+            }
         }
+        .frame(maxWidth: .infinity, alignment: .trailing)
         .padding(.horizontal, 16)
         .padding(.top, 6)
         .padding(.bottom, keyboardUp ? 12 : 28)
         .ignoresSafeArea(.container, edges: keyboardUp ? [] : .bottom)
+        // The row inside the 16pt sides: how wide the capsule grows.
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width in
+            barWidth = max(0, width - 32)
+        }
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
             keyboardUp = true
         }
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
             keyboardUp = false
         }
+    }
+
+    /// The field's width is whatever the button is not using, so the two always add up to the row:
+    /// the button's 44pt and the 12pt gap now, the whole row and no gap once it has grown. Until the
+    /// row has been measured the field keeps its natural, flexible width.
+    private var searchWidth: CGFloat? {
+        guard barWidth > 0 else { return nil }
+        return voiceOpen ? 0 : max(0, barWidth - ControlMetrics.Size.icon.side - 12)
     }
 
     /// The search field in place: `.searchable` used to push a separate page, and this one stays on
@@ -298,7 +348,7 @@ struct HomeSourcesView: View {
                 .focused($searchFocused)
         }
         .font(.body)
-        // The composer's own insets: 14pt inside the capsule, and the 48pt row it draws against.
+        // The composer's own insets: 14pt inside the capsule, and the row it draws against.
         .padding(.horizontal, 14)
         .frame(minHeight: ControlMetrics.Size.compact.hitTarget)
         // The composer's box, corner for corner.
@@ -307,21 +357,66 @@ struct HomeSourcesView: View {
         .onTapGesture { searchFocused = true }
     }
 
-    /// The round button, in two states over the same circle: the microphone while the field is idle,
-    /// a ✕ that empties the field and puts the keyboard away once it has focus. The swap is a fade.
-    /// The app's icon circle: 44pt across with a 24pt glyph.
-    private var circleButton: some View {
+    /// The round button and the capsule it becomes: one glass shape, one frame that changes. Closed it
+    /// is the app's 44pt icon circle; open it is the 76pt voice capsule, holding the same row the
+    /// sheet's old 76pt detent drew. The content is clipped to the shape while it grows.
+    private var voiceSlot: some View {
         ZStack {
-            GlassButton(L10n.tr("Voice"), glyph: .remix("mic-line"), size: .icon) { beginVoice() }
-                .opacity(searchFocused ? 0 : 1)
-                .allowsHitTesting(!searchFocused)
-                .accessibilityHidden(searchFocused)
-            GlassButton(L10n.tr("Close search"), glyph: .remix("close-line"), size: .icon) { endSearch() }
-                .opacity(searchFocused ? 1 : 0)
-                .allowsHitTesting(searchFocused)
-                .accessibilityHidden(!searchFocused)
+            if voiceOpen {
+                VoicePill(lead: leadBot?.bot, session: voice) { showVoiceSettings = true }
+                    .transition(.opacity)
+            } else {
+                circleGlyphs
+            }
+        }
+        .frame(width: voiceOpen ? (barWidth > 0 ? barWidth : nil) : ControlMetrics.Size.icon.side,
+               height: voiceOpen ? VoicePill.height : ControlMetrics.Size.icon.side)
+        .clipShape(Capsule())
+        .glass(in: Capsule(), interactive: !voiceOpen)
+        .contentShape(Capsule())
+        .gesture(voiceDrag)
+    }
+
+    /// The closed circle's two states in the same place: the microphone while the field is idle, a ✕
+    /// that empties it and puts the keyboard away once it has focus. The glass belongs to the slot, so
+    /// the swap is only a fade.
+    private var circleGlyphs: some View {
+        ZStack {
+            slotGlyph(L10n.tr("Voice"), glyph: "mic-line", shown: !searchFocused) { beginVoice() }
+            slotGlyph(L10n.tr("Close search"), glyph: "close-line", shown: searchFocused) { endSearch() }
         }
         .animation(Motion.reduced(Motion.fade, reduceMotion), value: searchFocused)
+    }
+
+    /// One 24pt glyph in the circle the slot draws: `GlassButton`'s own composition, with the glass
+    /// lifted to the slot so the shape can grow out of it.
+    private func slotGlyph(_ title: String, glyph: String, shown: Bool,
+                           action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            RemixIcon(glyph, size: ControlMetrics.Size.icon.glyph)
+                .foregroundStyle(Palette.text)
+                .frame(width: ControlMetrics.Size.icon.side, height: ControlMetrics.Size.icon.side)
+                .contentShape(Circle())
+        }
+        .buttonStyle(PressScale())
+        .opacity(shown ? 1 : 0)
+        .allowsHitTesting(shown)
+        .accessibilityHidden(!shown)
+        .accessibilityLabel(Text(title))
+    }
+
+    /// The capsule's two moves: a short pull up is the sheet at half height, a short pull down puts
+    /// the capsule away again — asking first when there are words or a photo to lose.
+    private var voiceDrag: some Gesture {
+        DragGesture(minimumDistance: 12)
+            .onEnded { value in
+                guard voiceOpen, !showVoice else { return }
+                if value.translation.height < -30 {
+                    openVoiceSheet()
+                } else if value.translation.height > 30 {
+                    if voice.hasWords { confirmDiscardVoice = true } else { dismissVoice() }
+                }
+            }
     }
 
     /// ✕: the words go, the keyboard goes with them, the list comes back whole, and the circle turns
@@ -333,15 +428,43 @@ struct HomeSourcesView: View {
 
     /// No lead bot is a setup problem, not a recording one: say where to fix it instead of opening the mic.
     private func beginVoice() {
-        guard !showVoice else { return }
+        guard !voiceOpen, !showVoice else { return }
         guard leadBot != nil else {
             toast = GlassToastItem(icon: "error-warning-line",
                                    text: L10n.tr("Pick a main bot in Settings first"))
             return
         }
-        voiceDetent = VoiceSheetView.small
-        showVoice = true
+        // The keyboard goes first: the bar must not ride up on it while it grows.
+        searchFocused = false
+        withAnimation(morphAnimation) { voiceOpen = true }
+        // Once the field has folded away it leaves the tree entirely, so no glass of its own is left
+        // at zero width to leave a line behind.
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(450))
+            if voiceOpen { searchCollapsed = true }
+        }
         Task { @MainActor in await voice.begin() }
+    }
+
+    /// The pull up: the same sheet as before, opened at the half height.
+    private func openVoiceSheet() {
+        guard voiceOpen, !showVoice else { return }
+        voiceDetent = .medium
+        showVoice = true
+    }
+
+    /// A pull down, or ✕ on the sheet: back to the round button, the words thrown away.
+    private func dismissVoice() {
+        voice.discard()
+        closeCapsule()
+    }
+
+    /// The reverse of `beginVoice`: the capsule shrinks back into the circle and the field comes back
+    /// to its width. The field returns to the tree first, still zero wide and invisible.
+    private func closeCapsule() {
+        guard voiceOpen else { return }
+        searchCollapsed = false
+        withAnimation(morphAnimation) { voiceOpen = false }
     }
 
     /// The same send a typed message uses, so the bot answers exactly as it would in the chat. The
@@ -354,14 +477,6 @@ struct HomeSourcesView: View {
             accounts.selection = lead.ref
         }
         return true
-    }
-
-    /// The words (or a refusal) are read at half height.
-    private func raiseSheet() {
-        guard showVoice, voiceDetent == VoiceSheetView.small else { return }
-        withAnimation(Motion.reduced(.spring(response: 0.35, dampingFraction: 0.9), reduceMotion)) {
-            voiceDetent = .medium
-        }
     }
 
     private func openSystemVoiceSettings() {
