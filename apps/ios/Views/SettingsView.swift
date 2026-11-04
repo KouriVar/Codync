@@ -48,7 +48,7 @@ struct SettingsView: View {
                 ForEach(HomeSource.allCases) { source in
                     Toggle(isOn: Binding(get: { enabledSources.contains(source) },
                                         set: { setSource(source, on: $0) })) {
-                        Text(source.title)
+                        Label { Text(source.title) } icon: { HomeSourceIcon(source: source) }
                     }
                 }
             }
@@ -225,5 +225,28 @@ struct HapticsSettingsView: View {
                 ToolbarItem(placement: .cancellationAction) { Button("关闭") { dismiss() } }
             }
         }
+    }
+}
+
+/// The home source's icon: the COE agent glyph from the design files, Remix's DeepSeek and chat-ai.
+private struct HomeSourceIcon: View {
+    let source: HomeSource
+
+    var body: some View {
+        Group {
+            switch source {
+            case .coe:
+                Image("coe-agent")
+                    .renderingMode(.template)
+                    .resizable()
+                    .scaledToFit()
+                    .foregroundStyle(.primary)
+            case .dsBot:
+                RemixIcon("deepseek-line", size: 18).foregroundStyle(.primary)
+            case .dsh:
+                RemixIcon("chat-ai-line", size: 18).foregroundStyle(.primary)
+            }
+        }
+        .frame(width: 22, height: 22)
     }
 }

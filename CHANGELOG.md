@@ -1278,3 +1278,15 @@
 - 限制/待办：`topBarInset` 以「状态栏 + 44pt inline 栏」估算，若系统栏高度不同可能差几 pt；横向 ScrollView 与竖向 List 的手势组合需真机确认。
 - 关联：C0138、C0128。
 
+### C0140 · 2026-11-04 · 设置里的三个首页来源加上图标
+
+- 原因：设置里 COE / DSHB / DSHC 三个来源开关没有图标。
+- 变化：
+  - COE 用设计文件 `样式文件/dsh-style/icons/sidebar/IconAgentPresetOutlineRegular.svg`，复制为 `apps/ios/Resources/Assets.xcassets/coe-agent.imageset`（SVG，template 渲染，随主题着色）。
+  - DSHB 用 Remix `deepseek-line`；DSHC 用 Remix `chat-ai-line`。
+  - 三个来源的 `Toggle` 改用 `Label`，图标 22×22。
+- 文件：`apps/ios/Views/SettingsView.swift`、`apps/ios/Resources/Assets.xcassets/coe-agent.imageset`（新）。
+- 验证：按要求本轮只验证编译通过（DevDebug 真机构建）。
+- 限制/待办：COE 图标是 480 viewBox 的路径，缩到 18pt 后的清晰度未截图核对。
+- 关联：C0134。
+
