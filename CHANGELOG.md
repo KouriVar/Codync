@@ -1849,3 +1849,14 @@
 - 验证：`xcodebuild build -scheme 'iOS Dev' -configuration DevDebug` 通过；已装到 iPhone 16 Pro（2.36.0 / 177）并启动。按要求未自测、未截图。
 - 限制/待办：无。
 - 关联：C0155、C0167。
+### C0180 · 2026-11-05 · 语音条进出动画去掉形变联动，退出改为下一帧起播
+
+- 排查结论（形变联动）：活动路径上**没有**任何 glassEffectID / matchedGeometryEffect / Namespace 把语音条和 sheet 连起来——`apps/ios/Views/HomeSourcesView.swift`、`apps/ios/Kit/Sources/CodyncUI/Voice/VoiceSheetView.swift`、`VoiceCamera.swift`、`VoiceMiniBar.swift`(已删) 均无；唯一命中是 `apps/ios/Views/HomeBottomBar.swift:19/26/57/68/77`（`@Namespace`、`GlassEffectContainer`、`glassEffectID`），那是**已不再使用**的旧悬浮底栏（仅被同样废弃的 `BotListView` 引用），与本路径无关，未改动。
+- 变化：
+  - 进入保持：`withAnimation(.easeInOut(duration: 0.3))` 同时置「语音条下移 40pt + 渐隐」与 `tabBarHidden = true`；动画放完（300ms）才卸载语音条并由系统上滑弹出 sheet。
+  - 退出改为：`onDismiss` 先把语音条按初始状态（offset 40 / opacity 0）挂回，**用 `DispatchQueue.main.async` 等到下一帧**，再用同一个 `withAnimation(.easeInOut(duration: 0.3))` 回到原位、透明度 1，tab bar 同步显示——首帧布局不再被并进动画，避免卡顿。
+  - 页面内容仍然没有任何位移或透明度变化。
+- 文件：`apps/ios/Views/HomeSourcesView.swift`。
+- 验证：`xcodebuild build -scheme 'iOS Dev' -configuration DevDebug` 通过；已装到 iPhone 16 Pro（2.36.0 / 178）并启动。按要求未自测、未截图。
+- 限制/待办：**系统 tab bar 的 `.toolbar(.hidden)` 是否参与该 `withAnimation` 事务我无法自测**。若真机上仍出现「语音条有滑动淡出、tab bar 却瞬间消失」，说明系统工具栏可见性不吃这个事务——按你的要求我先停在这里，请告诉我这个现象，我不再自己换方案。
+- 关联：C0174、C0176、C0178。

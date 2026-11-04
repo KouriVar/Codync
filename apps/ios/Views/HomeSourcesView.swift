@@ -91,15 +91,17 @@ struct HomeSourcesView: View {
                 voice.discard()
                 voiceDetent = VoiceSheetView.small
                 isTransitioning = true
-                // Back in the state it left in, then home on the same animation it went out with.
+                // Back in exactly the state it left in — down 40, invisible — and only on the next
+                // frame does it start home, so the first layout is not folded into the animation.
                 accessoryMounted = true
                 accessoryLeaving = true
-                Task { @MainActor in
-                    try? await Task.sleep(for: .milliseconds(20))
+                DispatchQueue.main.async {
                     withAnimation(Self.barFade) {
                         accessoryLeaving = false
                         tabBarHidden = false
                     }
+                }
+                Task { @MainActor in
                     try? await Task.sleep(for: .milliseconds(320))
                     isTransitioning = false
                 }
