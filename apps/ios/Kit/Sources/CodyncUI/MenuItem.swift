@@ -186,7 +186,12 @@ public extension View {
                 ControlGroup {
                     ForEach(quick) { action in
                         Button(action: action.action) {
-                            MenuGlyph(symbol: action.icon, destructive: false)
+                            Label {
+                                Text(action.title)
+                            } icon: {
+                                MenuGlyph(symbol: action.icon, destructive: false)
+                            }
+                            .labelStyle(.titleAndIcon)
                         }
                         .accessibilityLabel(action.title)
                     }

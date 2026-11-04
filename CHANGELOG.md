@@ -1243,3 +1243,12 @@
 - 限制/待办：其余设置子页沿用原来的呈现方式，未改。
 - 关联：C0035、C0133。
 
+### C0137 · 2026-11-04 · 长按菜单快捷按钮显示图标 + 文字
+
+- 原因：`ControlGroup` 里的三个快捷按钮只有图标，没有文字。
+- 变化：每项 `Button` 的 label 改为 `Label { Text(title) } icon: { MenuGlyph(...) }`，并显式 `.labelStyle(.titleAndIcon)`；没有使用 `.compactMenu` 或 `.iconOnly`。最多仍放三项。
+- 文件：`apps/ios/Kit/Sources/CodyncUI/MenuItem.swift`。
+- 验证：按要求本轮只验证编译通过（DevDebug 真机构建）。
+- 限制/待办：系统在 context menu 里的排列（图标在上、文字在下）由 ControlGroup 决定，未截图核对。
+- 关联：C0131。
+
