@@ -17,11 +17,6 @@ struct RootView: View {
     @State private var showCapture = false
     @State private var captureCompletion: (@MainActor @Sendable (UIImage) -> Void)?
 
-    /// The open bot, as a NavigationStack path.
-    private var path: Binding<[BotReference]> {
-        Binding(get: { accounts.selection.map { [$0] } ?? [] }, set: { accounts.selection = $0.last })
-    }
-
     var body: some View {
         Group {
             if mustSignIn {
@@ -83,27 +78,22 @@ struct RootView: View {
 
     /// State and Settings live in the avatar sheet; the experimental tab remains hidden.
     private var home: some View {
-        NavigationStack(path: path) {
-            // One home for every conversation source: the source switch picks Coe / DS Bot / DSH,
-            // and the layout (mixed or paged) comes from Settings. The DSH status area that used to
-            // sit under the avatar is gone; pairing moved into Settings.
-            HomeSourcesView()
-                .safeAreaInset(edge: .bottom, spacing: 0) { AccessBanners() }
-                .navigationDestination(for: BotReference.self) { ref in
-                    ChatScreen(ref: ref)
+        // The home draws its own tab bar and a stack per tab, so it is not wrapped in a
+        // NavigationStack here. The DSH status area that used to sit under the avatar is gone;
+        // pairing moved into Settings.
+        HomeSourcesView()
+            .safeAreaInset(edge: .bottom, spacing: 0) { AccessBanners() }
+            .tint(Palette.text)
+            .tracked(.screenViewed(.bots))
+            // Opening a bot (notification, widget, link) always lands on the Bots tab.
+            .onChange(of: accounts.selection) { old, ref in
+                if ref != nil {
+                    app.tab = .bots
+                    ReviewInvitation.shared.cancel(.interaction)
+                } else if let old {
+                    ReviewInvitation.shared.returned(from: "\(accounts.storage.id)/\(old.computerId)/\(old.botId)")
                 }
-        }
-        .tint(Palette.text)
-        .tracked(.screenViewed(.bots))
-        // Opening a bot (notification, widget, link) always lands on the Bots tab.
-        .onChange(of: accounts.selection) { old, ref in
-            if ref != nil {
-                app.tab = .bots
-                ReviewInvitation.shared.cancel(.interaction)
-            } else if let old {
-                ReviewInvitation.shared.returned(from: "\(accounts.storage.id)/\(old.computerId)/\(old.botId)")
             }
-        }
     }
 
     /// Every build with accounts requires sign-in. While Clerk restores, the last signed-in account's context
@@ -153,7 +143,7 @@ struct RootView: View {
 }
 
 /// A conversation, talking to the computer the bot lives on.
-private struct ChatScreen: View {
+struct ChatScreen: View {
     let ref: BotReference
     @Environment(AccountStore.self) private var accounts
 

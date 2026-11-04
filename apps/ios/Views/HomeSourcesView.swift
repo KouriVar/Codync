@@ -27,9 +27,8 @@ struct HomeSourcesView: View {
     @State private var voice = VoiceSession()
     /// The voice sheet is up (it opens on the microphone button).
     @State private var showVoice = false
-    /// The bar is out of the way: driven by the sheet's presentation *and* its dismissal, so it
-    /// always comes back the way it left.
-    @State private var barAway = false
+    /// Which tab is showing. The system keeps the accessory and the tab bar in step with it.
+    @State private var selection = HomeTab.pinned
     /// Which height it rests at: the 76pt pill, half, or full.
     @State private var voiceDetent: PresentationDetent = VoiceSheetView.small
     /// The glass pill that says what was just sent.
@@ -59,8 +58,7 @@ struct HomeSourcesView: View {
     // MARK: - Body
 
     var body: some View {
-        chromeView
-            .refreshable { await refreshAll() }
+        tabs
             .task {
                 syncDSHConnection()
                 #if DEBUG
@@ -94,7 +92,6 @@ struct HomeSourcesView: View {
                 // Pulled down or sent: either way the recording is over and the bar comes back.
                 voice.discard()
                 voiceDetent = VoiceSheetView.small
-                barAway = false
             }) {
                 VoiceSheetView(lead: leadBot?.bot, session: voice, detent: $voiceDetent,
                                openSystemSettings: { openSystemVoiceSettings() })
@@ -125,11 +122,7 @@ struct HomeSourcesView: View {
             }
             .onChange(of: voiceDetent) { _, _ in Haptics.selection() }
             // The bar climbs back the moment the sheet starts down, not after it has gone.
-            .onChange(of: showVoice) { _, shown in if !shown { barAway = false } }
             .onAppear { voice.onSend = { await sendToLeadBot($0) } }
-            .navigationDestination(item: $openDSHSession) { _ in
-                DSHConversationView(gateway: dsh)
-            }
             .sheet(isPresented: $showDSHConnect, content: dshConnectSheet)
             .codyncSheet(item: $creating) { target in creatingSheet(target) }
             .alert(deleteTitle, isPresented: deleteShown, presenting: confirmDelete) { item in
@@ -151,48 +144,129 @@ struct HomeSourcesView: View {
             }
     }
 
-    private var chromeView: some View {
-        baseView
-            .navigationTitle("")
-            .navigationBarTitleDisplayMode(.inline)
-            // The bar's background, its scroll behaviour and the fade under it are the system's
-            // business now: nothing here overrides them.
-            .toolbar { toolbarContent }
+    /// The home as four native tabs — 置顶, then one per source Settings leaves on — and the system's
+    /// own search tab on the right. Each tab has its own stack, so a conversation pushes inside the
+    /// tab it was opened from.
+    private var tabs: some View {
+        TabView(selection: $selection) {
+            Tab(HomeTab.pinned.title, systemImage: HomeTab.pinned.symbol, value: HomeTab.pinned) {
+                stack { rosterList(rows) }
+            }
+            if enabledSources.contains(.coe) {
+                Tab(HomeTab.coe.title, systemImage: HomeTab.coe.symbol, value: HomeTab.coe) {
+                    stack { rosterList(botEntries(for: .coe)) }
+                }
+            }
+            if enabledSources.contains(.dsBot) {
+                Tab(HomeTab.dsBot.title, systemImage: HomeTab.dsBot.symbol, value: HomeTab.dsBot) {
+                    stack { rosterList(botEntries(for: .dsBot)) }
+                }
+            }
+            if enabledSources.contains(.dsh) {
+                Tab(HomeTab.dsh.title, systemImage: HomeTab.dsh.symbol, value: HomeTab.dsh) {
+                    stack { rosterList(dshEntries, hint: dshHint) }
+                }
+            }
+            Tab(value: HomeTab.search, role: .search) {
+                stack { searchList }
+            } label: {
+                Label(HomeTab.search.title, systemImage: HomeTab.search.symbol)
+            }
+        }
+        // Scrolling down shrinks the bar to the tab you are on and folds the accessory into it.
+        .tabBarMinimizeBehavior(.onScrollDown)
+        .tabViewBottomAccessory {
+            HomeVoiceAccessory(onVoice: beginVoice, onCamera: { showCameraSheet = true })
+        }
+        .tint(Palette.text)
+        .onChange(of: enabledSources) { _, sources in
+            // The tab you were on has just been switched off in Settings: back to 置顶.
+            if let source = selection.source, !sources.contains(source) { selection = .pinned }
+        }
     }
 
-    /// One list for the home: the pinned sessions, then everything else by when it last spoke. It
-    /// reaches under the navigation bar and carries the same top fade the chat page does.
-    private var baseView: some View {
+    /// One tab's stack: the same toolbar, pushes and DSH destination in every tab.
+    private func stack<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
+        NavigationStack(path: path) {
+            content()
+                .navigationTitle("")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar { toolbarContent }
+                .navigationDestination(for: BotReference.self) { ref in ChatScreen(ref: ref) }
+                .navigationDestination(item: $openDSHSession) { _ in DSHConversationView(gateway: dsh) }
+        }
+    }
+
+    /// The open conversation, shared by every tab: opening one from a notification or a link lands in
+    /// whichever tab is on screen.
+    private var path: Binding<[BotReference]> {
+        Binding(get: { accounts.selection.map { [$0] } ?? [] }, set: { accounts.selection = $0.last })
+    }
+
+    /// A tab's sessions, in the same row style as before, with the system's soft top edge.
+    private func rosterList(_ entries: [HomeEntry], hint: String? = nil) -> some View {
         List {
-            if let hint = dshHint {
+            if let hint {
                 dshHintRow(hint)
             }
-            if rows.isEmpty {
+            if entries.isEmpty {
                 emptyRow
             }
-            ForEach(rows) { entry in
+            ForEach(entries) { entry in
                 entryRow(entry)
             }
         }
         .plainRosterList()
-        // iOS 26's own soft fade at the top edge, in both colour schemes: the list, the bar and the
-        // blur under it are all the system's.
         .scrollEdgeEffectStyle(.soft, for: .top)
         .background(Palette.background)
-        .safeAreaInset(edge: .bottom, spacing: 0) { bottomBar }
+        .refreshable { await refreshAll() }
+    }
+
+    /// The search tab: the same rows, filtered by title as you type.
+    private var searchList: some View {
+        List {
+            if searchEntries.isEmpty {
+                Text(L10n.tr(searchQuery.isEmpty ? "Search chats" : "No matches"))
+                    .font(.footnote)
+                    .foregroundStyle(Palette.secondary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 40)
+                    .rosterRow()
+            }
+            ForEach(searchEntries) { entry in
+                entryRow(entry)
+            }
+        }
+        .plainRosterList()
+        .scrollEdgeEffectStyle(.soft, for: .top)
+        .background(Palette.background)
+        .searchable(text: $searchText, prompt: Text(L10n.tr("Search chats")))
+    }
+
+    /// Every session of an enabled source whose title matches the search field.
+    private var searchEntries: [HomeEntry] {
+        guard !searchQuery.isEmpty else { return [] }
+        return otherEntries.filter { entry in
+            switch entry.kind {
+            case .bot(let item):
+                return item.bot.name.localizedStandardContains(searchQuery)
+            case .dsh(let session):
+                return session.title.localizedStandardContains(searchQuery)
+            }
+        }
     }
 
     // MARK: - Rows
 
-    /// The pinned sessions in the order they were pinned, then everything else by the last thing it
-    /// said.
+    /// The 置顶 tab: the pinned sessions in the order they were pinned, then everything else by the
+    /// last thing it said.
     private var rows: [HomeEntry] {
         let pinned = pinnedEntries
         let pinnedIDs = Set(pinned.map(\.id))
         return pinned + otherEntries.filter { !pinnedIDs.contains($0.id) }.sorted { stamp($0) > stamp($1) }
     }
 
-    /// Every session the home may show, pinning aside.
+    /// Every session of an enabled source, pinning aside.
     private var otherEntries: [HomeEntry] {
         enabledOrdered.flatMap { source in
             source == .dsh ? dshEntries : botEntries(for: source)
@@ -219,13 +293,6 @@ struct HomeSourcesView: View {
             .rosterRow()
     }
 
-    private var bottomBar: some View {
-        // The bar steps down and fades out with the sheet, and climbs back the same way.
-        HomeBottomBar(searchText: $searchText, hidden: barAway, startVoice: beginVoice) {
-            showCameraSheet = true
-        }
-    }
-
     // MARK: - The voice capsule
 
     /// The bot the capsule speaks to: the one the long-press menu made lead, and the store it lives on.
@@ -241,7 +308,6 @@ struct HomeSourcesView: View {
             return
         }
         voiceDetent = VoiceSheetView.small
-        barAway = true
         showVoice = true
         Task { await voice.begin() }
     }
@@ -328,13 +394,12 @@ struct HomeSourcesView: View {
         pinnedKeys.compactMap { key -> HomeEntry? in
             switch key.source {
             case .dsh:
-                guard let session = dsh.sessions.first(where: { $0.id == key.id }),
-                      !isSearching || session.title.localizedStandardContains(searchQuery) else { return nil }
+                guard let session = dsh.sessions.first(where: { $0.id == key.id }) else { return nil }
                 return HomeEntry(kind: .dsh(session))
             case .coe, .dsBot:
                 guard let item = accounts.roster.first(where: {
                     $0.bot.id == key.id && HomeSource.of(bot: $0.bot) == key.source
-                }), matchesSearch(item) else { return nil }
+                }) else { return nil }
                 return HomeEntry(kind: .bot(item))
             }
         }
@@ -379,7 +444,6 @@ struct HomeSourcesView: View {
         accounts.roster
             .filter { HomeSource.of(bot: $0.bot) == source }
             .filter { !HomeSessionVisibility.isHidden(title: $0.bot.name, isDSH: false) }
-            .filter { matchesSearch($0) }
             .map { HomeEntry(kind: .bot($0)) }
     }
 
@@ -387,7 +451,6 @@ struct HomeSourcesView: View {
         guard enabledSources.contains(.dsh) || pinnedKeys.contains(where: { $0.source == .dsh }) else { return [] }
         return dsh.sessions
             .filter { !HomeSessionVisibility.isHidden(title: $0.title, isDSH: true) }
-            .filter { !isSearching || $0.title.localizedStandardContains(searchQuery) }
             .sorted { ($0.updatedAt ?? 0) > ($1.updatedAt ?? 0) }
             .map { HomeEntry(kind: .dsh($0)) }
     }
@@ -833,5 +896,31 @@ struct DSHSessionRow: View {
         guard let value = session.updatedAt else { return nil }
         let ms = value > 1_000_000_000_000 ? value : value * 1000
         return Date(timeIntervalSince1970: ms / 1000)
+    }
+}
+
+/// The native bottom accessory: voice on the left, camera on the right. Shrunk into the tab bar it
+/// shows the two glyphs; expanded, the voice button says what it is for.
+struct HomeVoiceAccessory: View {
+    @Environment(\.tabViewBottomAccessoryPlacement) private var placement
+    let onVoice: () -> Void
+    let onCamera: () -> Void
+
+    var body: some View {
+        HStack(spacing: 16) {
+            Button(action: onVoice) {
+                if placement == .expanded {
+                    Label(L10n.tr("说点什么…"), systemImage: "mic.fill")
+                } else {
+                    Image(systemName: "mic.fill")
+                }
+            }
+            .accessibilityLabel(Text(L10n.tr("Voice")))
+            Spacer(minLength: 8)
+            Button(action: onCamera) {
+                Image(systemName: "camera.fill")
+            }
+            .accessibilityLabel(Text(L10n.tr("拍照")))
+        }
     }
 }

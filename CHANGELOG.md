@@ -1623,3 +1623,22 @@
 - 验证：`xcodebuild build -scheme 'iOS Dev' -configuration DevDebug` 通过；已装到 iPhone 16 Pro（2.36.0 / 160，iOS 27.3）并启动。按要求未自测、未截图。
 - 限制/待办：这是 iOS 27 工具栏布局的适配，属于系统 API 用法，不是顶部模糊的新补丁。
 - 关联：C0161。
+### C0163 · 2026-11-04 · 首页底栏换成 iOS 26 原生 TabView（4 tab + 底部附属栏 + 搜索）
+
+- 存档：改动前的布局已在 tag **`layout-before-tabbar`**（= 分支 `backup/layout-before-tabbar`）上留档，提交 `58f6f7c7`。
+  回退命令：`git checkout layout-before-tabbar`（或 `git switch backup/layout-before-tabbar`），看回来用 `git switch ui/native-tabbar`。
+  本次功能都在新分支 `ui/native-tabbar` 上，C0109–C0114 那批未提交改动全程未 stash、未提交、原样保留。
+- 原因：自绘的悬浮底栏（搜索框 + 麦克风 + 相机）要换成系统原生 tab bar，并要吃到 iOS 26 的「滚动缩小」「底部附属栏」能力。
+- 变化：
+  - 首页根视图改为 `TabView`（`Tab` API）：置顶、Coe、DS Bot、DSH 四个普通 tab，另加右侧 `Tab(role: .search)`。置顶 tab = 原首页内容与排序（置顶会话按钉的先后在前，其余按最后消息时间倒序混排）；其余三个 tab 只显示对应来源。图标用 SF Symbols（pin / bubble.left.and.bubble.right / cpu / terminal / magnifyingglass），标题中文（置顶、Coe、DS Bot、DSH、搜索）。
+  - 每个 tab 各自一个 `NavigationStack`（共用 `accounts.selection` 作为 path），二级页 push、长按菜单、来源角标、隐藏规则（`<bot-profile>`、`You keep the memory`、未命名会话）都保持原样；`ChatScreen` 由 private 改为模块内复用。
+  - 设置里的三个来源开关控制对应 tab 是否出现（置顶 tab 永远在第一位）；当前 tab 被关掉时自动切回置顶。
+  - 底部附属栏：`.tabViewBottomAccessory` 放一条原生栏——左语音（点击弹出原语音 sheet，三档 detent 原样复用）、右相机（沿用原相机 sheet）；按 `@Environment(\.tabViewBottomAccessoryPlacement)` 区分 inline（只两个图标）与 expanded（语音按钮多一行「说点什么…」）；系统默认样式，未叠任何玻璃或背景。
+  - 删除自绘底栏在首页的用法（搜索框、麦克风、相机的悬浮玻璃栏，以及 `barAway` 下移淡出逻辑）；`HomeBottomBar.swift` 仍留在仓库里，只因为已废弃的 `BotListView` 还引用它——那个文件带着另一会话的未提交改动，本轮不动。
+  - 缩放：`.tabBarMinimizeBehavior(.onScrollDown)`，下滚缩成当前 tab 并把附属栏并进同一行，上滚恢复。
+  - 顶部：头像（左）/ +（右）仍是标准 `ToolbarItem`，保留 iOS 27 的 `contentMarginsRemoved()`（C0162）；顶部模糊沿用系统 `.scrollEdgeEffectStyle(.soft, for: .top)`，每个 tab 的列表都加了。
+  - `RootView` 去掉外层的 `NavigationStack`（首页自带每 tab 的栈），保留 `AccessBanners` 与 selection 的观察逻辑。
+- 文件：`apps/ios/Views/HomeSourcesView.swift`、`apps/ios/Views/HomeSource.swift`（新增 `HomeTab`）、`apps/ios/Views/RootView.swift`。
+- 验证：`xcodebuild build -scheme 'iOS Dev' -configuration DevDebug` 通过；已装到 iPhone 16 Pro（2.36.0 / 161）并启动。按要求未自测、未截图。
+- 限制/待办：搜索 tab 只做标题的本地过滤（不含消息内容）；附属栏未做长按/更多操作；`HomeBottomBar` 待 `BotListView` 处理后再删。
+- 关联：C0161、C0162。
