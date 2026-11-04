@@ -27,6 +27,11 @@ struct HomeSourcesView: View {
     @State private var switcherFace = HomeFace.pinned
     /// The page's own scale while two fingers close on it: 1 is the page, `cardScale` is a card.
     @State private var pinchScale: CGFloat = 1
+    /// Where the system actually put its two toolbar buttons (global), and where the page starts:
+    /// the card is laid out from these numbers, and the page's own copies go exactly there.
+    @State private var accountFrame = CGRect.zero
+    @State private var plusFrame = CGRect.zero
+    @State private var pageOrigin = CGPoint.zero
 
     @State private var searchText = ""
     /// The field in the bottom bar has the keyboard.
@@ -95,9 +100,7 @@ struct HomeSourcesView: View {
             .overlay {
                 if switcherShown {
                     SourceSwitcher(faces: faces, centered: $switcherFace,
-                                   card: { face, window, insets in
-                                       AnyView(miniHome(face, window: window, insets: insets))
-                                   },
+                                   card: { AnyView(miniHome($0)) },
                                    commit: { pick($0) })
                         .ignoresSafeArea()
                         .transition(.opacity)
@@ -203,6 +206,18 @@ struct HomeSourcesView: View {
                 }
             }
             .simultaneousGesture(pinchToSwitch)
+            .onGeometryChange(for: CGPoint.self) { $0.frame(in: .global).origin } action: { origin in
+                guard !switcherShown, pinchScale == 1 else { return }
+                pageOrigin = origin
+            }
+            // The page's own copy of the toolbar buttons: the same views, at the system's measured
+            // places, inside the scaled page so they shrink with it and are already exactly where the
+            // system's own are when the two swap over.
+            .overlay(alignment: .topLeading) {
+                navReplica
+                    .opacity(1 - chromeOpacity)
+                    .allowsHitTesting(false)
+            }
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { toolbarContent }
@@ -318,20 +333,38 @@ struct HomeSourcesView: View {
         }
     }
 
+    /// The page's own copy of the toolbar's two buttons: the very same views, at the rectangles the
+    /// system measured for its own, so the swap is invisible on the frame it happens.
+    private var navReplica: some View {
+        ZStack(alignment: .topLeading) {
+            AccountSwitcherButton(avatarSize: 36)
+                .offset(x: accountFrame.minX - pageOrigin.x, y: accountFrame.minY - pageOrigin.y)
+            RemixImage("add-line", size: 24)
+                .frame(width: plusFrame.width, height: plusFrame.height)
+                .offset(x: plusFrame.minX - pageOrigin.x, y: plusFrame.minY - pageOrigin.y)
+        }
+    }
+
+    /// The status bar's strip, measured from where the system's own buttons begin.
+    private var navTop: CGFloat { accountFrame.minY }
+    /// The row those buttons sit in.
+    private var navRowHeight: CGFloat { max(accountFrame.height, plusFrame.height) }
+
     /// One card's content: the home exactly as it looks full screen — the navigation row, the list and
     /// the bar, at the window's own size — so the switcher only has to shrink it. Nothing in it takes
     /// a touch: the card itself answers, and it only picks the face.
-    private func miniHome(_ face: HomeFace, window: CGSize, insets: EdgeInsets) -> some View {
+    private func miniHome(_ face: HomeFace) -> some View {
         VStack(spacing: 0) {
-            // The status bar's strip: the page's own background, not a colour of its own.
-            Palette.background.frame(height: insets.top)
+            // The status bar's strip: the page's own background, not a colour of its own, and as tall
+            // as the system's own buttons say it is.
+            Palette.background.frame(height: navTop)
             miniNavRow
             miniList(face)
             miniBar
             // Below the bar, exactly the 28pt the real page keeps to the screen's edge.
             Palette.background.frame(height: 28)
         }
-        .frame(width: window.width, height: window.height)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Palette.background)
         .allowsHitTesting(false)
     }
@@ -370,15 +403,17 @@ struct HomeSourcesView: View {
         }
     }
 
-    /// The card's navigation row: the avatar and the "+" where the real bar puts them.
+    /// The card's navigation row: the same two views, at the places the system measured for its own.
     private var miniNavRow: some View {
-        HStack(spacing: 0) {
+        ZStack(alignment: .topLeading) {
             AccountSwitcherButton(avatarSize: 36)
-            Spacer(minLength: 0)
+                .offset(x: accountFrame.minX, y: 0)
             RemixImage("add-line", size: 24)
+                .frame(width: plusFrame.width, height: plusFrame.height)
+                .offset(x: plusFrame.minX, y: plusFrame.minY - accountFrame.minY)
         }
-        .padding(.horizontal, 16)
-        .frame(height: 44)
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .frame(height: navRowHeight)
     }
 
     /// The card's bar: the same field and circle as below, drawn rather than wired to anything.
@@ -412,9 +447,9 @@ struct HomeSourcesView: View {
             .glass(in: Capsule())
     }
 
-    /// The system toolbar's buttons are the one piece of chrome that cannot shrink into a card (the
-    /// bar isn't ours), so they step aside while the pages are up; the card draws its own row.
-    private var chromeOpacity: Double { switcherShown ? 0 : 1 }
+    /// The system toolbar's buttons cannot shrink (the bar isn't ours), so they are swapped for the
+    /// page's own copies the moment a pinch starts, and stay hidden until it is over.
+    private var chromeOpacity: Double { switcherShown || pinchScale < 0.999 ? 0 : 1 }
 
     /// The switcher's front door: two fingers closed on the list shrink the page toward a card and
     /// letting go makes the card. One finger still scrolls — this wakes only once the pinch has
@@ -716,12 +751,15 @@ struct HomeSourcesView: View {
             newBotMenu
                 .opacity(chromeOpacity)
                 .disabled(switcherShown)
+                .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { plusFrame = $0 }
         }
     }
 
     private var accountButton: some View {
         AccountSwitcherButton(avatarSize: 36)
             .disabled(switcherShown)
+            // Where the system puts it: the page's own copy goes to exactly this rectangle.
+            .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { accountFrame = $0 }
     }
 
     /// The system's own menu: one entry per source Settings leaves on.

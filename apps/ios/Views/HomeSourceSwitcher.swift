@@ -49,8 +49,8 @@ struct SourceSwitcher: View {
     let faces: [HomeFace]
     /// The card in the middle: the pager keeps it in step as the pages turn.
     @Binding var centered: HomeFace
-    /// Draws one card's page: the home lays it out at the window's own size, insets and all.
-    let card: (HomeFace, CGSize, EdgeInsets) -> AnyView
+    /// Draws one card's page: the home lays it out at the window's own size.
+    let card: (HomeFace) -> AnyView
     /// A card was tapped, or the fingers spread: show that face, full screen.
     let commit: (HomeFace) -> Void
 
@@ -59,7 +59,6 @@ struct SourceSwitcher: View {
     /// The window, measured once: every card is laid out against this one rectangle, so the page and
     /// its card can never disagree about their proportions.
     @State private var window = CGSize.zero
-    @State private var insets = EdgeInsets()
     /// The card being grown back into the page, and how far it has grown (0 = card, 1 = the window).
     @State private var growing: HomeFace?
     @State private var growProgress: CGFloat = 0
@@ -103,9 +102,7 @@ struct SourceSwitcher: View {
         .background(Palette.background)
         .onAppear {
             scrolled = centered
-            let metrics = Self.windowMetrics()
-            window = metrics.size
-            insets = metrics.insets
+            window = Self.windowSize()
         }
         // Two fingers spread: the card in the middle opens, exactly as tapping it does.
         .gesture(
@@ -184,7 +181,7 @@ struct SourceSwitcher: View {
         let shape = RoundedRectangle(cornerRadius: corner, style: .continuous)
         // The page is laid out at the window's own size and shrunk as one piece: nothing is cropped,
         // nothing is padded, and every card is identical.
-        let page = card(face, window, insets)
+        let page = card(face)
             .frame(width: window.width, height: window.height)
             .scaleEffect(scale, anchor: .topLeading)
             .allowsHitTesting(false)
@@ -198,14 +195,11 @@ struct SourceSwitcher: View {
             .contentShape(RoundedRectangle(cornerRadius: corner + Self.rim, style: .continuous))
     }
 
-    /// The window's size and its safe-area insets, from the window itself: one reading, so a card's
-    /// page and the card can never disagree about where the status bar ends.
-    private static func windowMetrics() -> (size: CGSize, insets: EdgeInsets) {
+    /// The window's size, for the card's rectangle. The page's own safe areas come from the home,
+    /// which measures the system's real toolbar buttons rather than guessing at them.
+    private static func windowSize() -> CGSize {
         let scene = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
-        guard let window = scene?.keyWindow ?? scene?.windows.first else { return (.zero, EdgeInsets()) }
-        let insets = window.safeAreaInsets
-        return (window.bounds.size,
-                EdgeInsets(top: insets.top, leading: insets.left, bottom: insets.bottom, trailing: insets.right))
+        return (scene?.keyWindow ?? scene?.windows.first)?.bounds.size ?? .zero
     }
 
     /// The system's own dots, so the indicator is the one iOS draws rather than a copy of it.

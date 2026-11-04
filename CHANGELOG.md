@@ -2595,3 +2595,42 @@
 - 限制/待办：卡片里的行不再是 `List`，因此卡片内的滚动、下拉刷新、行高自动测量都不生效（卡片本来也不需要）；
   卡片长到整屏的最后几帧仍带 1.5pt 玻璃边，随即被交接盖掉。
 - 关联：C0204、C0203、C0202。
+
+### C0206 · 2026-11-05 · 捏合卡片：顶部按钮同帧交接、卡片按真实安全区排版
+
+- 原因（真机录屏）：
+  1. **缩小时顶部按钮不跟着缩**：头像和「+」是系统 `ToolbarItem`，缩放只作用在页面内容上，所以它们待在全屏位置被淡出，
+     同时卡片顶部淡入一份复刻——看起来像消失再出现。底部栏是我方视图、在 `safeAreaInset` 里，所以能正常跟着缩。
+  2. **卡片内间距偏紧**：卡片页面此前按 `window.safeAreaInsets` 排版，那个读数不是真实安全区（状态栏高度拿错），
+     顶部条与导航行的相对位置不对，整体显得比全屏紧。
+  3. **放大结束跳一下**：交接时真实页面（真实安全区）与卡片（错误的假设值）不是同一套坐标，换回来的那一帧
+     头像上跳、列表下移、底栏也跟着动。
+- 决策：按穗确认**保留系统工具栏**（不改成自绘），用运行时测量 + 复刻做同帧交接，接受交接帧玻璃的轻微变化。
+- 变化（`Views/HomeSourcesView.swift`）：
+  - 新增 `accountFrame` / `plusFrame` / `pageOrigin` 三个测量值：
+    - 两个 `ToolbarItem` 内部各挂 `.onGeometryChange { $0.frame(in: .global) }`，量出**系统实际摆放**的矩形；
+    - 页面根内容挂同样的测量拿到自身 global 原点（切换态/捏合中不更新）。
+  - 新增 `navReplica`：把 `AccountSwitcherButton(avatarSize: 36)` 和 `RemixImage("add-line", size: 24)` 这两份**同一批视图**
+    按 `系统矩形 − 页面原点` 的偏移摆进页面，作为 `.overlay(alignment: .topLeading)` 挂在被缩放的内容上——于是它
+    跟列表、底部栏一起被 `scaleEffect` 缩小，并且在缩放比为 1 时与系统按钮**逐像素重合**。
+  - `chromeOpacity` 从「仅切换态」改为 **`switcherShown || pinchScale < 0.999 ? 0 : 1`**：捏合的第一帧系统按钮就隐藏、
+    复刻（`1 - chromeOpacity`）同帧出现，两者位置重合，肉眼看不出切换；放大结束时反过来。
+  - 卡片页面 `miniHome(_:)` 改为**用测量值排版**，不再假设安全区：状态栏条高 = `accountFrame.minY`（系统按钮的上沿），
+    导航行高 = `max(accountFrame.height, plusFrame.height)`，行内两枚按钮直接摆在 `accountFrame.minX` 与
+    `plusFrame.minX`（「+」的 y 取它与头像的实测差值），列表、底部栏、底部 28pt 依次与全屏一致。
+    卡片仍按窗口尺寸排版后整体 `scaleEffect` 到卡片大小（见 `HomeSourceSwitcher.mini`）。
+- 变化（`Views/HomeSourceSwitcher.swift`）：`card` 闭包回到 `(HomeFace) -> AnyView`，删除 `insets` 状态与
+  `windowMetrics()` 里的安全区读取，只保留 `windowSize()` 给卡片矩形用。
+- 保持不变：4 张卡片、捏合进入、左右滑与吸附、翻页轻触感、点卡片进入、向外张开退出、记住上次选择、
+  `UIPageControl` 分页点、0.66 卡片比例 / 10 间距 / 1.5pt 玻璃边、卡片放大路径。
+- 文件：`apps/ios/Views/HomeSourcesView.swift`、`apps/ios/Views/HomeSourceSwitcher.swift`。
+- 验证：`xcodebuild build -project apps/Codync.xcodeproj -scheme 'iOS Dev' -configuration DevDebug`
+  （真机 destination、ui-preview 覆盖、构建号 194）**编译通过，0 error**，改动文件 0 warning；
+  `xcrun devicectl device install app` 装到 iPhone 16 Pro（`com.suiyikou.codync.uipreview` 2.36.0 / 194）成功。
+  按要求**不自测**：不跑测试、不截图、不用 CDP，交接帧与卡片排版是否逐像素一致未在真机确认。
+- 限制/待办：
+  - 复刻用的是同一批视图但**没有系统工具栏的玻璃胶囊**（那是系统渲染的），交接那一帧按钮底会有轻微变化——已确认接受。
+  - 依赖 `.frame(in: .global)` 的测量：测量在切换态/捏合期间冻结，若系统在运行中改变工具栏布局（旋转、动态字号）
+    需要重新展开一次首页才会更新。
+  - 卡片尾部仍带 1.5pt 玻璃边，放大到整屏的最后几帧可见，随即被交接盖掉。
+- 关联：C0205、C0204、C0203、C0202。备份 tag：`backup/before-pinch-sync`（`060d7c25`）。
