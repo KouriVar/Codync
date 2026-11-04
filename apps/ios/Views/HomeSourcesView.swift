@@ -150,7 +150,7 @@ struct HomeSourcesView: View {
     private var tabs: some View {
         TabView(selection: $selection) {
             Tab(HomeTab.pinned.title, systemImage: HomeTab.pinned.symbol, value: HomeTab.pinned) {
-                stack { rosterList(rows) }
+                stack { rosterList(pinnedEntries, pinnedEmpty: true) }
             }
             if enabledSources.contains(.coe) {
                 Tab(HomeTab.coe.title, systemImage: HomeTab.coe.symbol, value: HomeTab.coe) {
@@ -204,13 +204,18 @@ struct HomeSourcesView: View {
     }
 
     /// A tab's sessions, in the same row style as before, with the system's soft top edge.
-    private func rosterList(_ entries: [HomeEntry], hint: String? = nil) -> some View {
+    private func rosterList(_ entries: [HomeEntry], hint: String? = nil, pinnedEmpty: Bool = false) -> some View {
         List {
             if let hint {
                 dshHintRow(hint)
             }
             if entries.isEmpty {
-                emptyRow
+                // The 置顶 tab teaches how to pin; the source tabs just say there is nothing.
+                if pinnedEmpty {
+                    pinnedEmptyState
+                } else {
+                    emptyRow
+                }
             }
             ForEach(entries) { entry in
                 entryRow(entry)
@@ -258,29 +263,10 @@ struct HomeSourcesView: View {
 
     // MARK: - Rows
 
-    /// The 置顶 tab: the pinned sessions in the order they were pinned, then everything else by the
-    /// last thing it said.
-    private var rows: [HomeEntry] {
-        let pinned = pinnedEntries
-        let pinnedIDs = Set(pinned.map(\.id))
-        return pinned + otherEntries.filter { !pinnedIDs.contains($0.id) }.sorted { stamp($0) > stamp($1) }
-    }
-
     /// Every session of an enabled source, pinning aside.
     private var otherEntries: [HomeEntry] {
         enabledOrdered.flatMap { source in
             source == .dsh ? dshEntries : botEntries(for: source)
-        }
-    }
-
-    /// The newest thing a session said, in milliseconds: DSH counts in seconds.
-    private func stamp(_ entry: HomeEntry) -> Int64 {
-        switch entry.kind {
-        case .bot(let item):
-            return item.bot.lastAt
-        case .dsh(let session):
-            let raw = session.updatedAt ?? 0
-            return Int64(raw < 1e12 ? raw * 1000 : raw)
         }
     }
 

@@ -1642,3 +1642,16 @@
 - 验证：`xcodebuild build -scheme 'iOS Dev' -configuration DevDebug` 通过；已装到 iPhone 16 Pro（2.36.0 / 161）并启动。按要求未自测、未截图。
 - 限制/待办：搜索 tab 只做标题的本地过滤（不含消息内容）；附属栏未做长按/更多操作；`HomeBottomBar` 待 `BotListView` 处理后再删。
 - 关联：C0161、C0162。
+### C0164 · 2026-11-04 · 置顶 tab 只显示钉住的会话，搜索用 role: .search 单独浮在右侧
+
+- 原因：C0163 的置顶 tab 复用了原来的「钉住 + 其余混排」列表，但 tab 化之后置顶应该就是「钉住的」；另外 tab 图标里 DSH 用的 `terminal` 不是要求的线条版。
+- 变化：
+  - 置顶 tab 只列出 `pinnedEntries`——长按「钉在首页」钉住的会话（三种来源都可钉），顺序仍是钉的先后（沿用 `@AppStorage` 里原有的钉住列表）；空时显示「长按会话，选『钉在首页』」；不再混入其他会话。混排用的 `rows` / `stamp` 计算随之删除。
+  - Coe、DS Bot、DSH 三个 tab 内容维持原状（各自来源的会话）。
+  - 搜索仍由 `Tab(value: HomeTab.search, role: .search) { … }` 声明并放在 `TabView` 最后一项，系统画成右侧独立的圆形玻璃钮；左边只留四个普通 tab，且受设置里三个开关控制。
+  - 图标统一 SF Symbols：`pin`、`bubble.left.and.bubble.right`、`cpu`、`apple.terminal`（DSH 由 `terminal` 改为线条版 `apple.terminal`）；搜索钮图标由系统提供。
+  - 底部附属栏未改：左麦克风 + 「说点什么」，右相机，系统默认样式。
+- 文件：`apps/ios/Views/HomeSourcesView.swift`、`apps/ios/Views/HomeSource.swift`。
+- 验证：`xcodebuild build -scheme 'iOS Dev' -configuration DevDebug` 通过；已装到 iPhone 16 Pro（2.36.0 / 162）并启动。按要求未自测、未截图。
+- 限制/待办：无。
+- 关联：C0163。

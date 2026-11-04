@@ -120,7 +120,7 @@ enum HomeTab: Hashable {
         case .pinned: return "pin"
         case .coe: return "bubble.left.and.bubble.right"
         case .dsBot: return "cpu"
-        case .dsh: return "terminal"
+        case .dsh: return "apple.terminal"
         case .search: return "magnifyingglass"
         }
     }
