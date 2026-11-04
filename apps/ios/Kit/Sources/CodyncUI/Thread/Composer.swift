@@ -269,11 +269,7 @@ struct Composer: View {
     }
 
     private var addLabel: some View {
-        RemixIcon("add-line", size: 24)
-            .foregroundStyle(Palette.text)
-            .frame(width: buttonHitSize, height: buttonHitSize)
-            .glass(in: Circle())
-            .contentShape(Circle())
+        GlassGlyph(glyph: .remix("add-line"), side: buttonHitSize, glyphSize: 24, ink: Palette.text)
     }
 
     private var fileChips: some View {

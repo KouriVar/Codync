@@ -2075,3 +2075,21 @@
   - 观感不变的理由：`VoiceGlass` 的 iOS 26 分支本来就是 `glassEffect(tint?.regular.tint(...).interactive() ?? .regular.interactive())`，与 `GlassSurface(interactive: true, tint:)` 逐项等价；0.92 的缩放只是搬进 `PressScale(scale:)`。
 - 验证：`xcodebuild build -scheme 'iOS Dev' -configuration DevDebug` 通过（0 error / 0 warning）。按要求未跑测试、未截图。
 - 关联：C0190、C0192、C0193。
+
+### C0192 · 2026-11-05 · 玻璃收口第 3 步：`GlassButton` 接管手搓圆钮，裸 material 并入 `GlassSurface`
+
+- 原因：手搓的玻璃/材质圆钮散在 6 个文件（相机页 2、远屏页 6+2、输入框“+”、跳到最新、头像铅笔角标）；远屏页 5 处还是 `.ultraThinMaterial`，在 iOS 26 上永远拿不到 Liquid Glass；“跳到最新”同一处并存系统 `.glass` 与自绘两套写法。
+- 变化：
+  - 新增 `Kit/Sources/CodyncUI/GlassButton.swift`：`GlassButton`（圆形图标钮，`.glass(tint:)` / `.filled(fill, ink:)`，`press` 传 nil 即不给按压反馈）+ `GlassGlyph`（同一个圆的“仅图形”版，给自带 `Button`/`Menu` 的调用方）。
+  - `Platform.swift`：`glass(in:)` 改为 `public`——app target 的相机快门要自绘这一个面。
+  - 迁移：
+    - `Views/QuickCapture.swift`：返回 → `GlassButton(press: nil)`；“更多”（`Menu` 标签）→ `GlassGlyph`；快门玻璃环 → `.glass(in: Circle(), interactive: true)`。
+    - `Kit/Sources/CodyncUI/Screen/ScreenView.swift`：`OverlayButton`（6 个）→ `GlassButton`；`IconLabel`（2 个标签）→ `GlassGlyph`；另 3 处 material（Capsule、圆角 12、圆角 8）→ `.glass`。
+    - `Kit/Sources/CodyncUI/Bots/BotProfileEditView.swift`：头像铅笔角标 → `GlassGlyph`（material → 玻璃）。
+    - `Kit/Sources/CodyncUI/Thread/Composer.swift`：输入框“+” → `GlassGlyph`。
+    - `Views/HomeSourcesView.swift` 语音胶囊、`Thread/ThreadView.swift` 顶部胶囊：裸 `glassEffect` → `.glass(in:interactive: true)`（`GlassEffectContainer` 保留）。
+    - `Thread/ConversationList.swift`：“跳到最新”两套写法合成一个 `GlassButton`，删掉 `#available(iOS 26)` 分支。
+  - 结果：裸 `.glassEffect` 与裸 material 现在各 **0 处**（只剩 `GlassSurface` 内部那一次）。
+- 验证：`xcodebuild build -scheme 'iOS Dev' -configuration DevDebug` 通过（0 error）。按要求未跑测试、未截图。
+- 本次唯一的可见变化（其余尺寸全部保持原值，收档放在 C0193）：① 远屏页 5 处 material 首次变成 Liquid Glass；② “跳到最新”从系统 `.glass` 按钮（controlSize large）改为自绘 44pt 玻璃圆钮。
+- 关联：C0190、C0191、C0193。

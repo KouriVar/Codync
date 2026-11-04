@@ -402,19 +402,8 @@ struct JumpToLatest: View {
         .animation(Motion.reduced(Motion.layout, reduceMotion), value: visible)
     }
 
-    @ViewBuilder private var jumpButton: some View {
-        if #available(iOS 26, *) {
-            Button(action: action) { RemixIcon("arrow-down-line", size: 18) }
-                .accessibilityLabel(Text(L10n.tr("Jump to latest")))
-                .font(.system(size: 18, weight: .medium))
-                .controlSize(.large)
-                .buttonStyle(.glass)
-                .buttonBorderShape(.circle)
-        } else {
-            Button(action: action) { RemixIcon("arrow-down-line") }
-                .accessibilityLabel(Text(L10n.tr("Jump to latest")))
-                .buttonStyle(IconButtonStyle())
-                .glass(in: Circle())
-        }
+    private var jumpButton: some View {
+        GlassButton(L10n.tr("Jump to latest"), glyph: .remix("arrow-down-line"),
+                    side: 44, glyphSize: 18) { action() }
     }
 }

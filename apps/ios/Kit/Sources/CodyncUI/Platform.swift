@@ -39,8 +39,9 @@ struct GlassSurface<S: Shape>: ViewModifier {
     }
 }
 
-extension View {
-    /// Liquid Glass in `shape` (content scrolls visibly underneath).
+public extension View {
+    /// Liquid Glass in `shape` (content scrolls visibly underneath). Public: the app target draws
+    /// one surface itself (the camera's shutter ring).
     func glass(in shape: some Shape, interactive: Bool = false, tint: Color? = nil) -> some View {
         modifier(GlassSurface(shape: shape, interactive: interactive, tint: tint))
     }

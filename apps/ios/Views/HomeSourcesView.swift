@@ -964,7 +964,7 @@ private struct VoiceCapsule: View {
         GlassEffectContainer(spacing: 12) {
             HomeVoiceAccessory(lead: lead, onTap: onTap)
                 .padding(.vertical, 10)
-                .glassEffect(.regular.interactive(), in: Capsule())
+                .glass(in: Capsule(), interactive: true)
         }
     }
 }

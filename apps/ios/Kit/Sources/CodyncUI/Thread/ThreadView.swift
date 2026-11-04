@@ -382,7 +382,7 @@ extension ThreadView {
             title
                 .padding(.horizontal, 14)
                 .frame(height: 44)
-                .glassEffect(.regular.interactive(), in: Capsule())
+                .glass(in: Capsule(), interactive: true)
                 .contentShape(Capsule())
         }
             .buttonStyle(.plain)
