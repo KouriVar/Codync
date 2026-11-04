@@ -1860,3 +1860,14 @@
 - 验证：`xcodebuild build -scheme 'iOS Dev' -configuration DevDebug` 通过；已装到 iPhone 16 Pro（2.36.0 / 178）并启动。按要求未自测、未截图。
 - 限制/待办：**系统 tab bar 的 `.toolbar(.hidden)` 是否参与该 `withAnimation` 事务我无法自测**。若真机上仍出现「语音条有滑动淡出、tab bar 却瞬间消失」，说明系统工具栏可见性不吃这个事务——按你的要求我先停在这里，请告诉我这个现象，我不再自己换方案。
 - 关联：C0174、C0176、C0178。
+### C0181 · 2026-11-05 · 点语音条后不再留下空白玻璃条：整条附属栏随动画卸掉
+
+- 现象：C0180 只对附属栏**内容**做 offset/opacity，内容淡没了，系统给附属栏的玻璃胶囊外壳还在原地，留下一条空白玻璃条，直到 sheet 弹出才消失。
+- 变化：
+  - 点击时不再只淡出内容，而是在 `withAnimation(.easeInOut(duration: 0.3))` 里把整个附属栏卸掉（`.tabViewBottomAccessory` 不再挂载，`accessoryMounted = false`），同一个事务里 `tabBarHidden = true`，交给系统动画一起退场；0.3s 后再弹 sheet。
+  - 关闭：`onDismiss` 里用同一个 `withAnimation(.easeInOut(duration: 0.3))` 把附属栏与 tab bar 一起挂回。
+  - `VoiceBar` 去掉了 `leaving` 参数与那层 offset/opacity；页面内容仍然没有任何位移或透明度变化。
+- 文件：`apps/ios/Views/HomeSourcesView.swift`。
+- 验证：`xcodebuild build -scheme 'iOS Dev' -configuration DevDebug` 通过；已装到 iPhone 16 Pro（2.36.0 / 179）并启动。按要求未自测、未截图。
+- 限制/待办：**系统卸载/挂载附属栏是否自带动画、是否吃这个 `withAnimation` 事务，我无法自测**。若真机上变成「瞬间消失/出现」（没有过渡），说明系统这部分不参与动画——按你的要求我先停在这里，请告知现象（「卸掉是瞬时的」即可），我不再自行改用 overlay 或其它方案。
+- 关联：C0178、C0180。
