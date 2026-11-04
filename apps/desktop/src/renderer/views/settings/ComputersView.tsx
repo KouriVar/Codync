@@ -239,9 +239,11 @@ function ManagedComputerCard({ store, ssh: overSSH, nested = false }: { store: B
                   : []),
               ]
             : []),
-          // On macOS and Windows this computer's Codync is this app: its version and update are on the Updates page.
+          // Every computer shows its own Codync version row, this one included: since C0110 this
+          // app no longer has an Updates page to send the reader to, so hiding this computer's row
+          // left macOS and Windows with no way to see which host version they run.
           // Kept while an update asked from here restarts the computer: its spinner says it's updating.
-          (online || store.isUpdating) && store.hello && !(store === app.local && window.codync.platform !== 'linux')
+          (online || store.isUpdating) && store.hello
             ? <CodyncVersionRow key="codync" store={store} />
             : null,
         ]}
