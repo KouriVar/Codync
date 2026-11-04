@@ -151,11 +151,27 @@ public struct VoiceCameraPage: View {
 
     public var body: some View {
         ZStack {
+            // The viewfinder reaches the very bottom of the sheet, corners and all, so no page
+            // background shows under it near the Home indicator.
+            viewfinder
+                .ignoresSafeArea(edges: .bottom)
+                .clipShape(RoundedRectangle(cornerRadius: 32, style: .continuous))
+            // The controls stay inside the safe area, 16pt clear of the Home indicator.
+            controls
+        }
+        .task {
+            await camera.requestAccess()
+            if camera.access == .granted { camera.start() }
+        }
+        .onDisappear { camera.stop() }
+    }
+
+    @ViewBuilder private var viewfinder: some View {
+        ZStack {
             Color.black
             switch camera.access {
             case .granted:
                 VoiceCameraPreview(session: camera.session)
-                controls
             case .denied:
                 Text(L10n.tr("The camera needs permission in Settings"))
                     .font(.system(size: 17))
@@ -166,14 +182,6 @@ public struct VoiceCameraPage: View {
                 ProgressView().tint(.white)
             }
         }
-        // The viewfinder takes the whole page; its corners are the sheet's.
-        .ignoresSafeArea()
-        .clipShape(RoundedRectangle(cornerRadius: 32, style: .continuous))
-        .task {
-            await camera.requestAccess()
-            if camera.access == .granted { camera.start() }
-        }
-        .onDisappear { camera.stop() }
     }
 
     /// Back on the left, the shutter in the middle, more on the right: 44pt circles 16pt from the

@@ -1786,3 +1786,14 @@
 - 验证：`xcodebuild build -scheme 'iOS Dev' -configuration DevDebug` 通过；已装到 iPhone 16 Pro（2.36.0 / 172）并启动。按要求未自测、未截图。
 - 限制/待办：`offset` / `opacity` 作用在 `TabView` 这一层（系统 tab bar 无法单独位移），因此过渡瞬间页面内容也会随之下移淡出约 0.35s——若观感不合适，可改成只对附属栏做动效。
 - 关联：C0170、C0172。
+### C0175 · 2026-11-04 · 相机页底部被裁：取景铺到底、按钮让开 Home 指示条
+
+- 原因：相机页整层 `.ignoresSafeArea()` 之后，三个按钮也被推到了安全区外，被 Home 指示条压住；同时取景在底部留下一条页面背景。
+- 变化：
+  - 取景层（黑底 + 实时预览 + 权限提示）单独 `.ignoresSafeArea(edges: .bottom)` 并 `clipShape(RoundedRectangle(cornerRadius: 32))`，一直铺到 sheet 最底部、圆角跟随 sheet，不再露出灰色/页面背景。
+  - 三个按钮改放在**遵守安全区**的那一层，`padding(.bottom, 16)`，因此离 Home 指示条 16pt，左右仍是 16pt。
+  - 其它布局与逻辑未动。
+- 文件：`apps/ios/Kit/Sources/CodyncUI/Voice/VoiceCamera.swift`。
+- 验证：`xcodebuild build -scheme 'iOS Dev' -configuration DevDebug` 通过；已装到 iPhone 16 Pro（2.36.0 / 173）并启动。按要求未自测、未截图。
+- 限制/待办：无。
+- 关联：C0173。
