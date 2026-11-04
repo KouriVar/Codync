@@ -1370,3 +1370,12 @@
 - 限制/待办：宿主低于 2.33.0 时 `setLead` 会被拒（与长按菜单一致），本轮没有按 `supportsLeadChoice` 隐藏这一行；多电脑时按电脑分组显示。
 - 关联：C0148。
 
+### C0147 · 2026-11-04 · 通用玻璃吐司
+
+- 原因：发送后要像系统「从某某粘贴了某某」那样用一条玻璃胶囊提示，而且以后别的地方也要用。
+- 变化：新增 `GlassToastItem`（图标 + 文案 + 可选点击动作）、`GlassToast`（`.glass(in: Capsule())`，46pt 高，20pt Remix 图标，subheadline 单行截断）与 `.glassToast($item, topPadding:)` 修饰器：从顶部落下淡入、2 秒自动消失、点一下执行动作后消失、只盖住胶囊本身不挡别处点击、跟随「减少动态效果」、VoiceOver 可读。
+- 文件：`apps/ios/Kit/Sources/CodyncUI/Toast/GlassToast.swift`（新）。
+- 验证：按要求只验证编译通过；第一次真正使用在 C0148 的发送提示。
+- 限制/待办：垂直位置由调用方的 overlay 与 `topPadding` 决定，本轮只在首页顶部使用。
+- 关联：C0148。
+
