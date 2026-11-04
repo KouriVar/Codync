@@ -119,7 +119,7 @@ public struct VoiceSheetView: View {
 
     /// TODO: `.large` runs the same layout as `.medium` for now; a continuous call mode belongs here.
     private var waveform: some View {
-        VoiceWaveform(level: session.level)
+        VoiceWaveform(level: session.level, paused: session.phase == .paused)
             .frame(maxWidth: .infinity)
     }
 
