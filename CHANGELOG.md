@@ -1416,3 +1416,20 @@
 - 验证：`xcodebuild build -scheme 'iOS Dev' -configuration DevDebug` 通过；已装到 iPhone 16 Pro（2.36.0 / 147）并启动。权限说明在安装包 Info.plist 里确认为中文两条。
 - 限制/待办：按要求未自测交互，真机点按结果待你验收；云端转写仍只留协议位置。
 - 关联：C0145、C0148。
+### C0150 · 2026-11-04 · 首页语音胶囊改成厚实的 Grok 风格（只改外观与布局）
+
+- 原因：胶囊跟搜索框一样只有 48pt 高，按钮小而挤，不像一个可以对着说话的控件。
+- 变化：
+  - 尺寸：胶囊 88pt 高、左右各 16pt、圆角 44（全圆角），玻璃材质沿用 `.glassEffect(.regular.interactive(), in: Capsule())`；外面加一层白色 0.15 描边（`strokeBorder`，1pt，向内不裁切）和一层柔和阴影（黑 0.18、半径 18、y 8），从列表上浮起来。底部避让安全区的逻辑没动。
+  - 布局（左右内边距各 16pt，段间距 16pt）：左侧主 Bot 头像直径 48，呼吸动画在 1.0…1.06 之间，外加一层用 Bot 自身颜色做的模糊外光（同步明暗与放大）。
+  - 中间：音量波形换成 `VoiceWaveform`——竖条 3pt 宽、3pt 间距、圆头，最矮 4pt、最高 36pt，条高随音量逐帧缓动（约 90ms 收敛，等效 spring 的 ease-out），并且始终带一点缓慢起伏，静音时不会变成一排死点；条形高度按中间高两端低的包络分布。
+  - 右侧三个按钮，间距 10pt：设置 44pt 圆形浅底（`Palette.text` 7%）+ 20pt Remix 图标；麦克风 52pt 主按钮，录音中强调色底 + 白色图标，暂停时浅色底 + 深色图标；取消 44pt 浅红底（`Palette.danger` 14%）+ 18pt 红色 ✕（加粗一档）。
+  - 图标全部复用现有 Remix：`settings-3-line`、`pause-line` / `mic-fill` / `arrow-up-line`、`close-line`。
+  - 转写/倒计时：文字在胶囊中间（原波形位置），17pt、最多两行、超出在前面加省略号（`truncationMode(.head)`）；1.5 秒倒计时改成麦克风按钮外面一圈 3pt 环形进度（`trim`，从 12 点方向顺时针），不加数字，编辑时环停住；此时麦克风按钮变成发送箭头。
+  - 出现/收起：从原麦克风按钮所在位置（左下）用 `scale(0.72, anchor: .bottomLeading)` + 透明度展开，spring `response 0.35 / dampingFraction 0.85`，收起反向。
+  - 点击区域：三个按钮都不小于 44pt（麦克风连外圈 60pt）；按下缩放到 0.92（`VoicePress`），触感仍走 `Haptics` 与设置里的档位。
+  - 录音、识别（`SpeechTranscriber`）、发送与吐司逻辑一行未改。
+- 文件：`apps/ios/Kit/Sources/CodyncUI/Voice/VoiceCapsule.swift`、`VoiceWaveform.swift`（新）、`apps/ios/Views/HomeBottomBar.swift`。
+- 验证：`xcodebuild build -scheme 'iOS Dev' -configuration DevDebug` 通过；已装到 iPhone 16 Pro（2.36.0 / 148）并启动。按要求未自测交互、未截图。
+- 限制/待办：两行文本的头部省略依赖 `truncationMode(.head)`，真机上若显示为尾部省略需要再换成自己截断；非中文语种词条未补。
+- 关联：C0148、C0149。

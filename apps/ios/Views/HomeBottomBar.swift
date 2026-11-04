@@ -33,12 +33,18 @@ struct HomeBottomBar: View {
                              openSystemSettings: openSystemSettings)
                     .glassEffect(.regular.interactive(), in: Capsule())
                     .glassEffectID("voice", in: glass)
-                    .transition(.scale(scale: 0.94, anchor: .bottom).combined(with: .opacity))
+                    // A hairline of light along the top edge and a soft shadow under it: the pill has
+                    // to read as a pane floating over the list, not a hole in it.
+                    .overlay(Capsule().strokeBorder(.white.opacity(0.15), lineWidth: 1))
+                    .shadow(color: .black.opacity(0.18), radius: 18, y: 8)
+                    // It grows out of the mic button it replaced, at the bar's left end.
+                    .transition(.scale(scale: 0.72, anchor: .bottomLeading).combined(with: .opacity))
             } else {
                 controlRow
             }
         }
-        .animation(Motion.reduced(.snappy(duration: 0.28), reduceMotion), value: voice.isPresented)
+        .animation(Motion.reduced(.spring(response: 0.35, dampingFraction: 0.85), reduceMotion),
+                   value: voice.isPresented)
         // One 16pt margin with the toolbar and the list rows.
         .padding(.horizontal, 16)
         .padding(.top, 10)
