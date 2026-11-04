@@ -95,3 +95,47 @@ extension HomeSource {
         }
     }
 }
+
+/// The capsule row above the home list: every session, the pinned ones, or a single source. Stored as
+/// its raw value, so a choice survives a relaunch; a filter whose source is switched off in Settings
+/// falls back to `.all`.
+enum HomeFilter: String, CaseIterable, Identifiable, Sendable {
+    case all
+    case pinned
+    case coe
+    case dsBot
+    case dsh
+
+    static let storageKey = "homeFilter"
+
+    var id: String { rawValue }
+
+    /// The source this filter narrows to, if it narrows to one.
+    var source: HomeSource? {
+        switch self {
+        case .all, .pinned: return nil
+        case .coe: return .coe
+        case .dsBot: return .dsBot
+        case .dsh: return .dsh
+        }
+    }
+
+    var title: String {
+        switch self {
+        case .all: return "全部"
+        case .pinned: return "置顶"
+        case .coe: return HomeSource.coe.title
+        case .dsBot: return HomeSource.dsBot.title
+        case .dsh: return HomeSource.dsh.title
+        }
+    }
+
+    /// What the row offers: all and pinned, plus one capsule per source that Settings leaves on — and
+    /// when only one source is on, its own capsule would say nothing the rest doesn't.
+    static func offered(sources: [HomeSource]) -> [HomeFilter] {
+        guard sources.count > 1 else { return [.all, .pinned] }
+        return [.all, .pinned] + sources.compactMap { source in
+            HomeFilter.allCases.first { $0.source == source }
+        }
+    }
+}

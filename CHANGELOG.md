@@ -1555,3 +1555,15 @@
 - 验证：`xcodebuild build -scheme 'iOS Dev' -configuration DevDebug` 通过。本轮真机安装时设备连接隧道一直失败（`The tunnel connection failed`，手机锁屏/同一 Wi-Fi 未就绪），安装未完成；包已产出在 `build/dd-voice/Build/Products/DevDebug-iphoneos/`（2.36.0 / 156），解锁后一条 `devicectl device install app` 即可。
 - 限制/待办：键盘「完成」依赖 `.toolbar(placement: .keyboard)`，若真机上没出现需要改为自绘键盘条；`.large` 仍复用半屏布局（二期连续通话）。
 - 关联：C0155、C0156、C0157。
+### C0159 · 2026-11-04 · 首页去掉横向分页，改成单列表 + 顶部胶囊筛选
+
+- 原因：C0139 起的首页是「置顶 + 每个来源一页」的横向分页，翻页找会话比筛选麻烦；顶部渐进模糊在深色模式下也会显出一条灰带。
+- 变化：
+  - 去掉分页：删掉横向分页 `ScrollView`（`scrollTargetBehavior(.paging)` / `containerRelativeFrame`）与 `pinnedPage`、`sourcePage`，首页改为一条竖向 `List`；`.plainRosterList` 的顶部内边距、行内边距、隐藏分隔线等样式沿用，列表仍可滚到导航栏下方。
+  - 顶部胶囊筛选：作为列表第一行（随列表滚动，不悬浮），`HomeFilter`（全部/置顶/Coe/DSH Bot/DSH）可用项由设置里的来源开关决定——只开一个来源时只显示「全部」「置顶」；胶囊高 32、左右内边距 14、间距 8、字号 15，选中项 `.primary` 底色 + 反色文字，未选中 `secondarySystemFill`；选择存 `@AppStorage("homeFilter")`，切换时 0.2 秒淡入淡出 + 按档位震一下；设置里关掉当前来源时自动回到「全部」。
+  - 列表内容：全部 = 置顶会话按钉的先后在最上面，其余按最后消息时间倒序混排（DSH 的 `updatedAt` 统一换算成毫秒比较），保留来源角标；置顶 = 只显示钉住的，空态仍是「长按会话，选『钉在首页』」；单来源 = 只显示该来源。长按菜单、DSH push 到二级页、`<bot-profile>` / `You keep the memory` / 未命名会话与系统时间消息的过滤规则都没动。
+  - 顶部渐进模糊：`ProgressiveTopBlur` 改为跟聊天页同一套（叠加在列表上、`ignoresSafeArea(edges: .top)`），材质跟随 `colorScheme`（深色用 `.thickMaterial`、浅色 `.ultraThinMaterial`），上面再叠一层 `systemBackground` 渐变，深色模式下不再是一条灰带；`.toolbarBackground(.hidden, for: .navigationBar)` 保留。
+- 文件：`apps/ios/Views/HomeSourcesView.swift`、`apps/ios/Views/HomeSource.swift`（新增 `HomeFilter`）、`apps/ios/Kit/Sources/CodyncUI/Thread/ChatTranscript.swift`（`ProgressiveTopBlur`）。
+- 验证：`xcodebuild build -scheme 'iOS Dev' -configuration DevDebug` 通过；已装到 iPhone 16 Pro（2.36.0 / 157）并启动。按要求未自测、未截图。
+- 限制/待办：列表切换用行级淡入淡出（List 的插入/移除动画），不是整页交叉淡变；若观感不够，可换成 `ScrollView` + `LazyVStack` 自己控透明度。
+- 关联：C0139、C0156。
