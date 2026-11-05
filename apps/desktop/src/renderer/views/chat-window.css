@@ -106,9 +106,10 @@
   flex: none;
   transition: opacity var(--layout), padding var(--layout);
 }
-/* Clears the traffic lights. */
+/* Clears the traffic lights. Green's right edge is 62 + 14 = 76; title-bar controls start
+   ~19 further on, at x ≥ 95 (see trafficLightPosition in src/main/index.ts). */
 html[data-platform="darwin"] .sidebar-header {
-  padding-left: 80px;
+  padding-left: 95px;
 }
 .sidebar.compact .sidebar-header {
   padding-left: 0;

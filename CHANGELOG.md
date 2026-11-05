@@ -1168,3 +1168,15 @@ iOS 定制分支：`ui/ios-customization`；当前 Mac 工作分支：`ui/macos-
 - **未换（保留）** 自定义标题栏与红绿灯区（主进程 `BrowserWindow` 的 `trafficLightPosition` 等）、底部/菜单栏托盘（`src/main/tray.ts`）、系统原生菜单（主进程）、Codync Screen（`src/main/screen.ts` 与随包 helper）、主会话标题 pill（自定义，驱动主 bot 菜单）。锚点菜单与 `Controls.tsx` 里的 `Button`/`Switch`/`ChoicePicker` 等仍为原实现（为免影响全局尺寸/形状未逐一面替换）。
 - **限制/待办** 实验分支，未做视觉/端到端自测；off-scale 像素（44/38/54 等）保留字面量以维持几何；`npm test` 既有失败与本次无关。若后续要求全量换 `Controls.tsx` 的基元，需逐视图核对尺寸。
 - **关联** C0106、C0100、C0101、C0102、C0105。
+
+### C0108 · 2026-11-06 · 修正 Mac 红绿灯位置（只改位置）
+
+- **原因** 用户反馈当前红绿灯偏下、左边距也对不上（图1），按图2 的正常参考修正；只改位置，不改功能，不碰 Host/网关/agent harness/登录。
+- **变化**
+  - 主进程窗口配置 `trafficLightPosition` 由 `{ x: 14, y: 20 }` 改为 **`{ x: 16, y: 16 }`**（以窗口内容区左上角为 (0,0)）。原生 14pt 控件按 9pt 圆间距布局（起点间距 23pt），因此三颗为红 (16,16)、黄 (39,16)、绿 (62,16)；四周安全区按 1× 的 16px。
+  - 标题栏其他控件（Tab、返回、搜索）的左内缩由 80px 提到 **95px**（绿灯右缘 62+14=76，再留约 19），即从 x ≥ 95 起排。
+  - 正式包与 dev 窗口共用同一 `openChat()` 窗口配置；`tools/package-mac-local.cjs` 用正则从源码读取该位置并注入官方 2.34.2 本地包，所以两种窗口一致。
+- **文件** `apps/desktop/src/main/index.ts`、`apps/desktop/src/renderer/views/chat-window.css`、`docs/guides/macos-ui-preview.md`、`CHANGELOG.md`。
+- **验证** `apps/desktop` 下 `npm run typecheck` 与 `npm run build`（electron-vite build）通过。按规则只编译、未启动应用实测红绿灯像素。
+- **限制/待办** 圆间距 9 由 macOS 原生 14pt 控件布局决定；Electron 只提供整组位置（`trafficLightPosition` / `setWindowButtonPosition`），无法逐颗设定。若系统实际起点间距不是 23pt，黄/绿会随之偏移。坐标为点单位，Retina 下不变。
+- **关联** C0088、C0089、C0106。

@@ -153,6 +153,8 @@ test ! -e "$codync_legacy_plist" &&
 Mac 主窗口保留原生红绿灯，显式使用 `trafficLightPosition: { x: 14, y: 20 }`，
 将预期 14 点按钮的中心对齐现有 54px 顶部栏中心（27 点）。其他平台的窗口配置保持原样。
 
+> C0108 起改为 `trafficLightPosition: { x: 16, y: 16 }`（以内容区左上角为 (0,0)；原生 14pt 控件、9pt 间距，故红 (16,16)、黄 (39,16)、绿 (62,16)），标题栏其他控件从 x ≥ 95 起排。上面 C0088 的旧值仅作历史记录。
+
 类型检查、桌面构建及应用环境/沙盒/关闭行为相关的 10 项现有回归检查通过。
 本机没有 Rust 工具链，未构建或启动新的开发 Host；实际界面检查使用仓库已有 demo 内存 Host，
 放在从生产代码窗口选项生成的独立 Electron 预览窗口中，数据在 `~/.codync-dev-macos-ui/desktop-ui-preview`。
