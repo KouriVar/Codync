@@ -28,10 +28,7 @@ struct DSHConversationView: View {
         // comes up with the keyboard. It has no backing of its own — only the field's glass — so the
         // messages stay visible behind it, exactly as on Coe's page.
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            ConversationComposer(text: $draft, placeholder: "给 DSH 发一条消息",
-                                 canSend: canSend, bottomPadding: 12) {
-                send()
-            }
+            DSHComposer(gateway: gateway, draft: $draft)
         }
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
@@ -199,13 +196,134 @@ struct DSHConversationView: View {
         .glass(in: Capsule(), interactive: false)
         .accessibilityElement(children: .combine)
     }
+}
 
-    private var canSend: Bool {
-        !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && gateway.openSessionId != nil
+// MARK: - DSH composer
+
+/// The DSH chat page's input bar, in the same one-glass frame Coe's page uses.
+///
+/// It has two states: a capsule until the field is focused (＋ on the left, send on the right), then
+/// the expanded two-row box (the field on top, model and send below). Collapsing the keyboard or
+/// losing focus returns it to the capsule with the draft kept. Send turns into stop while a turn runs
+/// with an empty field; a disconnected gateway greys all three controls.
+struct DSHComposer: View {
+    @ObservedObject var gateway: DSHGateway
+    @Binding var draft: String
+
+    @FocusState private var focused: Bool
+    /// Keyboard up: sit closer to it; down: keep the resting gap.
+    @State private var keyboardUp = false
+    @State private var showAddSheet = false
+    @State private var showModelSheet = false
+
+    private var trimmed: String { draft.trimmingCharacters(in: .whitespacesAndNewlines) }
+    private var isEmpty: Bool { trimmed.isEmpty }
+
+    /// `gateway.phase == .ready` means the transport is up and the input can be used at all.
+    private var connected: Bool { gateway.phase == .ready }
+    /// A running turn with an empty field: the send slot shows stop instead.
+    private var showsStop: Bool { gateway.isRunning && isEmpty }
+    /// Text may be sent when connected, a session is open, and there is something to send.
+    private var canSend: Bool { connected && gateway.openSessionId != nil && !isEmpty }
+
+    var body: some View {
+        ConversationComposer(
+            leading: AnyView(addButton),
+            field: AnyView(field),
+            trailing: AnyView(trailing),
+            mode: focused ? .expanded : .capsule,
+            bottomPadding: keyboardUp ? 8 : 12
+        )
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
+            keyboardUp = true
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
+            keyboardUp = false
+        }
+        .sheet(isPresented: $showAddSheet) {
+            PlaceholderSheet(title: "添加")
+                .presentationDetents([.medium, .large])
+        }
+        .sheet(isPresented: $showModelSheet) {
+            PlaceholderSheet(title: "模型")
+                .presentationDetents([.medium, .large])
+        }
+    }
+
+    /// The bare field. No glass of its own — the frame supplies the glass.
+    private var field: some View {
+        TextField("给 DSH 发一条消息", text: $draft, axis: .vertical)
+            .font(.body)
+            .lineLimit(1...6)
+            .textFieldStyle(.plain)
+            .focused($focused)
+    }
+
+    /// ＋ on the left in both states.
+    private var addButton: some View {
+        GlassButton("添加", glyph: .remix("add-line"), size: .compact, glyphSize: 24,
+                    ink: connected ? Palette.text : Palette.tertiary, style: .plain) {
+            showAddSheet = true
+        }
+        .disabled(!connected)
+    }
+
+    /// The model control: model button + send (or stop) in the expanded box; in the capsule only send.
+    @ViewBuilder private var trailing: some View {
+        if focused {
+            HStack(spacing: 6) {
+                modelButton
+                sendButton
+            }
+        } else {
+            sendButton
+        }
+    }
+
+    private var modelButton: some View {
+        GlassButton("模型", glyph: .remix("robot-2-line"), size: .compact, glyphSize: 24,
+                    ink: connected ? Palette.text : Palette.tertiary, style: .plain) {
+            showModelSheet = true
+        }
+        .disabled(!connected)
+    }
+
+    private var sendButton: some View {
+        Group {
+            if showsStop {
+                GlassButton("停止", glyph: .remix("stop-fill"), size: .compact, glyphSize: 20,
+                            style: .filled(Palette.accentFill, ink: Palette.onAccent)) {
+                    gateway.cancelTurn()
+                }
+            } else {
+                let enabled = canSend
+                GlassButton("发送", glyph: .remix("arrow-up-line"), size: .compact, glyphSize: 20,
+                            style: .filled(enabled ? Palette.accentFill : Palette.accentDim,
+                                           ink: enabled ? Palette.onAccent : Palette.tertiary)) {
+                    guard enabled else { return }
+                    send()
+                }
+                .disabled(!enabled)
+            }
+        }
     }
 
     private func send() {
         let text = draft
         if gateway.send(text: text) { draft = "" }
+    }
+}
+
+/// A sheet with only a title and a one-line "coming soon" placeholder, centred.
+private struct PlaceholderSheet: View {
+    let title: String
+
+    var body: some View {
+        VStack(spacing: 12) {
+            Text(title).font(.title3.weight(.semibold)).foregroundStyle(Palette.text)
+            Text("即将上线").font(.body).foregroundStyle(Palette.secondary)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Palette.background)
     }
 }

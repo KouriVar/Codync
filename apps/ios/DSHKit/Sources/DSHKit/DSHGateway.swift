@@ -806,6 +806,16 @@ public final class DSHGateway: ObservableObject {
         send(["type": "session-create", "requestId": id])
     }
 
+    /// Asks the gateway to stop the running turn (`session-cancel`). The receipt only means the
+    /// request was accepted; the turn is over when its `turn/end` arrives — the same rule the status
+    /// line and the conversation's ending notice follow. Returns false when there is nothing to cancel.
+    @discardableResult public func cancelTurn() -> Bool {
+        guard isRunning, let sessionId = openSessionId, phase == .ready, validatedGatewayId != nil else {
+            return false
+        }
+        return send(["type": "session-cancel", "sessionId": sessionId])
+    }
+
     private func selectScope(gatewayId: String, sessionId: String) {
         let scope = DSHSessionScope(gatewayId: gatewayId, sessionId: sessionId, format: 4)
         selectedScope = scope

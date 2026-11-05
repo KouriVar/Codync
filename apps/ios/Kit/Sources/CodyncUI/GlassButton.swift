@@ -94,6 +94,9 @@ public struct GlassButton: View {
         case glass(tint: Color? = nil)
         /// A solid fill, with the glyph in `ink` on top.
         case filled(Color, ink: Color)
+        /// Just the glyph, no circle behind it: for controls inside a frame that is already glass
+        /// (the composer's +, model and send), so glass is not stacked on glass.
+        case plain
     }
 
     let title: String
@@ -178,6 +181,11 @@ public struct GlassGlyph: View {
                 .foregroundStyle(fillInk)
                 .frame(width: side, height: side)
                 .background(fill, in: ControlMetrics.shape.anyShape(side: side))
+                .contentShape(ControlMetrics.shape.anyShape(side: side))
+        case .plain:
+            glyphView
+                .foregroundStyle(ink)
+                .frame(width: side, height: side)
                 .contentShape(ControlMetrics.shape.anyShape(side: side))
         }
     }

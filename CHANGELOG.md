@@ -3234,3 +3234,58 @@
 - 关联：设计 `/tmp/codync-audit/attachment-images.md`；备份 tag `backup/before-dsh-images-c0218`
   （`2fb2c54a`，含 C0217）。回滚可 revert 本次提交，回到「纯图消息不显示、DSH 无图片能力」的状态，
   不改协议、无数据迁移，DSH 原消息与历史不受影响。
+
+### C0219 · 2026-11-05 · 新输入框：bot 页胶囊 + chat 页可展开
+
+- 原因：输入框原来分在三处（加号、玻璃输入框、发送），bot 页和 chat 页是两套；穗要的是「一个框」：
+  bot 页永远一条胶囊，chat 页没获焦是胶囊、获焦后展开成上下两行。
+- 变化：
+  - `apps/ios/Kit/Sources/CodyncUI/Thread/ConversationComposer.swift`：重写成**单一玻璃框**。两种形态
+    `Mode.capsule` / `.expanded`：胶囊一行（框内左侧 +、中间输入、右侧发送，底对齐），展开两行（上面
+    整行打字、下面 48pt 按钮行）。框内的按钮不再自带玻璃（玻璃叠玻璃）。所有几何收在一个 `private
+    enum Layout` 里：外边距 16、最小高 48、圆角 24、按钮离边 6、间隙 6、展开打字区内边距 12；胶囊→方框
+    用 `Motion.layout` 系统 spring 过渡，不硬切。
+  - `apps/ios/Kit/Sources/CodyncUI/GlassButton.swift`：`Style` 新增 `.plain`（只画图标、不画圆底），给框内
+    按钮用；原 `.glass` / `.filled` 完全不变。
+  - `apps/ios/Kit/Sources/CodyncUI/Thread/Composer.swift`（Coe bot 页）：改成新单框；`+` 仍是原来的照片/
+    视频、拍照、选择文件菜单（行为一字未改），label 改成无玻璃的 `GlassGlyph`（compact 36、图标 24）；
+    输入区改成裸 TextField（去掉自己的玻璃、1…6 行）；发送/停止/中断保留原逻辑，几何由 48 玻璃圆改成
+    compact 36 实心圆、箭头 20。引用条、附件条仍放在框上方，与改动前一致。**没有模型按钮、没有语音按钮。**
+  - `apps/ios/Views/DSHConversationView.swift`（chat 页）：输入框改用新的 `DSHComposer`（与 `DSHConversationView`
+    同文件，避免改生成式 pbxproj）：未获焦 = 胶囊（+ 左、发送右，无模型按钮）；`@FocusState` 获焦 = 展开
+    （上打字、下 + 模型 发送），收起键盘/失焦变回胶囊、草稿保留。运行中且输入为空，发送位变停止
+    （`stop-fill`，调 `gateway.cancelTurn()`）；未连接时 +、模型、发送都变灰不可点。`+`、模型各弹一个
+    `.medium/.large` 半屏 sheet，只有标题「添加」/「模型」和「即将上线」占位。键盘弹起时输入框底距键盘 8。
+  - `apps/ios/DSHKit/Sources/DSHKit/DSHGateway.swift`：新增 `cancelTurn()`，发 `session-cancel`（协议 #18）。
+    （**说明**：任务说「接现有的取消逻辑」，但 DSHGateway 原本没有任何取消实现，`session-cancel` 全仓从未
+    发送过；停止按钮要能用（验收第 7 条）就必须补这一条最小发送。只发请求，收尾仍以 `turn/end` 为准，
+    不新增其它功能。）
+  - `CHANGELOG.md`：本节。
+- **实际用的尺寸（一倍图 pt）**：外边距 16；胶囊高/按钮行高 48（`Size.bar.hitTarget`）；圆角 24；框内按钮
+  compact 36（`Size.compact.side`）、离框边 6、间距 6；`+`/模型图标 24（`Size.bar.glyph`）、发送实心圆箭头 20；
+  展开打字区内边距 12；文字 `.body` 17pt、1…6 行后框内滚动；键盘弹起底距 8、否则 12。所有能用的尺寸/玻璃/
+  字号都走现有 token；圆角 24 与箭头 20 本仓没有对应 token，收在上述 `Layout` 与 `sendGlyph` 两个单点常量。
+- **与方案不一样的地方**：
+  - **胶囊态不显示模型按钮**。方案线框图 `01` 的空胶囊里画了模型按钮，但穗本轮原话是「chat 页没获焦时跟 bot
+    页一样：左边加号、右边发送」，所以模型按钮只在**展开**后出现。若你要胶囊里也一直有模型按钮，告诉我，改动很小。
+  - **状态行到输入框顶约 16pt，不是 24pt**。按「不改状态行」，我没动 `ConversationStatusLine` 的下边距（10），
+    加上输入框自身的上边距 6 = 16。要做到 24，需要动状态行下边距或输入框上边距（后者会把回到底部按钮从 36
+    顶到 44）。请拍板是否要调。
+  - **附件条、引用条仍在框外上方**，没有搬进框内（方案把「附件行进框内」列为【建议】，本轮只做写到的建议，且穗说
+    「照旧能用」，所以保持原位置）。
+  - `DSHComposer` 放在 `DSHConversationView.swift` 里而不是新文件，因为 app target 的 pbxproj 是 XcodeGen 生成的，
+    新文件要重新生成工程；挪进已有文件避免工程文件的无关 diff。
+  - 模型按钮图标用 Remix `robot-2-line`（通用模型图标；本仓没有更贴切的提供方图标来源）。
+  - `ConversationComposer` 的胶囊/展开切换用现有 `Motion.layout`（`spring(duration:0.3,bounce:0)`）作为「系统
+    spring」，没有另造动画曲线。
+- 边界：不改消息气泡、状态行、顶部栏、右上角「更多」；不填加号/模型 sheet 内容、不接模型切换；不加语音；不加
+  依赖、测试 target；不改 Package.swift/project.yml/pbxproj；C0212–C0218 的发送状态、草稿冻结、事件投影、图片
+  显示均未动。
+- 验证：`xcodebuild build -project apps/Codync.xcodeproj -scheme 'iOS Dev' -configuration DevDebug`（真机
+  destination、ui-preview 覆盖、构建号 213）编译通过，0 error；仅未改文件的既有警告。`xcrun devicectl device
+  install app` 装到 iPhone 16 Pro（`00008140-000A31311AE3001C`，`com.suiyikou.codync.uipreview`，2.36.0 / 213）
+  成功。按穗要求**只编译不自测**，八项真机场景留给穗操作。构建与安装记录在 `/tmp/codync-audit/c0219-build.log`、
+  `c0219-install.json`。
+- 关联：布局方案 `~/Downloads/布局方案.md` 及线框图（`00` 结构、`01`–`03`、`10` 机器人页）；备份 tag
+  `backup/before-new-composer-c0219`（`3bc3e9a6`，含 C0218）。回滚可 revert 本次提交，回到三处分离的旧输入框与
+  无展开的 DSH 输入；不改协议、无数据迁移，`cancelTurn` 属新增但可随本次一并撤掉。

@@ -109,20 +109,22 @@ struct Composer: View {
         .animation(Motion.layout, value: commands.map(\.id))
     }
 
-    private var fieldPadding: CGFloat { 6 }
-    /// Send/stop circle inside the 48pt toolbar row: the bar size, like the home bar's field.
-    private var buttonSize: CGFloat { ControlMetrics.Size.bar.side }
+    /// Send/stop circle inside the conversation frame: the compact size.
+    private var buttonSize: CGFloat { ControlMetrics.Size.compact.side }
     /// The row height, and the tap target of the buttons on both sides of the field.
-    private var buttonHitSize: CGFloat { ControlMetrics.Size.bar.hitTarget }
+    private var buttonHitSize: CGFloat { ControlMetrics.Size.compact.hitTarget }
+    /// The send/stop arrow: 20pt, a touch smaller than the 24pt glyph of the + beside it.
+    private var sendGlyph: CGFloat { 20 }
 
     /// The bar, in the page's one composer shape: the quote and the attachments sit above the row,
     /// the "+" opens the attachments menu on the left, send/stop/interrupt on the right.
     private var field: some View {
         ConversationComposer(
             accessory: accessoryBar,
-            leading: canAttach ? AnyView(addButton) : nil,
+            leading: canAttach ? AnyView(addButton) : AnyView(EmptyView()),
             field: AnyView(box),
             trailing: AnyView(trailingButton),
+            mode: .capsule,
             bottomPadding: keyboardUp ? 12 : 28
         )
         // Lines, not the text: an animated transaction on every keystroke breaks IME composition.
@@ -202,12 +204,13 @@ struct Composer: View {
             case .send: submit()
             }
         } label: {
-            RemixIcon(symbol, size: ControlMetrics.Size.bar.glyph)
+            RemixIcon(symbol, size: sendGlyph)
                 .contentTransition(.opacity)
                 .foregroundStyle(ink)
                 .frame(width: buttonSize, height: buttonSize)
                 .background(fill, in: Circle())
-                .frame(width: buttonHitSize, height: buttonHitSize)
+                // Wider than the circle for a comfortable tap, but no taller: the frame is the 48pt bar.
+                .frame(width: buttonHitSize, height: buttonSize)
                 .contentShape(Circle())
         }
         .buttonStyle(PressScale())
@@ -221,17 +224,12 @@ struct Composer: View {
 
     private var box: some View {
         TextField(placeholder, text: $input.text, selection: $input.selection, axis: .vertical)
-            .lineLimit(1...8)
+            .lineLimit(1...6)
             .font(.body)
             .textFieldStyle(.plain)
             .focused($focused)
             // A hardware keyboard's Return (⌘↩ too) submits the field and ends editing.
             .onSubmit(newline)
-            .padding(.vertical, fieldPadding)
-            .padding(.horizontal, 14)
-            .frame(minHeight: buttonHitSize)
-            .glass(in: RoundedRectangle(cornerRadius: 24, style: .continuous), interactive: true)
-            .contentShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
         .onChange(of: draftKey, initial: true) {
             draft = model.composerDraft(for: draftKey)
         }
@@ -272,9 +270,10 @@ struct Composer: View {
     }
 
     private var addLabel: some View {
-        GlassGlyph(glyph: .remix("add-line"), size: .bar, ink: Palette.text)
-            .frame(width: ControlMetrics.Size.bar.hitTarget, height: ControlMetrics.Size.bar.hitTarget)
-            .contentShape(Circle())
+        GlassGlyph(glyph: .remix("add-line"), size: .compact, glyphSize: 24, ink: Palette.text, style: .plain)
+            // Wider for a comfortable tap, but no taller than the compact circle: the frame is 48pt.
+            .frame(width: ControlMetrics.Size.compact.hitTarget, height: ControlMetrics.Size.compact.side)
+            .contentShape(Rectangle())
     }
 
     private var fileChips: some View {
