@@ -9,6 +9,7 @@ export interface ScreenAgentState {
 export interface ScreenHelperDetails {
   name: string
   bundleId: string
+  appBundleId: string
   icon: string | null
 }
 

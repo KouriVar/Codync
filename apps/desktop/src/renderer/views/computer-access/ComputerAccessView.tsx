@@ -48,7 +48,7 @@ export function ComputerAccessView({ onContinue }: { onContinue?: (ready: boolea
           <li><Icon name="lock.shield" size={13} /><p>{tr(onContinue ? 'Permissions stay on this computer. You can change them later in Settings → Computer access.' : 'Permissions stay on this computer. Your other computers keep their own permissions.')}</p></li>
           <li><Icon name="iphone" size={13} /><p>{tr('On iPhone, connect with a QR code or Ask Access. No SSH setup needed.')}</p></li>
         </ul>
-        {mac && access.helper ? <ResetPermissions bundleId={access.helper.bundleId} /> : null}
+        {mac && access.helper ? <ResetPermissions helper={access.helper} /> : null}
         {onContinue ? <footer className="computer-access-footer">
           <Button kind={ready ? 'primary' : 'secondary'} onClick={() => onContinue(ready)}>{tr(ready ? 'Continue' : 'Set up later')}{ready ? <Icon name="arrow.right" size={12} /> : null}</Button>
         </footer> : null}

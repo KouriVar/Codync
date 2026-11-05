@@ -76,21 +76,58 @@ iPhone 继续使用原本地配对；不将现有手机重新配对到开发沙�
 首次启动主版本机包时，现有启动逻辑会安装并重启随包的 Host 2.39.1。覆盖前请备份旧应用和
 `~/.codync` 数据。主版配对是否仍可使用属于验收项，Host 2.39.1 要求手机端 Codync 至少为 2.36.0。
 
-首次从旧签名迁移时，先关闭菜单栏的「远程屏幕」，退出 Codync，在终端重置 helper 的两项权限。
-正式身份使用以下命令：
+首次从旧签名迁移时，先关闭菜单栏的「远程屏幕」，退出 Codync，再按版本重置授权。
+macOS 可能把 helper 的录屏请求归到主程序名下。正式身份的命令如下。
 
 ```sh
+tccutil reset ScreenCapture com.pokai.Codync
 tccutil reset ScreenCapture com.pokai.Codync.screen
 tccutil reset Accessibility com.pokai.Codync.screen
 ```
 
-开发身份使用 `com.pokai.Codync.dev.screen`。在 Finder 备份旧包后，将新包放到原安装路径，再打开 Codync。
+开发身份使用 `com.pokai.Codync.dev` 和 `com.pokai.Codync.dev.screen`。在 Finder 备份旧包后，将新包放到原安装路径，再打开 Codync。
 在「设置 → 电脑访问」启用 Codync Screen。分别打开系统设置的「屏幕与系统音频录制」和「辅助功能」，
 把对应栏的 Codync Screen 卡片拖进列表并打开开关。系统未接收拖拽时，可用「在访达中显示」定位 helper，
 通过系统设置的「+」选中同一个 `.app`，也可以点 Codync 的授权按钮唤起系统提示。
+如果 Codync Screen 已授权而录屏仍未就绪，用「+」选中当前安装的 Codync 主程序并打开录屏开关。
 
 返回 Codync 确认三项就绪，再从手机上已配对电脑的「屏幕」入口打开画面。重复打包并替换同一个安装路径，
 这次直接确认三项就绪、手机能看到画面。首次授权和重复打包之间应保留系统权限记录。
+
+### 内置后台任务接管（C0093）
+
+从 C0092 升级时，已恢复录屏的 Mac 可以直接沿用当前权限。先在旧版菜单栏关闭「远程屏幕」来注销旧的内置任务，
+然后退出 Codync，备份旧应用后把新包复制到原安装路径。重新打开后，在「电脑访问」启用 Codync Screen，
+按系统提示允许其在后台运行。如果升级前漏了关闭步骤，可在新版菜单栏关闭再开启「远程屏幕」完成切换。
+正式身份的本机包使用 `com.pokai.Codync.screen.personal` 作为 LaunchAgent 标签，开发身份使用
+`com.pokai.Codync.dev.screen.personal`。标签与应用的 Bundle ID 分开，权限记录继续用原应用身份。
+
+用以下命令确认正式身份的内置任务已经出现 `state = running` 和 `pid =`。
+「电脑访问」就绪时，可能仍是旧任务在提供连接，所以接管时以任务标签为准。
+
+```sh
+launchctl print "gui/$(id -u)/com.pokai.Codync.screen.personal" | grep -E 'state = running|pid ='
+```
+
+只在这台 Mac 上确实有旧的手工任务 `com.suiyk.codyncscreen` 时，等内置任务显示运行后，才在终端停用并保留它的配置。
+
+```sh
+codync_legacy_plist="$HOME/Library/LaunchAgents/com.suiyk.codyncscreen.plist"
+test ! -e "$codync_legacy_plist.disabled" &&
+  mv "$codync_legacy_plist" "$codync_legacy_plist.disabled" &&
+  launchctl bootout "gui/$(id -u)/com.suiyk.codyncscreen"
+```
+
+回到 Codync 刷新并从手机重新打开屏幕，确认旧任务退出后仍可使用。
+如果需要回退，先在 Codync 关闭「远程屏幕」并退出，将旧应用放回原路径，恢复手工任务配置，
+然后打开旧版并重新开启「远程屏幕」。
+
+```sh
+codync_legacy_plist="$HOME/Library/LaunchAgents/com.suiyk.codyncscreen.plist"
+test ! -e "$codync_legacy_plist" &&
+  mv "$codync_legacy_plist.disabled" "$codync_legacy_plist" &&
+  launchctl bootstrap "gui/$(id -u)" "$codync_legacy_plist"
+```
 
 ## 验证与记账
 

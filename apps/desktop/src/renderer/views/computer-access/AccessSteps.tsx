@@ -65,8 +65,11 @@ function AccessRow({ title, icon, detail, done, active = false, status, children
 
 function SettingsHint({ app, control = false }: { app: string; control?: boolean }) {
   const tr = useTr()
+  const hint = control
+    ? 'It may be listed under Device Control and Data Access or Accessibility.'
+    : 'If it is already allowed, add and enable the main Codync app in the same list.'
   return <p className="computer-access-inline-note">
-    {tr('In System Settings, look for')} <strong>{app}</strong>.{control ? <> {tr('It may be listed under Device Control and Data Access or Accessibility.')}</> : null} {tr('Return here after granting access; if asked, allow the helper to restart.')}
+    {tr('In System Settings, look for')} <strong>{app}</strong>. {tr(hint)} {tr('Return here after granting access; if asked, allow the helper to restart.')}
   </p>
 }
 

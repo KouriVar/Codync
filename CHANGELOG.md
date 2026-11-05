@@ -940,3 +940,15 @@ iOS 定制分支：`ui/ios-customization`；当前 Mac 工作分支：`ui/macos-
   本机主版包随附 Host 2.39.1，首次打开时现有启动逻辑会切换到该 Host。替换前需备份旧应用及 Host 数据。
   新增界面文案提供简体与繁体中文，其余语言回退至英文。
 - **关联** C0089、C0090、C0091。
+
+### C0093 · 2026-11-05 · 修复本机 Codync Screen 内置后台任务的启动约束
+
+- **原因** C0092 的主程序和 helper 签名有效，但 macOS 的旧 Service Management 记录仍以旧代码哈希约束启动。系统日志显示内置任务被拒绝，实际连接来自单独安装的手工 LaunchAgent。录屏授权按系统日志改为清理主程序记录后，用户确认已有画面。
+- **变化** 本机包使用独立的 `.personal` 后台任务标签，内置 LaunchAgent 的 `SpawnConstraint` 按签名团队和 helper 签名标识匹配。通过远程屏幕开关显式注销旧内置任务再启用新任务。主程序和 helper 的 Bundle ID、包内可执行路径与进程架构沿用。
+  录屏栏补充主程序的授权提示，重置说明也包含主程序的录屏命令。接管步骤在新任务有 PID 后才停用手工任务，并保留回退配置。
+- **文件** `apps/desktop/{tools/package-mac-personal.cjs,src/main/screen.ts,src/shared/computer-access.ts}`、
+  `apps/desktop/src/renderer/{lib/computer-access-phrases.ts,views/computer-access/{AccessSteps,ComputerAccessView,ResetPermissions}.tsx}`、
+  `docs/guides/macos-ui-preview.md`。
+- **验证** Electron typecheck 和 build、签名的 `Screen Dev` 编译、本机主版打包通过。对最终包检查了 LaunchAgent 的标签、路径与启动约束，helper 的签名满足团队和标识要求，整包通过严格签名校验。
+- **限制与待办** 按用户要求验证到编译、打包和签名为止。由用户安装并检查内置任务 PID，再停用手工任务验证手机画面。
+- **关联** C0092。

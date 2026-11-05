@@ -8,11 +8,15 @@ import { identity } from './environment'
 import { shouldSyncScreenAgent } from '../shared/computer-access'
 
 // Codync Screen (capture + input for Remote screen): on macOS a launchd agent inside the app
-// bundle (apps/screen-macos, registered through SMAppService), which owns the Screen Recording
-// and Accessibility grants. Linux starts its helper from the host, so nothing happens here.
+// bundle (apps/screen-macos, registered through SMAppService). It checks the macOS grants it
+// needs, including when macOS attributes screen recording to the enclosing Codync app.
 
-const serviceName = `${identity.screenLabel}.plist`
 const isMac = process.platform === 'darwin'
+const previousService = `${identity.screenLabel}.plist`
+const personalService = `${identity.screenLabel}.personal.plist`
+const serviceName = isMac && app.isPackaged &&
+  existsSync(join(process.resourcesPath, '..', 'Library/LaunchAgents', personalService))
+  ? personalService : previousService
 const screenBundlePath = join(process.resourcesPath, '..', 'Library/LoginItems', `${identity.screenName}.app`)
 const screenExecutablePath = join(screenBundlePath, 'Contents/MacOS', identity.screenName)
 let helperIcon: NativeImage | undefined
@@ -28,7 +32,7 @@ async function helperDetails() {
   // Xcode exports this from the helper's compiled AppIcon.icns before signing it.
   const icon = nativeImage.createFromPath(join(screenBundlePath, 'Contents/Resources/PermissionIcon.png'))
   helperIcon = icon.isEmpty() ? undefined : icon.resize({ width: 32, height: 32 })
-  return { name, bundleId: identity.screenLabel, icon: helperIcon ? icon.toDataURL() : null }
+  return { name, bundleId: identity.screenLabel, appBundleId: identity.appId, icon: helperIcon ? icon.toDataURL() : null }
 }
 
 /** Identifies the helper binary even if an app replacement preserves its modification date. */
@@ -41,17 +45,30 @@ function helperStamp() {
   }
 }
 
-function status(): string {
+function status(service = serviceName): string {
   if (!isMac || !app.isPackaged) return 'not-registered'
-  return app.getLoginItemSettings({ type: 'agentService', serviceName }).status ?? 'not-registered'
+  return app.getLoginItemSettings({ type: 'agentService', serviceName: service }).status ?? 'not-registered'
+}
+
+function previousServiceRegistered() {
+  if (serviceName === previousService) return false
+  const previousStatus = status(previousService)
+  return previousStatus === 'enabled' || previousStatus === 'requires-approval'
 }
 
 /** Registers (or removes) the agent; returns whether macOS wants the user to allow it. */
 export function setScreenAgent(on: boolean): { needsApproval: boolean } {
   if (!isMac || !app.isPackaged) return { needsApproval: false }
+  const previousRegistered = previousServiceRegistered()
+  if (on && previousRegistered) {
+    throw new Error('Turn off Remote screen in the menu bar, then turn it back on to switch to the new background service.')
+  }
   // Registering an enabled agent is a no-op, so a helper launchd gave up on would never start again.
   if (on && status() === 'enabled') app.setLoginItemSettings({ type: 'agentService', serviceName, openAtLogin: false })
   app.setLoginItemSettings({ type: 'agentService', serviceName, openAtLogin: on })
+  if (!on && previousRegistered) {
+    app.setLoginItemSettings({ type: 'agentService', serviceName: previousService, openAtLogin: false })
+  }
   prefs.set('screenHelperStamp', on ? helperStamp() : null)
   prefs.set('screenHelperResumeAfterUpdate', false)
   return { needsApproval: status() === 'requires-approval' }
@@ -64,11 +81,12 @@ export function setScreenAgent(on: boolean): { needsApproval: boolean } {
 export function syncScreenAgent(enabled: boolean): { needsApproval: boolean } {
   if (!isMac || !app.isPackaged || !enabled) return { needsApproval: false }
   // A first registration belongs to explicit setup, never application startup.
-  if (!shouldSyncScreenAgent(enabled, status(), prefs.get('screenHelperResumeAfterUpdate') === true)) {
-    return { needsApproval: status() === 'requires-approval' }
+  const current = status()
+  if (!shouldSyncScreenAgent(enabled, current, prefs.get('screenHelperResumeAfterUpdate') === true)) {
+    return { needsApproval: current === 'requires-approval' }
   }
   const stale = prefs.get('screenHelperStamp') !== helperStamp()
-  if (!stale && status() === 'enabled') return { needsApproval: false }
+  if (!stale && current === 'enabled') return { needsApproval: false }
   return setScreenAgent(true)
 }
 

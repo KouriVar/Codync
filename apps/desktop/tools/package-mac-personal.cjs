@@ -74,6 +74,17 @@ async function pack(staging) {
     },
   })
   assert(packed, 'Electron did not produce an app bundle.')
+  // A fresh service label avoids reusing the pre-migration Service Management record.
+  // Keep the original plist so the app can unregister the previous embedded service.
+  const agents = join(packed, 'Contents/Library/LaunchAgents')
+  const personalLabel = `${screenId}.personal`
+  const personalPlist = join(agents, `${personalLabel}.plist`)
+  copyFileSync(join(agents, `${screenId}.plist`), personalPlist)
+  run('/usr/bin/plutil', ['-replace', 'Label', '-string', personalLabel, personalPlist])
+  run('/usr/bin/plutil', ['-insert', 'SpawnConstraint', '-json', JSON.stringify({
+    'team-identifier': team,
+    'signing-identifier': screenId,
+  }), personalPlist])
   const packagedScreen = join(packed, 'Contents/Library/LoginItems', `${screenName}.app`)
   await signAsync({
     app: packed,

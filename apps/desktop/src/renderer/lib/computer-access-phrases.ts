@@ -1,5 +1,7 @@
 // These controls are specific to the Mac desktop permission page.
 export const macAccessHans = {
+  'If it is already allowed, add and enable the main Codync app in the same list.': '如果助手已经开启录屏授权，请在同一列表添加 Codync 主程序并打开开关。',
+  'Turn off Remote screen in the menu bar, then turn it back on to switch to the new background service.': '请从菜单栏关闭「远程屏幕」，再重新开启以切换到新的后台任务。',
   'Drag into Screen & System Audio Recording': '拖到「屏幕与系统音频录制」列表',
   'Drag into Accessibility': '拖到「辅助功能」列表',
   'Show in Finder': '在访达中显示',
@@ -9,6 +11,8 @@ export const macAccessHans = {
 }
 
 export const macAccessHant = {
+  'If it is already allowed, add and enable the main Codync app in the same list.': '如果輔助程式已開啟錄影授權，請在同一列表加入 Codync 主程式並打開開關。',
+  'Turn off Remote screen in the menu bar, then turn it back on to switch to the new background service.': '請從選單列關閉「遠端螢幕」，再重新開啟以切換到新的背景作業。',
   'Drag into Screen & System Audio Recording': '拖到「螢幕與系統音訊錄製」列表',
   'Drag into Accessibility': '拖到「輔助使用」列表',
   'Show in Finder': '在 Finder 中顯示',
