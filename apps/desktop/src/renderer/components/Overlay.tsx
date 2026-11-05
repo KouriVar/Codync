@@ -5,6 +5,7 @@ import { afterExit } from '../lib/exit-delay'
 import { stackModals } from '../lib/modal-stack'
 import { useTr } from '../lib/use-language'
 import { Icon } from './Icon'
+import { Button } from './ui/button'
 import { HStack, VStack } from './Stack'
 import { Text } from './Text'
 import './overlay.css'
@@ -206,13 +207,15 @@ export function Dialog({ open, title, message, actions, cancel = 'Cancel', onCan
         {shownContent.children}
         <div className="dialog-buttons">
           {cancel !== null ? (
-            <button className="dialog-button" data-autofocus onClick={dismiss}>
+            <Button variant="secondary" size="sm" className="dialog-button" data-autofocus onClick={dismiss}>
               {tr(cancel)}
-            </button>
+            </Button>
           ) : null}
           {shownContent.actions.map((a) => (
-            <button
+            <Button
               key={a.title}
+              variant={a.destructive ? 'destructive' : 'default'}
+              size="sm"
               className={`dialog-button ${a.destructive ? 'destructive' : 'prominent'}`}
               onClick={() => {
                 onClose()
@@ -220,7 +223,7 @@ export function Dialog({ open, title, message, actions, cancel = 'Cancel', onCan
               }}
             >
               {tr(a.title)}
-            </button>
+            </Button>
           ))}
         </div>
       </div>

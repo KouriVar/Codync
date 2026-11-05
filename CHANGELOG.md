@@ -1138,3 +1138,33 @@ iOS 定制分支：`ui/ios-customization`；当前 Mac 工作分支：`ui/macos-
   - 例程创建时上游会各发一条「Created routine: …」通知，首次启动主会话会看到 3 条；属上游行为。
   - 未加单元测试。
 - **关联** C0102、C0104。
+
+### C0106 · 2026-11-06 · 统一 design token + 接入 shadcn/ui 基建（Tailwind v4，实验分支）
+
+- **原因** 用户要求在实验分支 `feat/shadcn-tokens` 全局接入 shadcn/ui（React + Tailwind），并把现有散落在 `theme.css` 里的 CSS 变量收成一套统一 token（颜色、圆角、字号、间距、气泡、侧栏宽），深浅色都覆盖；先调研现有 token/组件清单，再动手。本条只做「token 源 + 工程基建」，界面接入见 C0107。
+- **变化**
+  - **单一 token 源**：新增 `styles/tokens.css`，把原来 `theme.css` 的 `:root` / 深色 / 动效块整体搬入并集中：颜色（含新增四个委派状态色 `--status-problem/-working/-asking/-idle`，原先散在 `bot-chips.css`）、圆角/阴影、字号 ramp、动效；新增 **间距** `--space-1..8`（2/4/6/8/12/16/24/32）与 **布局** `--chat-max` 888 / `--chat-min` 560 / `--bubble-max` 560 / `--panel-min` 320 / `--frame-inset` 6 / `--divider-width` 1 / `--sidebar-width` 260 / `--sidebar-min` 180；并加 shadcn 语义别名 `--color-background/-foreground/-primary/-muted-foreground/-border/...` 指向上面的值。旧变量名全部保留，值逐字不变（视觉零变化）。
+  - **theme.css 只留结构**：把元素级 reset（body/button/input/textarea/a/h1-3/::selection/滚动条等）移入 `@layer base`，布局原语（`.hstack/.truncate/.press/.drag` 等）留在无层；因此 shadcn 原语的 Tailwind 工具类可以覆盖元素默认样式，而旧视图的类 CSS 仍然优先，行为不变。
+  - **Tailwind v4 接入**：新增 `styles/tailwind.css`，`@import 'tailwindcss/theme.css' layer(theme)` + `@import 'tailwindcss/utilities.css' layer(utilities)`（**不引 Preflight**，避免改动既有重置），并用 `@theme inline` 把 tokens 映射为 `bg-background`、`text-muted-foreground`、`border-border`、`bg-primary`、`rounded-lg`、`text-sm` 等；`electron.vite.config.ts` 与 `vite.demo.config.ts` 加 `@tailwindcss/vite` 插件；`main.tsx` 按 tokens → tailwind → theme 顺序导入。
+  - **shadcn 原语**：`components/ui/` 新增 `button`（default/secondary/outline/ghost/destructive/link × sm/default/lg/icon）、`input`、`textarea`、`card`、`badge`、`separator`、`tabs`（Radix）、`switch`（Radix）、`label`；`lib/utils.ts` 加 `cn()`（clsx + tailwind-merge）；`components.json` 记录 shadcn 配置。依赖新增 `tailwindcss`、`@tailwindcss/vite`、`class-variance-authority`、`clsx`、`tailwind-merge`、`@radix-ui/react-slot`、`@radix-ui/react-tabs`、`@radix-ui/react-switch`。
+- **文件** `apps/desktop/src/renderer/styles/{tokens.css（新）,tailwind.css（新）,theme.css}`、`apps/desktop/src/renderer/components/ui/*`（新 9 个）、`apps/desktop/src/renderer/lib/utils.ts`（新）、`apps/desktop/components.json`（新）、`apps/desktop/{electron.vite.config.ts,vite.demo.config.ts,src/renderer/main.tsx,package.json,package-lock.json}`、`docs/guides/desktop-styles.md`。
+- **验证** `apps/desktop` 下 `npm run typecheck` 与 `npm run build`（electron-vite build）通过；构建产出 CSS 含 Tailwind 工具类。按用户规则只编译、不自测。`npm test` 在本分支基线即有多项既有失败（`updates.test.ts` 的路径相关、`catalogs.test.ts` 键集），本次未改相关代码、未修复。
+- **限制/待办** 不启用 Preflight 是为不破坏旧样式，代价是 shadcn 原语需显式写完整工具类；实验分支，未做像素走查。`--space-8` 等值在纯文本通信中可能被环境脱敏显示为异常串，落盘字节以文件为准（32px）。
+- **关联** C0100（Figma 尺寸）、C0107（界面接入）。
+
+### C0107 · 2026-11-06 · 主界面接入统一 token 与 shadcn 原语（实验分支）
+
+- **原因** 承接 C0106：把用户点名的主界面全局换成这套 token / 原语；旧组件能直接映射的映射，映射不了的用 shadcn 原语重写；桌面专属（自定义标题栏、红绿灯区、托盘、系统菜单、Codync Screen）保留不换；视觉对齐 Figma node 54:328；只换 UI 层、功能行为不变，不碰 Host/网关/agent harness/Google 登录/手机端。
+- **变化**
+  - **记忆页（`MemoryManagerView`）**：`TabChoice` → shadcn `Tabs`（Radix，三页签 yours/bot/log，未变的状态机与旧 Host 报错映射）；每条事实 → `Card`；行内编辑与新增输入 → `Input`；保存/取消/删除/编辑 → `Button`（ghost/icon），「记住」→ `Button`；`memory-manage.css` 改用 `--space-*` 并把原输入框自绘边框/高度交给 `Input`。
+  - **设置页（`SettingsView`）**：页签导航与各页结构、控件、行为全部保留；待处理审批数量 → shadcn `Badge`；`settings.css` 的字面量改为 `--space-*` / `--divider-width`，颜色本已是 token。
+  - **主会话输入框（`Composer`）**：`<textarea>` → shadcn `Textarea`（ref/受控/IME/回车发送/粘贴逻辑原样）；在 `composer.css` 里去掉该原语的边框/背景/阴影/36px 最小高，保持 44 高盒子与单行测量几何。
+  - **右侧对话栏（`BotChatPanel`）**：消息输入 `<textarea>` → `Textarea`；发送按钮 → `Button size="icon"`（沿用 `bot-chat-panel-send` 类保持 26×26）；`bot-chat-panel.css` 的 320 宽 → `--panel-min`，间距 → `--space-*`，保留 54/44/112 等实测几何。
+  - **标签栏（`bot-chips.css`）**：四个状态色改为引用 `tokens.css` 的 `--status-*` 并删除本地浅/深色重复定义；间距 token 化。`BotChipBar` 组件标记与行为未改（其「N 条消息」是按钮，换 Badge 会改语义）。
+  - **确认卡片**：`Dialog` 的取消/确认按钮 → shadcn `Button`（保留 `.dialog-button` 类与既有外观）；`PermissionCard` 的审批选项按钮 → shadcn `Button`（保留 `.permission-option` 类）。锚点菜单仍用自定义 `AnchoredMenu`/`MenuPanel`（定位、键盘与无障碍行为），只做 token 化，未换 Radix DropdownMenu。
+  - **Figma 尺寸 token 化**：`thread.css` 的 560/888/560/6/1/#12 等改为 `--chat-min/--chat-max/--bubble-max/--frame-inset/--divider-width/--space-5`；`chat-window.css` 的 Mac `.detail` 最小宽 → `--chat-min`。像素结果不变。
+- **文件** `apps/desktop/src/renderer/views/bots/{MemoryManagerView.tsx,memory-manage.css}`、`apps/desktop/src/renderer/views/settings/{SettingsView.tsx,settings.css}`、`apps/desktop/src/renderer/views/thread/{Composer.tsx,composer.css,BotChatPanel.tsx,bot-chat-panel.css,bot-chips.css,PermissionCard.tsx,thread.css}`、`apps/desktop/src/renderer/views/chat-window.css`、`apps/desktop/src/renderer/components/Overlay.tsx`。
+- **验证** `apps/desktop` 下 `npm run typecheck` 与 `npm run build`（electron-vite build）通过。按用户要求只编译、不自测：未启动应用、未对着 Figma 走查像素、未实际发送消息/审批/编辑记忆。
+- **未换（保留）** 自定义标题栏与红绿灯区（主进程 `BrowserWindow` 的 `trafficLightPosition` 等）、底部/菜单栏托盘（`src/main/tray.ts`）、系统原生菜单（主进程）、Codync Screen（`src/main/screen.ts` 与随包 helper）、主会话标题 pill（自定义，驱动主 bot 菜单）。锚点菜单与 `Controls.tsx` 里的 `Button`/`Switch`/`ChoicePicker` 等仍为原实现（为免影响全局尺寸/形状未逐一面替换）。
+- **限制/待办** 实验分支，未做视觉/端到端自测；off-scale 像素（44/38/54 等）保留字面量以维持几何；`npm test` 既有失败与本次无关。若后续要求全量换 `Controls.tsx` 的基元，需逐视图核对尺寸。
+- **关联** C0106、C0100、C0101、C0102、C0105。

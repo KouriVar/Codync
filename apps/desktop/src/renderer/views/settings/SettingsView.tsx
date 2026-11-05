@@ -8,6 +8,7 @@ import { Icon } from '../../components/Icon'
 import { useDismiss } from '../../components/Overlay'
 import { HStack, IconSlot, VStack } from '../../components/Stack'
 import { Text } from '../../components/Text'
+import { Badge } from '../../components/ui/badge'
 import { useModel } from '../../lib/observable'
 import { appLanguages, languageTitle } from '../../lib/l10n'
 import { useTr } from '../../lib/use-language'
@@ -65,7 +66,7 @@ export function SettingsView({ page, setPage }: { page: SettingsPage; setPage: (
                 </IconSlot>
                 <Text truncate grow>{tr(item.label ?? item.title)}</Text>
                 {item.id === 'computers' && app.approvals.length > 0 ? (
-                  <Text size="caption" weight="semibold" tone="secondary">{app.approvals.length}</Text>
+                  <Badge variant="secondary">{app.approvals.length}</Badge>
                 ) : null}
               </button>
             ))}

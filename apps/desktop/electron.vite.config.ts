@@ -1,6 +1,7 @@
 import { execFileSync } from 'node:child_process'
 import { resolve } from 'node:path'
 import react from '@vitejs/plugin-react'
+import tailwindcss from '@tailwindcss/vite'
 import { defineConfig } from 'electron-vite'
 
 // Fresh macOS checkouts must include SF Symbols without a separate manual icons step.
@@ -15,7 +16,7 @@ export default defineConfig({
   renderer: {
     resolve: { alias: { '@shared': resolve('src/shared') } },
     server: { fs: { allow: [resolve('..')] } },
-    plugins: [react()],
+    plugins: [react(), tailwindcss()],
     // Readable function names in error reports; the files are local, so size doesn't matter.
     build: { minify: false },
   },

@@ -143,6 +143,14 @@
   width: 100%;
   height: calc(round(up, calc(var(--conversation) * 1.25), 1px) + 10px);
   transition: height var(--layout);
+  /* C0106: the field is the shared shadcn Textarea, but the composer surface already draws its
+     own fill and outline — drop the primitive's border, background, shadow and 36px min-height
+     so the measured single-line height (and its growth) is unchanged. */
+  min-height: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  border-radius: 0;
 }
 .composer-measure {
   position: absolute;

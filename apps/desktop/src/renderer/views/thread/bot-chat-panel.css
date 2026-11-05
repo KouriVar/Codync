@@ -6,8 +6,8 @@
   display: flex;
   flex-direction: column;
   height: 100%;
-  width: 320px;
-  min-width: 320px;
+  width: var(--panel-min);
+  min-width: var(--panel-min);
   min-height: 0;
   background: var(--background);
 }
@@ -17,7 +17,7 @@
   position: relative;
   flex: none;
   height: 54px;
-  padding: 8px;
+  padding: var(--space-4);
   display: grid;
   place-items: center;
 }
@@ -26,46 +26,46 @@
   max-width: calc(100% - 72px);
   display: flex;
   align-items: center;
-  padding: 0 10px 0 8px;
+  padding: 0 10px 0 var(--space-4);
   border-radius: var(--radius-pill);
   background: var(--panel);
   overflow: hidden;
 }
 .bot-chat-panel-head-actions {
   position: absolute;
-  top: 8px;
-  right: 8px;
+  top: var(--space-4);
+  right: var(--space-4);
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: var(--space-1);
 }
 .bot-chat-panel-scroll {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
   /* The title band is 54; 58 more puts the first message 112 from the panel's top. */
-  padding: 58px 8px 8px;
+  padding: 58px var(--space-4) var(--space-4);
 }
 .bot-chat-panel-note {
-  padding: 8px 4px;
+  padding: var(--space-4) var(--space-2);
   text-align: center;
 }
 .bot-chat-panel-status {
-  padding: 6px 4px;
+  padding: var(--space-3) var(--space-2);
 }
 /* One message: avatar at the bubble's bottom-left corner, name in the bot's colour above the
    bubble. 24 apart from the next message. */
 .panel-msg {
   display: flex;
   align-items: flex-end;
-  gap: 4px;
+  gap: var(--space-2);
 }
 .panel-msg + .panel-msg,
 .panel-msg + .time-separator,
 .time-separator + .panel-msg,
 .bot-chat-panel-status + .panel-msg,
 .panel-msg + .bot-chat-panel-status {
-  margin-top: 24px;
+  margin-top: var(--space-7);
 }
 .panel-msg-avatar {
   flex: none;
@@ -82,7 +82,7 @@
 }
 .panel-msg-name {
   height: 28px;
-  padding: 4px 12px;
+  padding: var(--space-2) var(--space-5);
   display: flex;
   align-items: center;
   min-width: 0;
@@ -96,30 +96,34 @@
   max-width: 100%;
 }
 .bot-chat-panel-mine {
-  margin-top: 24px;
-  padding-top: 8px;
+  margin-top: var(--space-7);
+  padding-top: var(--space-4);
   border-top: 0.5px solid var(--border);
 }
 .bot-chat-panel-mine-title {
-  padding: 6px 0;
+  padding: var(--space-3) 0;
 }
 /* The box at the foot: 44 tall, 9 padding, its bottom 8 above the panel's edge. */
 .bot-chat-panel-composer {
   flex: none;
-  padding: 8px;
+  padding: var(--space-4);
 }
 .bot-chat-panel-box {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-4);
   height: 44px;
-  padding: 9px 9px 9px 12px;
+  padding: 9px 9px 9px var(--space-5);
   border-radius: var(--radius-pill);
   background: var(--surface);
 }
 .bot-chat-panel-box textarea {
   flex: 1;
   min-width: 0;
+  /* The element selector outranks the layered shadcn utilities: drop the Textarea's 36px
+     min-height and shadow so the field keeps the frame's 22px line inside the 44-tall box. */
+  min-height: 0;
+  box-shadow: none;
   max-height: calc(26px * 1);
   padding: 0;
   border: 0;
@@ -147,6 +151,6 @@
   opacity: 0.4;
 }
 .bot-chat-panel-hint {
-  padding: 8px 2px;
+  padding: var(--space-4) var(--space-1);
   text-align: center;
 }

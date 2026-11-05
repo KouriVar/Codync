@@ -1,5 +1,6 @@
 import { resolve } from 'node:path'
 import react from '@vitejs/plugin-react'
+import tailwindcss from '@tailwindcss/vite'
 import { defineConfig, type Plugin } from 'vite'
 
 // The website's live demo: the renderer on an in-memory host (src/renderer/demo), served by
@@ -17,6 +18,6 @@ export default defineConfig({
   // Absolute, so assets resolve however the host serves the page (folder URL or index.html).
   base: '/demo/desktop/',
   resolve: { alias: { '@shared': resolve('src/shared') } },
-  plugins: [react(), alwaysDark],
+  plugins: [react(), tailwindcss(), alwaysDark],
   build: { outDir: resolve('../../web/public/demo/desktop'), emptyOutDir: true, chunkSizeWarningLimit: 1500 },
 })

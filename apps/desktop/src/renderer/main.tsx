@@ -1,4 +1,7 @@
 import { createRoot } from 'react-dom/client'
+// Order matters: tokens declare the CSS variables tailwind maps and theme.css reads.
+import './styles/tokens.css'
+import './styles/tailwind.css'
 import './styles/theme.css'
 import { ChatWindow } from './views/ChatWindow'
 import { PairingWindow } from './views/PairingWindow'

@@ -1,0 +1,68 @@
+/* ============================================================================
+   Tailwind CSS v4 + shadcn/ui theme bridge (C0106)
+   ----------------------------------------------------------------------------
+   Tailwind is imported WITHOUT its Preflight reset: the renderer already has a
+   hand-written reset in `styles/theme.css` and a large bespoke stylesheet, and
+   Preflight would quietly change it. Only the theme (design tokens) and the
+   utility layer are pulled in, so `components/ui/*` can be written the shadcn
+   way (utility classes + cva) while every existing view keeps its own CSS.
+
+   `@theme inline` maps the tokens from `styles/tokens.css` into Tailwind's
+   namespaces, so utilities like `bg-background`, `text-muted-foreground`,
+   `border-border`, `rounded-lg` and `text-sm` resolve to the same values the
+   rest of the app uses — one palette, two vocabularies.
+   ============================================================================ */
+
+@layer theme, base, components, utilities;
+@import 'tailwindcss/theme.css' layer(theme);
+@import 'tailwindcss/utilities.css' layer(utilities);
+
+/* Scan the whole renderer for class names (the ui primitives and any view that
+   adopts utilities). */
+@source '../';
+
+@theme inline {
+  /* Colour: semantic surfaces and ink, pointing at tokens.css. */
+  --color-background: var(--background);
+  --color-foreground: var(--text);
+  --color-card: var(--surface);
+  --color-card-foreground: var(--text);
+  --color-popover: var(--panel);
+  --color-popover-foreground: var(--text);
+  --color-primary: var(--accent-fill);
+  --color-primary-foreground: var(--on-accent);
+  --color-secondary: var(--surface);
+  --color-secondary-foreground: var(--text);
+  --color-muted: var(--surface);
+  --color-muted-foreground: var(--secondary);
+  --color-accent: var(--chip-on);
+  --color-accent-foreground: var(--text);
+  --color-destructive: var(--danger-fill);
+  --color-destructive-foreground: var(--on-danger);
+  --color-border: var(--border);
+  --color-input: var(--outline);
+  --color-ring: var(--stroke-strong);
+
+  /* Radius: shadcn's sm/md/lg/xl onto the app's scale. (xl is repeated literally: the app token
+     already uses the name --radius-xl, so mapping it to itself would be circular.) */
+  --radius-sm: var(--radius-s);
+  --radius-md: var(--radius-m);
+  --radius-lg: var(--radius-l);
+  --radius-xl: 22px;
+
+  /* Type: Tailwind's size names onto the app's scaled ramp. */
+  --text-xs: var(--text-caption);
+  --text-sm: var(--text-callout);
+  --text-base: var(--text-body);
+  --text-lg: var(--text-title3);
+  --text-xl: var(--text-title2);
+  --text-2xl: var(--text-title);
+  --text-3xl: var(--text-large-title);
+  --text-xs--line-height: 1.4;
+  --text-sm--line-height: 1.45;
+  --text-base--line-height: 1.5;
+
+  /* Fonts. */
+  --font-sans: var(--font);
+  --font-mono: var(--mono);
+}

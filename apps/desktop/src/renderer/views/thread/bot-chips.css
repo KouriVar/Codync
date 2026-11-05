@@ -3,26 +3,15 @@
    share one rounded container, 62 tall — summary on top, tag below — so the text no longer floats
    loose above the tag. One row each, scrolled sideways, flush with the box's column. */
 .bot-chip-bar-wrap {
-  /* The four status dots: red broke · orange running · blue awaiting you · green done. */
-  --status-problem: #d92d20;
-  --status-working: #e8890c;
-  --status-asking: #2f6fed;
-  --status-idle: #1f9d55;
+  /* The four delegation status dots (red broke · orange running · blue awaiting you · green done)
+     now live in tokens.css as --status-problem / -working / -asking / -idle; only referenced below. */
   max-width: var(--column);
   margin: 0 auto;
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--space-4);
   min-width: 0;
-}
-@media (prefers-color-scheme: dark) {
-  .bot-chip-bar-wrap {
-    --status-problem: #f0736a;
-    --status-working: #f0a030;
-    --status-asking: #6ea8ff;
-    --status-idle: #4fc17f;
-  }
 }
 /* The row of running bots, above the tags: 28 tall, one strip each, scrolled sideways when they
    don't fit. */
@@ -30,7 +19,7 @@
   display: flex;
   flex-wrap: nowrap;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-3);
   min-height: 28px;
   overflow-x: auto;
   scrollbar-width: none;
@@ -45,7 +34,7 @@
   flex: none;
   height: 28px;
   max-width: 220px;
-  padding: 0 8px;
+  padding: 0 var(--space-4);
   border-radius: var(--radius-pill);
   background: var(--surface);
 }
@@ -53,7 +42,7 @@
   display: flex;
   flex-wrap: nowrap;
   align-items: flex-end;
-  gap: 4px;
+  gap: var(--space-2);
   overflow-x: auto;
   scrollbar-width: none;
 }
@@ -92,11 +81,11 @@
 .bot-chip {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-3);
   flex: none;
   height: 30px;
   max-width: 220px;
-  padding: 0 8px 0 4px;
+  padding: 0 var(--space-4) 0 var(--space-2);
   border-radius: 0;
   background: transparent;
 }

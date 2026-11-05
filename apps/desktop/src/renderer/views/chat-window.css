@@ -433,7 +433,7 @@ html[data-platform="darwin"] .sidebar-header {
 /* The conversation fills the window on the Mac: the chat area never squeezes under 560 (C0096).
    The joined right-hand panel keeps its own 320 floor; both are set in the thread's own sheet. */
 html[data-platform="darwin"] .detail {
-  min-width: 560px;
+  min-width: var(--chat-min);
 }
 
 /* C0096: with no sidebar the account menu has no footer to rise from; on the Mac it drops from the

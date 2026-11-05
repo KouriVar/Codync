@@ -1,8 +1,10 @@
 import { useState } from 'react'
 import { BotAvatar } from '../../components/Avatar'
+import { Button } from '../../components/ui/button'
 import { IconButton } from '../../components/Controls'
 import { Icon } from '../../components/Icon'
 import { Text } from '../../components/Text'
+import { Textarea } from '../../components/ui/textarea'
 import { useTr } from '../../lib/use-language'
 import { avatarColor } from '../../lib/theme'
 import { useStore } from '../../store/context'
@@ -104,7 +106,7 @@ export function BotChatPanel({ botId, peerId, peerName, onClose }: {
       {mine ? (
         <div className="bot-chat-panel-composer">
           <div className="bot-chat-panel-box">
-            <textarea
+            <Textarea
               rows={1}
               value={draft}
               placeholder={tr('Message {name}').replaceAll('{name}', () => peerName)}
@@ -117,9 +119,9 @@ export function BotChatPanel({ botId, peerId, peerName, onClose }: {
                 }
               }}
             />
-            <button className="press bot-chat-panel-send" aria-label={tr('Send')} title={tr('Send')} disabled={!draft.trim()} onClick={send}>
+            <Button size="icon" className="press bot-chat-panel-send" aria-label={tr('Send')} title={tr('Send')} disabled={!draft.trim()} onClick={send}>
               <Icon name="arrow.up" size={13} weight="bold" />
-            </button>
+            </Button>
           </div>
         </div>
       ) : (

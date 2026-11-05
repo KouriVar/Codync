@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { Entry, FileDiff, PermissionOption } from '@shared/models'
 import { Disclosure, Spinner } from '../../components/Controls'
+import { Button } from '../../components/ui/button'
 import { Icon } from '../../components/Icon'
 import { HStack, VStack } from '../../components/Stack'
 import { Text } from '../../components/Text'
@@ -86,14 +87,16 @@ export function PermissionCard({ entry, hostName, answering, respond }: { entry:
             {options.map((o, i) => (
               <div key={o.optionId}>
                 {i > 0 ? <div className="thread-hairline" /> : null}
-                <button
+                <Button
+                  variant="ghost"
+                  size="sm"
                   className={answering === null || answering === o.optionId ? 'permission-option' : 'permission-option dimmed'}
                   disabled={answering !== null}
                   onClick={() => respond(o.optionId)}
                 >
                   <Text size="body" weight={o.kind === 'allow_once' ? 'semibold' : 'regular'} tone={o.kind.startsWith('allow') ? 'text' : 'danger'} className="permission-option-label">{optionLabel(o)}</Text>
                   {answering === o.optionId ? <Spinner size={14} /> : null}
-                </button>
+                </Button>
               </div>
             ))}
           </div>

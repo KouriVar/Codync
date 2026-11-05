@@ -6,6 +6,7 @@ import type { PickedFile } from '@shared/ipc'
 import { BotAvatar } from '../../components/Avatar'
 import { Icon } from '../../components/Icon'
 import { IconButton } from '../../components/Controls'
+import { Textarea } from '../../components/ui/textarea'
 import { RecordingPill } from '../../components/RecordingPill'
 import { Sheet, usePresence } from '../../components/Overlay'
 import { VoiceChatSettingsView } from '../settings/VoiceChatSettingsView'
@@ -263,7 +264,7 @@ function DestinationComposer({ botId, reply, about, cancelReply, onCall, onInter
             ) : null}
             <div className="composer-field">
               <div ref={measure} className="composer-measure" aria-hidden="true">{draft + '\u200b'}</div>
-              <textarea
+              <Textarea
                 ref={field}
                 rows={1}
                 value={draft}

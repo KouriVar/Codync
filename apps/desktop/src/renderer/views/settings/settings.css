@@ -10,23 +10,23 @@
   flex: none;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--space-1);
   padding: 30px 10px 10px;
 }
 .settings-group {
   font-size: var(--text-callout);
   font-weight: 500;
   color: var(--tertiary);
-  padding: 0 10px 4px;
+  padding: 0 10px var(--space-2);
 }
 .settings-group:not(:first-child) {
-  padding-top: 16px;
+  padding-top: var(--space-6);
 }
 .settings-item {
   display: flex;
   align-items: center;
   gap: 10px;
-  height: 32px;
+  height: var(--space-8);
   padding: 0 10px;
   border-radius: var(--radius-s);
   font-size: var(--text-body);
@@ -38,7 +38,7 @@
 }
 /* A row's leading icon, centered in a fixed column so the labels line up. */
 .settings-divider {
-  width: 1px;
+  width: var(--divider-width);
   flex: none;
   background: var(--border);
 }
@@ -49,7 +49,7 @@
   flex-direction: column;
 }
 .settings-title {
-  padding: 30px 56px 12px 32px;
+  padding: 30px 56px var(--space-5) var(--space-8);
 }
 .settings-page {
   flex: 1;
@@ -64,20 +64,20 @@
 }
 /* One filled group, like a CardSection's. */
 .settings-card {
-  padding: 16px;
+  padding: var(--space-6);
   width: 100%;
   background: var(--surface);
   border-radius: var(--radius-l);
-  margin-bottom: 8px;
+  margin-bottom: var(--space-4);
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--space-4);
 }
 .settings-section-header {
   display: flex;
   align-items: center;
-  min-height: 24px;
-  padding: 0 0 10px 2px;
+  min-height: var(--space-7);
+  padding: 0 0 10px var(--space-1);
 }
 .settings-row {
   display: flex;
@@ -99,7 +99,7 @@
 .settings-code {
   font-family: var(--mono);
   font-size: var(--text-caption);
-  padding: 6px;
+  padding: var(--space-3);
   flex: 1;
   min-width: 0;
   background: var(--code-background);
@@ -176,7 +176,7 @@
 }
 /* Over SSH: room between its note and the SSH config card or hosts under it. */
 .settings-ssh > .reveal + .settings-card {
-  margin-top: 12px;
+  margin-top: var(--space-5);
 }
 /* The SSH config question's icon sits on its title's line. */
 .ssh-config-icon {
@@ -187,16 +187,16 @@
   width: 460px;
 }
 .settings-ssh-editor-body {
-  padding: 4px 20px 20px;
+  padding: var(--space-2) 20px 20px;
 }
 .settings-approval {
   width: 420px;
 }
 .settings-approval-body {
-  padding: 0 24px 24px;
+  padding: 0 var(--space-7) var(--space-7);
 }
 .settings-analytics-icon {
-  padding-top: 2px;
+  padding-top: var(--space-1);
 }
 
 /* Voice chat: its own sheet outside Settings; rows that need a key dim until there is one. */

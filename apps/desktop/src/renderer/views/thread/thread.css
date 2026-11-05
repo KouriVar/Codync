@@ -450,15 +450,17 @@
 
 /* C0096 — the Mac main layout's sizes. The chat column and its box top out at 888 and never squeeze
    under 560; a bubble tops out at 560. The docked peer conversation keeps 320 at least, and gives way
-   first: the panel shrinks to 320 before the chat shrinks to 560 (both set in `ThreadView`). */
+   first: the panel shrinks to 320 before the chat shrinks to 560 (both set in `ThreadView`).
+   C0106: the numbers are named tokens in styles/tokens.css (--chat-max / --chat-min / --bubble-max /
+   --panel-min / --frame-inset / --divider-width). */
 html[data-platform="darwin"] .conversation {
-  min-width: 560px;
+  min-width: var(--chat-min);
   /* C0100: the content column keeps its 80px side inset inside the main area (782 at 1280),
      capped at 888 and floored at 560. */
-  --column: clamp(560px, calc(100% - 160px), 888px);
+  --column: clamp(var(--chat-min), calc(100% - 160px), var(--chat-max));
 }
 html[data-platform="darwin"] {
-  --agent-bubble-max: min(560px, max(80px, (100cqw + 32px) * 0.8 - 32px), 100cqw - 88px);
+  --agent-bubble-max: min(var(--bubble-max), max(80px, (100cqw + 32px) * 0.8 - 32px), 100cqw - 88px);
 }
 /* The docked peer conversation hangs off the chat's right edge, split from it by the panel's own
    hairline. It is a layout child, not an overlay: the chat reflows beside it (C0096). */
@@ -472,19 +474,19 @@ html[data-platform="darwin"] {
    hairline drawn down the middle of that gap. */
 html[data-platform="darwin"] .thread-view {
   box-sizing: border-box;
-  padding: 6px;
+  padding: var(--frame-inset);
 }
 html[data-platform="darwin"] .bot-chat-dock {
   position: relative;
-  margin-left: 12px;
+  margin-left: var(--space-5);
 }
 html[data-platform="darwin"] .bot-chat-dock::before {
   content: '';
   position: absolute;
-  left: -7px;
-  top: -6px;
-  bottom: -6px;
-  width: 1px;
+  left: calc(-1 * (var(--frame-inset) + var(--divider-width)));
+  top: calc(-1 * var(--frame-inset));
+  bottom: calc(-1 * var(--frame-inset));
+  width: var(--divider-width);
   background: var(--border);
   pointer-events: none;
 }
