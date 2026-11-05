@@ -271,6 +271,7 @@ pub(super) async fn call(hub: &Arc<Hub>, caller: &Caller, method: &str, b: Value
         "memory" | "memoryFile" => crate::chat::memory::call(hub, method, &b).await?,
         "memoryAdd" | "memoryEdit" | "memoryDelete" => crate::chat::memory::manage_call(hub, method, &b).await?,
         "recallSearch" => crate::chat::recall::api_call(hub, method, &b).await?,
+        "proactiveSettings" | "proactiveSetTimes" | "proactiveLog" => crate::chat::proactive::api_call(hub, method, &b).await?,
         "library" => crate::chat::library::list(hub, str_arg(&b, "botId")?)?,
         "readArtifact" | "renameArtifact" => crate::chat::artifacts::api(hub, method, &b).await?,
         "editHandoff" | "keepConversation" => crate::chat::handoff::call(hub, method, &b)?,

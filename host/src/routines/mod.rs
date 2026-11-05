@@ -50,6 +50,10 @@ pub struct Routine {
     pub timeout_seconds: u64,
     #[serde(default)]
     pub last_error: Option<String>,
+    /// A silent run reports nothing to the chat: no start notice, no result message, no notification
+    /// (a failure still surfaces). Off by default, so every existing routine behaves as before.
+    #[serde(default)]
+    pub silent: bool,
 }
 
 #[derive(Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -244,6 +248,7 @@ impl Routines {
             if !updated && s.routines.iter().filter(|r| !r.deleted).count() >= 1000 {
                 bail!("routine limit reached");
             }
+            let silent = body["silent"].as_bool().unwrap_or_else(|| old.as_ref().is_some_and(|r| r.silent));
             let r = Routine {
                 id: id.clone(),
                 bot_id: row.config.id.clone(),
@@ -266,6 +271,7 @@ impl Routines {
                 timeout_seconds: timeout
                     .unwrap_or_else(|| old.as_ref().map_or_else(default_timeout, |r| r.timeout_seconds)),
                 last_error: None,
+                silent,
             };
             if !(1..=86_400).contains(&r.timeout_seconds) {
                 bail!("timeoutSeconds must be between 1 and 86400");
@@ -428,7 +434,7 @@ fn required<'a>(body: &'a Value, key: &str) -> Result<&'a str> {
 }
 fn public(r: &Routine) -> Value {
     json!({"id":r.id,"botId":r.bot_id,"name":r.name,"instruction":r.instruction,"triggers":r.triggers,"enabled":r.enabled,"createdAt":r.created_at,"updatedAt":r.updated_at,
-        "timeoutSeconds":r.timeout_seconds,"lastError":r.last_error,
+        "timeoutSeconds":r.timeout_seconds,"lastError":r.last_error,"silent":r.silent,
         "triggerDescriptions":r.triggers.iter().map(Trigger::description).collect::<Vec<_>>(),"nextRunAt": if r.enabled {r.next_runs.iter().flatten().min().copied()} else {None}})
 }
 fn new_run(r: &Routine, event: Value, delivery_id: Option<String>) -> Run {

@@ -17,6 +17,7 @@ pub fn start(hub: &Arc<Hub>) -> JoinSet<()> {
     });
     tokio::spawn(registry::refresh_loop());
     tokio::spawn(crate::icons::cleanup_loop(hub.clone()));
+    crate::chat::proactive::start(hub.clone());
     tokio::spawn(market::refresh_first_page());
     tokio::spawn(market::automatic_loop(hub.clone()));
     tokio::spawn(voice::refresh_loop(hub.clone()));

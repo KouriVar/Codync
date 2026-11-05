@@ -25,6 +25,21 @@ export const mainLayoutHans = {
   'The connected Host is too old to edit memory.': '当前连接的 Host 版本太旧，不支持编辑记忆',
   'About you — your name, time zone, people and lasting preferences, shared by every bot. {used} of {cap} in use.': '「关于你」：你的名字、时区、身边的人和长期偏好，所有 Bot 共享这一层。已用 {used}/{cap}。',
   'This bot — only what this bot itself learned about you. {used} of {cap} in use.': '「这个 Bot」：只有这个 Bot 自己学到的关于你的事。已用 {used}/{cap}。',
+  'Proactive reports': '主动跟进汇报',
+  'Midday report': '中午简报',
+  'Daily summary': '每日总结',
+  'Memory tidy': '记忆整理',
+  'A short note at noon: what is done, and what needs your decision.': '中午发一条简短汇报：做了什么、有什么要你拍板。',
+  'One full summary in the evening: finished, still open, and what to do next.': '晚上发一次完整总结：做完了什么、还没做完的、接下来建议做什么。',
+  'Quietly tidies memory at this time and sends nothing.': '在这个时间安静整理记忆，不发消息。',
+  'Proactive reports run on this computer’s time zone. Changes take effect immediately.': '汇报按这台电脑的时区运行；改完立即生效。',
+  'Loading…': '正在加载…',
+  'Saved — takes effect immediately': '已保存，立即生效',
+  'Action log': '动作日志',
+  'Nothing done on its own yet.': '还没有它自己动手的记录。',
+  'failed': '失败',
+  'done': '完成',
+
 }
 
 export const mainLayoutHant = {
@@ -47,4 +62,19 @@ export const mainLayoutHant = {
   'The connected Host is too old to edit memory.': '當前連線的 Host 版本太舊，不支援編輯記憶',
   'About you — your name, time zone, people and lasting preferences, shared by every bot. {used} of {cap} in use.': '「關於你」：你的名字、時區、身邊的人和長期偏好，所有 Bot 共享這一層。已用 {used}/{cap}。',
   'This bot — only what this bot itself learned about you. {used} of {cap} in use.': '「這個 Bot」：只有這個 Bot 自己學到的關於你的事。已用 {used}/{cap}。',
+  'Proactive reports': '主動跟進匯報',
+  'Midday report': '中午簡報',
+  'Daily summary': '每日總結',
+  'Memory tidy': '記憶整理',
+  'A short note at noon: what is done, and what needs your decision.': '中午發一條簡短匯報：做了什麼、有什麼要你拍板。',
+  'One full summary in the evening: finished, still open, and what to do next.': '晚上發一次完整總結：做完了什麼、還沒做完的、接下來建議做什麼。',
+  'Quietly tidies memory at this time and sends nothing.': '在這個時間安靜整理記憶，不發訊息。',
+  'Proactive reports run on this computer’s time zone. Changes take effect immediately.': '匯報按這台電腦的時區運行；改完立即生效。',
+  'Loading…': '正在載入…',
+  'Saved — takes effect immediately': '已儲存，立即生效',
+  'Action log': '動作日誌',
+  'Nothing done on its own yet.': '還沒有它自己動手的記錄。',
+  'failed': '失敗',
+  'done': '完成',
+
 }

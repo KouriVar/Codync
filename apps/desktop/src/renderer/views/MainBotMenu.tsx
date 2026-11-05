@@ -12,6 +12,8 @@ export interface MainMenuActions {
   openBots: () => void
   /** The Mac's memory page (C0102): the bot's own and the shared facts, editable. */
   openMemory: () => void
+  /** The proactive-report times (C0105). */
+  openProactive: () => void
   openSearch: () => void
   openNewBot: () => void
   openNewGroup: () => void
@@ -64,6 +66,7 @@ export function useMainBotMenu(conversation: {
         { title: 'Import bots…', icon: 'square.and.arrow.down', action: actions.openImport },
         { title: 'Extensions', icon: 'square.grid.2x2', action: actions.openExtensions },
         { title: 'Network', icon: 'desktopcomputer', action: () => actions.openSettings('network') },
+        { title: 'Proactive reports', icon: 'clock', action: actions.openProactive },
         { title: 'Check for updates', icon: 'arrow.down.circle', action: () => void window.codync.updates.check() },
       ]
     }

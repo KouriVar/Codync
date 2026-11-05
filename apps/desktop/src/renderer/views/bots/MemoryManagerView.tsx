@@ -9,7 +9,15 @@ import { relativeTime } from '../thread/chat-items'
 import './memory.css'
 import './memory-manage.css'
 
-type Section = 'yours' | 'bot'
+type Section = 'yours' | 'bot' | 'log'
+
+/** One line of what the bot did on its own (C0105). */
+interface ActionLog {
+  at: number
+  routine: string
+  status: string
+  summary: string
+}
 
 /**
  * The Mac's memory page (C0102): what the bot knows, opened from the main bot's menu. Unlike the
@@ -28,6 +36,7 @@ export function MemoryManagerView({ botId }: { botId: string }) {
   const [draft, setDraft] = useState('')
   const [confirm, setConfirm] = useState<number | null>(null)
   const [adding, setAdding] = useState('')
+  const [log, setLog] = useState<ActionLog[] | null>(null)
 
   /** An older host answers "unknown method"; say so plainly instead of showing the raw wire error. */
   const friendly = (e: unknown) => {
@@ -64,11 +73,28 @@ export function MemoryManagerView({ botId }: { botId: string }) {
     }
   }
 
+  // Load the action log when its tab is open (C0105).
+  useEffect(() => {
+    if (section !== 'log') return
+    let live = true
+    void (async () => {
+      try {
+        const client = await store.ready()
+        const res = await client.call<{ entries: ActionLog[] }>('proactiveLog', {})
+        if (live) setLog(res.entries)
+      } catch (e) {
+        if (live) setError(friendly(e))
+      }
+    })()
+    return () => { live = false }
+  }, [section, store, tr])
+
   const shared = section === 'yours'
   const layer = section === 'yours' ? view?.yours : view?.bot
   const sections: { id: Section; label: string }[] = [
     ...(view?.shared ? [{ id: 'yours' as const, label: 'About you' }] : []),
     { id: 'bot', label: 'This bot' },
+    { id: 'log', label: 'Action log' },
   ]
 
   const saveEdit = async (entry: MemoryEntry) => {
@@ -151,6 +177,26 @@ export function MemoryManagerView({ botId }: { botId: string }) {
             />
             <Button onClick={() => void doAdd()} disabled={busy || !adding.trim()}>{tr('Remember this')}</Button>
           </HStack>
+        </>
+      ) : null}
+      {view && section === 'log' ? (
+        <>
+          {!log ? <p className="memory-muted">{tr('Loading…')}</p> : null}
+          {log && log.length === 0 ? <div className="memory-empty"><span>{tr('Nothing done on its own yet.')}</span></div> : null}
+          {log && log.length > 0 ? (
+            <VStack gap={4}>
+              {log.map((e, i) => (
+                <div className="memory-manage-row memory-manage-log" key={`${e.at}-${i}`}>
+                  <span className="memory-manage-text" title={e.summary}>
+                    <b>{tr(e.routine)}</b> · {relativeTime.day(e.at, tr)}{e.summary ? ` — ${e.summary}` : ''}
+                  </span>
+                  <small className={e.status === 'failed' ? 'memory-manage-meta memory-attention' : 'memory-manage-meta'}>
+                    {e.status === 'failed' ? tr('failed') : tr('done')}
+                  </small>
+                </div>
+              ))}
+            </VStack>
+          ) : null}
         </>
       ) : null}
     </div>

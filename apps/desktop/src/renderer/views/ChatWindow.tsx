@@ -25,6 +25,7 @@ import { ThreadView } from './thread/ThreadView'
 import { queueVoiceKey } from './thread/voice-shortcut-keys'
 import { NewBotView, NewGroupView } from './bots/NewBotView'
 import { MemoryManagerView } from './bots/MemoryManagerView'
+import { ProactiveSettingsView } from './bots/ProactiveSettingsView'
 import { ImportBotsSheet } from './bots/ImportBotsView'
 import { BotEditorView } from './bots/BotEditorView'
 import { MarketplaceView } from './marketplace/MarketplaceView'
@@ -226,6 +227,8 @@ function ChatSplitView({ onComputerAccess }: { onComputerAccess: () => void }) {
   const [botsList, setBotsList] = useState(false)
   /** C0102: the Mac's memory page, opened from the main bot's menu. */
   const [memoryOpen, setMemoryOpen] = useState(false)
+  /** C0105: the proactive-report times, opened from the main bot's menu. */
+  const [proactiveOpen, setProactiveOpen] = useState(false)
   const [windowSize, setWindowSize] = useState({ width: window.innerWidth, height: window.innerHeight })
   const newButton = useRef<HTMLButtonElement>(null)
   const railNewButton = useRef<HTMLButtonElement>(null)
@@ -326,6 +329,7 @@ function ChatSplitView({ onComputerAccess }: { onComputerAccess: () => void }) {
   const menuActions: MainMenuActions = {
     openBots: () => setBotsList(true),
     openMemory: () => { setBotsList(false); setMemoryOpen(true) },
+    openProactive: () => { setBotsList(false); setProactiveOpen(true) },
     openSearch: () => setSearching(true),
     openNewBot: () => create('bot'),
     openNewGroup: () => create('group'),
@@ -553,6 +557,16 @@ function ChatSplitView({ onComputerAccess }: { onComputerAccess: () => void }) {
         onClose={() => setConfirmDelete(null)}
       />
       <SectionNameDialog naming={naming} onClose={() => setNaming(null)} />
+      {/* C0105: the proactive-report times, effective immediately. */}
+      {isMac ? (
+        <Sheet open={proactiveOpen} onClose={() => setProactiveOpen(false)} width={Math.min(560, windowSize.width - 48)} height={Math.min(420, sheetHeight)}>
+          {selectedStore || app.local ? (
+            <StoreContext.Provider value={(selectedStore ?? app.local)!}>
+              <ProactiveSettingsView />
+            </StoreContext.Provider>
+          ) : null}
+        </Sheet>
+      ) : null}
       {/* C0102: the memory page, its facts editable, for the bot whose chat is open. */}
       {isMac ? (
         <Sheet open={memoryOpen} onClose={() => setMemoryOpen(false)} width={Math.min(560, windowSize.width - 48)} height={sheetHeight}>

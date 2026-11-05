@@ -1116,3 +1116,25 @@ iOS 定制分支：`ui/ios-customization`；当前 Mac 工作分支：`ui/macos-
   - 检索沿用上游 SQL 子串扫描（无独立索引表，上游注释估 0.6s/18 万条/单 bot），大库下仍是即时查询。
   - 跳转依赖目标消息能被分页加载到（40 页以内）；超出则只切到会话、不定位。
 - **关联** C0102、C0103；上游 `docs/features/context-and-memory.md`。
+
+### C0105 · 2026-11-06 · 主动跟进第三期：三个定时例程、静默例程、时间设置、动作日志
+
+- **原因** 第三期需求：中午 12:00 简短汇报、晚上 20:00 完整总结、晚上 00:00 只整理记忆不发消息；时间做成可改设置；随时因"要同意/出问题"而发；小事自做、大事先发确认卡片；每次自主动作记日志并在「记忆」页可见。
+- **落点** Host（例程/静默/设置/日志）＋ Desktop（设置区、动作日志页签）。只新增，唯一例外见"静默"。
+- **变化**
+  - **三个例程**：新模块 `host/src/chat/proactive.rs` 为首领 bot（lead）创建/维护三个 cron 例程——`Midday report`（12:00）、`Daily summary`（20:00）、`Memory tidy`（00:00，静默），全部用本机时区；指令内置策略：**小事可自做再汇报（只读查看/总结/整理记忆/改提醒），大事一律先发确认卡片说明做什么与为什么、等同意、没回不做；其余不发送消息、返回 (pass)**。创建/更新走**上游 `routines.save`**，例程 id 存 `kv`；启动时幂等（时间、开关、silent 一致就不重存）。另将**上游默认的 9:00/18:00「Check in」例程停用一次**，使汇报只发生在三个设定时点（数据层操作，不改上游代码）。
+  - **静默例程（新增能力）**：`Routine` 新增可选 `silent`（`#[serde(default)]`，既有例程行为不变）。`runner` 对 silent 运行**不发开始通知、不投递结果、不推送**；失败仍会发失败通知（对应"出问题随时发"）。这是本期唯一必须触碰上游 `runner` 的地方（最小改动）。silent 运行的 agent 最终回复 `(pass)`，上游本就把 pass 视作不发言（`agent/bot/turn.rs` 过滤），**不是**发空消息或秒删凑合。
+  - **时间设置**：Desktop「主 bot 菜单 → 更多 → 主动跟进汇报」打开设置页，改三个时间；保存调用新增 `proactiveSetTimes`，更新 `kv` 并重写三例程 schedule，在 1s 调度 tick 内**立即生效**（无需重启）。
+  - **动作日志**：新增等价存储 `kv: proactive.actions`（不改上游 memory 结构）。后台每 20s 汇总三个例程新完成的 run（成功/失败、时间、简短摘要；含敏感词打码，最多 300 条）。「记忆」页新增**「动作日志」页签**读取 `proactiveLog` 展示。
+  - **要同意/出问题随时发**：复用上游权限确认卡片（Ask 模式）与例程失败通知；提示词要求"小事以外先发确认卡片、等同意、没回不做"。
+  - 不做 App 前后台判断；不改上游 dreaming；不改手机端。
+- **文件** `host/src/chat/{proactive.rs（新）,mod.rs}`、`host/src/routines/{mod.rs,runner.rs}`、`host/src/api/bots.rs`、`host/src/background.rs`；`apps/desktop/src/renderer/views/bots/{ProactiveSettingsView.tsx（新）,proactive-settings.css（新）,MemoryManagerView.tsx}`、`apps/desktop/src/renderer/views/{MainBotMenu.tsx,ChatWindow.tsx}`、`apps/desktop/src/renderer/lib/main-layout-phrases.ts`、`CHANGELOG.md`。
+- **验证** `host` 下 `cargo check` 通过；`apps/desktop` 下 `npm run typecheck` 与 `npm run build`（electron-vite build）通过。按规则只编译、未自测（未启动应用、未等到点、未改时间验证）。
+- **限制与待办**
+  - 例程按**当前 lead bot** 创建；若中途更换 lead，旧 bot 上的三个例程会残留（重启会为新 lead 再建一套）；建议换 lead 后手动删旧的。删除 lead 会由上游 `disable_bot` 一并停用其例程。
+  - 静默只对这三个（及任何显式 `silent:true` 的）例程生效；通用例程编辑器不带 `silent` 字段，会保留原值。
+  - "小事/大事"是**提示词策略**，不是强制沙箱；真正的强保证仍依赖上游 Ask 权限审批。未改上游 agent/harness。
+  - 动作日志只记**三个例程的整轮结果**，非逐工具动作（逐动作要动 agent 内部）。
+  - 例程创建时上游会各发一条「Created routine: …」通知，首次启动主会话会看到 3 条；属上游行为。
+  - 未加单元测试。
+- **关联** C0102、C0104。
