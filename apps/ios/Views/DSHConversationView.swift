@@ -637,9 +637,14 @@ struct DSHComposer: View {
         VStack(alignment: .leading, spacing: 0) {
             ForEach(commandSuggestions) { command in
                 Button { runCommand(command) } label: {
-                    HStack(spacing: 8) {
+                    HStack(spacing: 10) {
+                        Image(systemName: DSHCommandStyle.icon(command))
+                            .font(.system(size: 15)).frame(width: 22).foregroundStyle(Palette.text)
                         VStack(alignment: .leading, spacing: 1) {
-                            Text("/" + command.name).font(.subheadline).foregroundStyle(Palette.text)
+                            HStack(spacing: 6) {
+                                Text(DSHCommandStyle.title(command)).font(.subheadline).foregroundStyle(Palette.text)
+                                Text("/" + command.name).font(.caption2).foregroundStyle(Palette.tertiary)
+                            }
                             if !command.description.isEmpty {
                                 Text(command.description).font(.caption2).foregroundStyle(Palette.secondary).lineLimit(1)
                             }
@@ -854,6 +859,37 @@ struct DSHComposer: View {
 
 /// The "添加" sheet: the media options the gateway accepts. Photos and camera go through
 /// `message.images`; the rest arrive in later steps.
+/// Human-facing presentation for gateway commands/skills: a Chinese title and an SF Symbol icon for
+/// the common ones; unknown commands fall back to their raw token and a terminal icon. Descriptions
+/// come from the gateway (requested with locale=zh-CN), so they are already localized.
+private enum DSHCommandStyle {
+    static let titles: [String: String] = [
+        "compact": "压缩", "model": "模型", "export": "下载日志", "plan": "计划", "goal": "目标",
+        "permission": "权限", "clear": "清空", "rename": "重命名", "archive": "归档", "fork": "分叉",
+        "help": "帮助", "resume": "继续", "pause": "暂停", "tasks": "任务", "task": "任务",
+        "status": "状态", "cost": "用量", "usage": "用量", "context": "上下文", "review": "审查",
+        "test": "测试", "commit": "提交", "diff": "差异", "mcp": "MCP", "init": "初始化",
+    ]
+    static let icons: [String: String] = [
+        "compact": "arrow.down.right.and.arrow.up.left", "model": "cpu", "export": "square.and.arrow.down",
+        "plan": "list.bullet.rectangle", "goal": "target", "permission": "lock.shield", "clear": "trash",
+        "rename": "pencil", "archive": "archivebox", "fork": "arrow.triangle.branch", "help": "questionmark.circle",
+        "resume": "play.fill", "pause": "pause.fill", "tasks": "checklist", "status": "info.circle",
+        "cost": "gauge", "usage": "gauge", "context": "doc.text.magnifyingglass", "review": "eye",
+        "test": "checkmark.seal", "commit": "arrow.up.doc", "diff": "plus.forwardslash.minus",
+    ]
+    static func title(_ command: DSHCommand) -> String { titles[command.name.lowercased()] ?? command.name }
+    static func icon(_ command: DSHCommand) -> String {
+        if command.groupTitle == "skills" { return "sparkles" }
+        return icons[command.name.lowercased()] ?? "terminal"
+    }
+    /// Commands that duplicate a built-in button (we already have 照片/文件) are hidden in the add sheet.
+    static func isRedundant(_ command: DSHCommand) -> Bool {
+        ["file", "files", "attach", "attachment", "upload", "photo", "image", "picture", "media"]
+            .contains(command.name.lowercased())
+    }
+}
+
 private struct DSHAddSheet: View {
     let canPhoto: Bool
     let canFile: Bool
@@ -882,15 +918,23 @@ private struct DSHAddSheet: View {
                     if commandPending {
                         Text("命令加载中…").font(.footnote).foregroundStyle(Palette.secondary)
                     }
-                    ForEach(groups) { group in
+                    ForEach(groups.filter { group in group.commands.contains { !DSHCommandStyle.isRedundant($0) } }) { group in
                         VStack(alignment: .leading, spacing: 6) {
-                            Text(group.title == "skills" ? "技能" : "命令")
+                            Text(group.title == "skills" ? "技能" : "指令")
                                 .font(.footnote.weight(.semibold)).foregroundStyle(Palette.secondary)
-                            ForEach(group.commands) { command in
+                            ForEach(group.commands.filter { !DSHCommandStyle.isRedundant($0) }) { command in
                                 Button { onCommand(command); onClose() } label: {
-                                    HStack(spacing: 8) {
+                                    HStack(spacing: 10) {
+                                        Image(systemName: DSHCommandStyle.icon(command))
+                                            .font(.system(size: 15)).frame(width: 22)
+                                            .foregroundStyle(Palette.text)
                                         VStack(alignment: .leading, spacing: 1) {
-                                            Text("/" + command.name).font(.subheadline).foregroundStyle(Palette.text)
+                                            HStack(spacing: 6) {
+                                                Text(DSHCommandStyle.title(command))
+                                                    .font(.subheadline).foregroundStyle(Palette.text)
+                                                Text("/" + command.name)
+                                                    .font(.caption2).foregroundStyle(Palette.tertiary)
+                                            }
                                             if !command.description.isEmpty {
                                                 Text(command.description).font(.caption2)
                                                     .foregroundStyle(Palette.secondary).lineLimit(1)

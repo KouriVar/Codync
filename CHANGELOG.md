@@ -3871,3 +3871,19 @@
 - 边界：不改输入框结构/宽度/箭头/状态行/串流。
 - 验证：`xcodebuild build ... -configuration DevDebug`（`generic/platform=iOS`）**BUILD SUCCEEDED，0 error**，构建号 **240**；
   已装 iPhone 16 Pro（2.36.0 / 240）。不跑测试、不截图。
+
+### C0223fix5 · 2026-11-05 · 命令/技能列表：图标 + 中文名 + 说明（类参考图）
+
+- 说明：用户希望命令/技能不是光秃秃的 `/compact` 英文 token，而是像参考图那样「图标 + 中文名 + 一句说明」，点即执行。
+- 变化（仅 UI 呈现，协议字段不变）：
+  - `DSHCommandStyle`：常见命令→中文名+SF Symbol（compact 压缩、model 模型、export 下载日志、plan 计划、goal 目标、
+    permission 权限、clear/rename/archive/fork/help…）；技能统一 `sparkles` 图标；未收录的回落原名 + `terminal`。
+  - 加号 sheet 与 `/` 过滤菜单：每行改为「图标 + 中文名（+ 灰色 `/token`）+ 中文说明」。说明来自网关按 `locale=zh-CN`
+    返回的 `description`（已本地化），我们不编造。
+  - 分组标题：「命令」改为「指令」（对齐参考图），技能仍「技能」。
+  - 去重：`file/attach/upload/photo/image…` 这类与已有「照片/文件」按钮重复的命令，在加号里**隐藏**；整组若全被隐藏则
+    不显示该组标题。
+- 「未确认」：命令的中文名是客户端映射（网关只给 token + 本地化 description）；未收录的新命令显示原名。
+- 边界：不改输入框结构/宽度/箭头/状态行/串流。
+- 验证：`xcodebuild build ... -configuration DevDebug`（`generic/platform=iOS`）**BUILD SUCCEEDED，0 error**，构建号 **241**；
+  已装 iPhone 16 Pro（2.36.0 / 241）。不跑测试、不截图。
