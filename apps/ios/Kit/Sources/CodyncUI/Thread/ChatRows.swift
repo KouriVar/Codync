@@ -123,7 +123,8 @@ struct UserBubble: View {
     @Environment(BotStore.self) private var model
 
     var body: some View {
-        VStack(alignment: .trailing, spacing: 4) {
+        let hasAttachments = !(entry.data.attachments?.isEmpty ?? true)
+        VStack(alignment: .trailing, spacing: hasAttachments ? 12 : 4) {
             if let attachments = entry.data.attachments, !attachments.isEmpty {
                 AttachmentList(attachments: attachments, botId: entry.botId)
             }

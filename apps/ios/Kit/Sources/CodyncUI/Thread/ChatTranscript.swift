@@ -210,9 +210,10 @@ private struct ChatEntryRow: View {
         case "user":
             HStack(spacing: 0) {
                 Spacer(minLength: 40)
-                VStack(alignment: .trailing, spacing: 4) {
-                    fileList
-                    pictureList
+                VStack(alignment: .trailing, spacing: hasAttachments ? 12 : 4) {
+                    if hasAttachments {
+                        VStack(alignment: .trailing, spacing: 4) { fileList; pictureList }
+                    }
                     // A message that is only pictures has no text to put in a bubble.
                     if let text = entry.data.text, !text.isEmpty {
                         Text(text)
@@ -228,9 +229,10 @@ private struct ChatEntryRow: View {
             .padding(.top, 12)
         case "agent":
             HStack(spacing: 0) {
-                VStack(alignment: .leading, spacing: 4) {
-                    fileList
-                    pictureList
+                VStack(alignment: .leading, spacing: hasAttachments ? 12 : 4) {
+                    if hasAttachments {
+                        VStack(alignment: .leading, spacing: 4) { fileList; pictureList }
+                    }
                     if let text = entry.data.text, !text.isEmpty {
                         MarkdownText(text).equatable()
                             .padding(.horizontal, 16)
@@ -244,14 +246,17 @@ private struct ChatEntryRow: View {
             .padding(.top, 12)
         default:
             // A notice is a neutral line; a picture riding on one (a context photo) still shows, above it.
-            VStack(alignment: .leading, spacing: 4) {
-                fileList
-                pictureList
+            VStack(alignment: .leading, spacing: hasAttachments ? 12 : 4) {
+                if hasAttachments {
+                    VStack(alignment: .leading, spacing: 4) { fileList; pictureList }
+                }
                 NoticeRow(entry: entry)
             }
             .padding(.top, 10)
         }
     }
+
+    private var hasAttachments: Bool { !images.isEmpty || !files.isEmpty }
 
     /// The row's pictures, when the transcript knows how to load them.
     @ViewBuilder private var pictureList: some View {

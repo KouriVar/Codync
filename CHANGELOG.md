@@ -3833,3 +3833,17 @@
 - 验证：`xcodebuild build ... -configuration DevDebug`（`generic/platform=iOS`）**BUILD SUCCEEDED，0 error**，
   构建号 **236**；已装 iPhone 16 Pro（2.36.0 / 236）。不跑测试、不截图。
 - 说明：`tokenUsage` 的确切字段名网关未文档化，若个别 key 未命中映射仍会显示英文原名；把实际 key 给我可精修。
+
+### C0223fix2 · 2026-11-05 · 附件（图片/文件/文档）与消息气泡间距改为 12
+
+- 说明：用户反馈"带图发送时图片离附带的消息气泡太远（约55px@1x），改成12"。
+- 变化（CodyncUI，DSH 与 Coe 共用）：
+  - `ChatTranscript.ChatEntryRow`（DSH 的 user/agent/notice 三种行）：把「附件块（图片+文件）」与「文字气泡」之间的间距
+    统一成 **12**（附件彼此之间仍 4）；无附件时保持 4。
+  - `ChatRows.UserBubble`（Coe 用户气泡）：有附件时附件→文字气泡间距 **12**（无附件 4）。
+  - `Attachments.swift`：图片框 `.frame(maxWidth:220, maxHeight:280)` 加 `alignment: .bottom`，避免图片在框内上下留白把气泡顶远。
+- 覆盖：图片、文件、文档都走同一「附件块」，因此都是 12；视频本轮未做附件，未涉及。
+- 边界：不改输入框结构/宽度/箭头/状态行/串流。
+- 验证：`xcodebuild build ... -configuration DevDebug`（`generic/platform=iOS`）**BUILD SUCCEEDED，0 error**，
+  构建号 **237**；已装 iPhone 16 Pro（2.36.0 / 237）。不跑测试、不截图。
+- 若仍偏大/偏小：告诉我，我按你量到的实际像素再调（也可把 12 做成统一常量）。

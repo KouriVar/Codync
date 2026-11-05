@@ -100,7 +100,7 @@ struct AttachmentList: View {
             ForEach(attachments) { file in
                 if file.isImage {
                     AttachmentImage(file: file, botId: botId, maxPixels: 720)
-                        .frame(maxWidth: 220, maxHeight: 280)
+                        .frame(maxWidth: 220, maxHeight: 280, alignment: .bottom)
                         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                         .contentShape(Rectangle())
                         .onTapGesture { viewing = file }
@@ -285,7 +285,7 @@ struct TranscriptImageList: View {
         VStack(alignment: .trailing, spacing: 4) {
             ForEach(images) { ref in
                 LoadedImage(id: ref.id, maxPixels: 720, reloadKey: reloadKey, load: { await load(ref.id) })
-                    .frame(maxWidth: 220, maxHeight: 280)
+                    .frame(maxWidth: 220, maxHeight: 280, alignment: .bottom)
                     .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                     .contentShape(Rectangle())
                     .onTapGesture { viewing = ref }
