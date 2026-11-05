@@ -504,11 +504,15 @@ html[data-platform="darwin"] .title-pill {
   padding: 0 10px 0 8px;
   justify-content: center;
 }
-/* The first message sits 90 from the top, which also clears the title pill (and any red error
-   notice at the head of the transcript). The column carries the 80px side inset, so the scroll
-   content adds none; the bottom reserves the floating composer plus its 8px gap. */
+/* C0101: the message list's viewport starts below the title band (54: traffic lights + title pill),
+   so scrolling messages are clipped at its top and never show behind the title or the traffic
+   lights; the top-fade fades them out just under it. The first message still sits 90 from the
+   conversation's top (54 + 36); the bottom reserves the floating composer plus its 8px gap. */
+html[data-platform="darwin"] .transcript-frame {
+  top: 54px;
+}
 html[data-platform="darwin"] .transcript-content {
-  padding: 90px 0 calc(var(--composer-height, 70px) + 8px);
+  padding: 36px 0 calc(var(--composer-height, 70px) + 8px);
 }
 html[data-platform="darwin"] .transcript-content > div:first-of-type .chat-row {
   padding-top: 0;

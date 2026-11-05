@@ -39,6 +39,16 @@ export function BotChatPanel({ botId, peerId, peerName, onClose }: {
     setDraft('')
   }
   const name = (id: string) => store.authorName(id, id === peerId ? peerName : undefined)
+  /**
+   * Every sender's name takes its own bot's theme colour (C0101) — the main bot and the peer alike,
+   * one rule for both. The colour is nudged toward the text colour so a dark swatch still reads on
+   * the ground; a bot we don't have (a peer on another computer) uses the text colour, never a
+   * fixed grey.
+   */
+  const nameColor = (id: string) => {
+    const bot = store.bots.get(id)
+    return bot ? `color-mix(in srgb, ${avatarColor(bot.avatarColor)} 60%, var(--text))` : 'var(--text)'
+  }
   return (
     <aside className="bot-chat-panel" aria-label={tr('Conversation with {name}').replaceAll('{name}', () => peerName)}>
       <div className="bot-chat-panel-head">
@@ -66,7 +76,7 @@ export function BotChatPanel({ botId, peerId, peerName, onClose }: {
               <span className="panel-msg-avatar">{bot ? <BotAvatar bot={bot} size={24} animated={false} /> : null}</span>
               <div className="panel-msg-content">
                 <div className="panel-msg-name">
-                  <Text size="subheadline" weight="medium" style={{ color: avatarColor(bot?.avatarColor ?? '') }}>{name(row.author)}</Text>
+                  <Text size="subheadline" weight="medium" style={{ color: nameColor(row.author) }}>{name(row.author)}</Text>
                 </div>
                 <Bubble className="bubble agent selectable" items={() => [{ title: 'Copy', icon: 'square.on.square', action: () => window.codync.app.copy(row.text) }]}>
                   <MarkdownText text={row.text} />
