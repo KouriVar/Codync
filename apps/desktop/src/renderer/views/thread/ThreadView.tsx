@@ -15,6 +15,7 @@ import { UpdateNeededCard } from '../UpdateNeededCard'
 import { buildChat, rowIn, useArrivals, type ChatItem } from './chat-items'
 import { BotConversationView, BotMessageRow } from './BotConversation'
 import { BotChatPanel } from './BotChatPanel'
+import { MemoryNotice } from './MemoryNotice'
 import { useMainBotMenu } from '../MainBotMenu'
 import { isMac } from '../settings/parts'
 import { CallConversationView, CallLineRow } from '../call/CallRows'
@@ -212,6 +213,8 @@ export const ThreadView = memo(function ThreadView({ botId }: { botId: string })
           </button>
           {isMac ? <AnchoredMenu open={mainMenu.open} onClose={mainMenu.close} anchor={mainMenu.anchor} items={mainMenu.items} /> : null}
         </div>
+        {/* C0102: a light “记住了：……” pill when this bot's memory gains a fact. */}
+        {isMac ? <MemoryNotice botId={botId} /> : null}
         {/* An update card takes the composer's place, so there's nothing to reply with. */}
         <Transcript botId={botId} openTrace={openTrace} onReply={store.mismatch ? undefined : setReplyTo} openRoutine={presentRoutine} openAgent={presentAgent} openBotChat={(peerId) => setBotChat({ id: peerId, name: store.authorName(peerId) })} openArtifact={openArtifact} openCall={setCallLine} />
         <div className="composer-dock" ref={dock}>

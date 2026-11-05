@@ -1071,3 +1071,17 @@ iOS 定制分支：`ui/ios-customization`；当前 Mac 工作分支：`ui/macos-
 - **验证** `apps/desktop` 下 `npm run typecheck` 与 `npm run build`（electron-vite build）通过。按用户要求只编译、不做功能自测：未启动应用、未滚动核对遮挡、未对照右栏颜色。
 - **限制与待办** 若某个 bot 的色板本身就是黑/灰，提亮后名字仍偏灰（那是它自己的主题色）——要鲜艳需改该 bot 的颜色。未加单元测试。
 - **关联** C0100。
+
+### C0102 · 2026-11-06 · 记忆第一期：Mac「记忆」页面（看/改/删/新增）+ 新增记忆轻提示
+
+- **原因** 用户需求「主 bot 记忆 + 主动跟进」的第一期（自动保存记忆）。调研确认：上游 Host 已有本机记忆（`MEMORY.md`+注意事项文件、SQLite `memory_*` 元数据）与自动提炼（dreaming：闲置 5 分钟或 8 条用户消息、新会话/压缩时触发，每次都过检查、拒绝机密、每次 run 有日志），但 App 端只读、不能改删。第一期只补齐「App 端能看/改/删/新增」与「新增时轻提示」，并沿用上游存储与提炼，不重造。
+- **变化**
+  - **沿用不改**：记忆存储用上游「`MEMORY.md` 文件 + SQLite 元数据」；自动提炼用上游 dreaming，未改其提示词、检查规则与文件格式。
+  - **Host（仅新增，不改已有逻辑）**：新增 `host/src/chat/memory/manage.rs`，提供 `memoryAdd` / `memoryEdit` / `memoryDelete` 三个接口，复用 `chat::memory::files::write` 的同一套 compare-and-swap 写文件、以 `Author::User` 记为用户所写；`host/src/chat/memory/mod.rs` 注册模块并导出，`host/src/api/bots.rs` 增加三个 dispatch 分支。
+  - **Desktop（主 bot 菜单 → 记忆）**：主 bot 菜单 a 组新增「记忆」，打开 Sheet 内的 `MemoryManagerView`：分「关于你 / 这个 Bot」两层列出每条事实，可逐条编辑、删除、新增；调用上述三个新接口。为守住"菜单可见项 ≤10"，把「完整对话」移到「更多」。
+  - **Desktop（轻提示）**：主会话顶部新增 `MemoryNotice`：当该 bot 记忆数量增加时显示「记住了：……」，约 4 秒消失，不写入消息流；编辑/删除不提示（只按数量增长判定为"新增"）。
+  - 新增配文案（简体/繁体），仅桌面表。
+- **文件** `host/src/chat/memory/{manage.rs,mod.rs}`、`host/src/api/bots.rs`；`apps/desktop/src/renderer/{views/bots/{MemoryManagerView.tsx,memory-manage.css},views/thread/{MemoryNotice.tsx,memory-notice.css},views/ChatWindow.tsx,views/MainBotMenu.tsx,views/thread/ThreadView.tsx,lib/main-layout-phrases.ts}`。
+- **验证** `host` 下 `cargo check` 通过；`apps/desktop` 下 `npm run typecheck` 与 `npm run build`（electron-vite build）通过。按规则只编译、不自测：未启动应用、未实际新增/编辑/删除记忆、未等 dreaming 触发提示。
+- **限制与待办** 需配套本版 Host（旧 Host 不认 `memoryAdd/Edit/Delete`，页面会报 unknown method）。dreaming 提炼仍是自由事实行，**未做「偏好/决定/待办」分类**（需改上游提示词与格式，按"不改已有逻辑"本轮不做）。可改删的是 `MEMORY.md` 的事实行；长文笔记仍是详情页只读。未加单元测试。
+- **关联** 上游 `docs/features/context-and-memory.md`、`docs/design/bot-memory.md`；编号接 C0101。

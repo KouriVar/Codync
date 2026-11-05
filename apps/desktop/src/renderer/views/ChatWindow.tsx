@@ -24,6 +24,7 @@ import { isMac } from './settings/parts'
 import { ThreadView } from './thread/ThreadView'
 import { queueVoiceKey } from './thread/voice-shortcut-keys'
 import { NewBotView, NewGroupView } from './bots/NewBotView'
+import { MemoryManagerView } from './bots/MemoryManagerView'
 import { ImportBotsSheet } from './bots/ImportBotsView'
 import { BotEditorView } from './bots/BotEditorView'
 import { MarketplaceView } from './marketplace/MarketplaceView'
@@ -223,6 +224,8 @@ function ChatSplitView({ onComputerAccess }: { onComputerAccess: () => void }) {
   const [showAccount, setShowAccount] = useState(false)
   /** C0096: with the sidebar gone on the Mac, its list opens from the main bot's menu instead. */
   const [botsList, setBotsList] = useState(false)
+  /** C0102: the Mac's memory page, opened from the main bot's menu. */
+  const [memoryOpen, setMemoryOpen] = useState(false)
   const [windowSize, setWindowSize] = useState({ width: window.innerWidth, height: window.innerHeight })
   const newButton = useRef<HTMLButtonElement>(null)
   const railNewButton = useRef<HTMLButtonElement>(null)
@@ -322,6 +325,7 @@ function ChatSplitView({ onComputerAccess }: { onComputerAccess: () => void }) {
   // C0096: every entry the sidebar held, as the main bot's menu reaches it. Same handlers, new door.
   const menuActions: MainMenuActions = {
     openBots: () => setBotsList(true),
+    openMemory: () => { setBotsList(false); setMemoryOpen(true) },
     openSearch: () => setSearching(true),
     openNewBot: () => create('bot'),
     openNewGroup: () => create('group'),
@@ -549,6 +553,18 @@ function ChatSplitView({ onComputerAccess }: { onComputerAccess: () => void }) {
         onClose={() => setConfirmDelete(null)}
       />
       <SectionNameDialog naming={naming} onClose={() => setNaming(null)} />
+      {/* C0102: the memory page, its facts editable, for the bot whose chat is open. */}
+      {isMac ? (
+        <Sheet open={memoryOpen} onClose={() => setMemoryOpen(false)} width={Math.min(560, windowSize.width - 48)} height={sheetHeight}>
+          {selected && selectedStore ? (
+            <StoreContext.Provider value={selectedStore}>
+              <MemoryManagerView botId={selected.botId} />
+            </StoreContext.Provider>
+          ) : (
+            <Text as="div" tone="secondary" className="memory-empty">{tr('Open a bot to see its memory.')}</Text>
+          )}
+        </Sheet>
+      ) : null}
       {/* C0096: the sidebar's list on the Mac, opened from the main bot's menu (or Toggle Sidebar). */}
       {isMac ? (
         <Sheet open={botsList} onClose={() => setBotsList(false)} width={Math.min(360, windowSize.width - 48)} height={sheetHeight} dismissOnDim>

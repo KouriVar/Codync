@@ -10,6 +10,8 @@ import type { SettingsPage } from './settings/SettingsView'
 export interface MainMenuActions {
   /** The roster the sidebar held — its sections, right-clicks and footer — in a sheet. */
   openBots: () => void
+  /** The Mac's memory page (C0102): the bot's own and the shared facts, editable. */
+  openMemory: () => void
   openSearch: () => void
   openNewBot: () => void
   openNewGroup: () => void
@@ -57,7 +59,8 @@ export function useMainBotMenu(conversation: {
     if (page === 'more') {
       return [
         back(),
-        { title: 'New group chat', icon: 'person.2', divider: true, action: actions.openNewGroup },
+        { title: 'Full conversation', icon: 'list.bullet.rectangle', divider: true, action: conversation.onFullConversation },
+        { title: 'New group chat', icon: 'person.2', action: actions.openNewGroup },
         { title: 'Import bots…', icon: 'square.and.arrow.down', action: actions.openImport },
         { title: 'Extensions', icon: 'square.grid.2x2', action: actions.openExtensions },
         { title: 'Network', icon: 'desktopcomputer', action: () => actions.openSettings('network') },
@@ -68,7 +71,7 @@ export function useMainBotMenu(conversation: {
     // The bot's own conversation, then the other bots, then the app itself — a rule between each.
     const own: MenuItem[] = [
       { title: 'Routines', icon: 'clock', action: conversation.onRoutines },
-      { title: 'Full conversation', icon: 'list.bullet.rectangle', action: conversation.onFullConversation },
+      { title: 'Memory', icon: 'brain', action: () => actions.openMemory() },
       { title: 'Conversation details', icon: 'info.circle', action: conversation.onDetails },
     ]
     const bots: MenuItem[] = [

@@ -1,0 +1,30 @@
+/* "记住了：……" — a light pill over the top of the conversation when memory gains a fact (C0102).
+   It floats, never enters the transcript, and does not take clicks. */
+.memory-notice {
+  position: absolute;
+  top: 58px;
+  left: 50%;
+  z-index: 6;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: min(520px, calc(100% - 32px));
+  padding: 6px 12px;
+  border-radius: var(--radius-pill);
+  background: var(--chrome-fill);
+  box-shadow: var(--shadow-m);
+  pointer-events: none;
+  animation: memory-notice-in 0.18s var(--ease-out) both;
+}
+@keyframes memory-notice-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-4px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .memory-notice {
+    animation: none;
+  }
+}
