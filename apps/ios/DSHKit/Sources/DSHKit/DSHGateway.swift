@@ -66,6 +66,10 @@ public final class DSHGateway: ObservableObject {
     public var supportsGoals: Bool { capabilities.contains("goals") }
     public var supportsTasks: Bool { capabilities.contains("tasks") }
 
+    // Cards that replace the input while a tool needs approval or the user is asked a question.
+    @Published public private(set) var pendingApproval: DSHApprovalRequest?
+    @Published public private(set) var pendingQuestion: DSHQuestionRequest?
+
     /// The single outstanding request/reply (commands, options, …). The UI serialises them.
     private var commandAwaiter: CheckedContinuation<DSHFrame, Never>?
     private static let requestKinds: Set<String> = [
@@ -345,6 +349,18 @@ public final class DSHGateway: ObservableObject {
             handleSubscribed(frame)
         case "session-status":
             handleSessionStatus(frame)
+        case "approval-requested":
+            guard frame.string("sessionId") == openSessionId else { return }
+            pendingApproval = Self.decodeApproval(frame)
+        case "approval-resolved":
+            guard frame.string("sessionId") == openSessionId else { return }
+            if pendingApproval?.approvalId == frame.string("approvalId") { pendingApproval = nil }
+        case "question-requested":
+            guard frame.string("sessionId") == openSessionId else { return }
+            pendingQuestion = Self.decodeQuestion(frame)
+        case "question-resolved":
+            guard frame.string("sessionId") == openSessionId else { return }
+            pendingQuestion = nil
         case "goal-updated":
             guard frame.string("sessionId") == openSessionId else { return }
             goal = Self.decodeGoal(frame.json["goal"])
@@ -958,6 +974,59 @@ public final class DSHGateway: ObservableObject {
                                       "itemId": itemId, "action": action]
         if let text, !text.isEmpty { payload["text"] = text }
         send(payload)
+    }
+
+    // MARK: - Approval & question cards
+
+    /// `outcome` is `allowed-once` or `rejected`.
+    public func respondApproval(_ approval: DSHApprovalRequest, outcome: String) {
+        guard let sid = openSessionId else { return }
+        send(["type": "approval-response", "rpcId": approval.rpcId, "sessionId": sid,
+              "approvalId": approval.approvalId, "outcome": outcome])
+        if pendingApproval?.approvalId == approval.approvalId { pendingApproval = nil }
+    }
+
+    /// `answers` is `[{id, selected:[String], custom?:String}]`, in question order.
+    public func answerQuestion(_ request: DSHQuestionRequest, answers: [[String: Any]]) {
+        guard let sid = openSessionId else { return }
+        send(["type": "question-answer", "rpcId": request.rpcId, "sessionId": sid, "answers": answers])
+        pendingQuestion = nil
+    }
+
+    public func cancelQuestion(_ request: DSHQuestionRequest) {
+        guard let sid = openSessionId else { return }
+        send(["type": "question-cancel", "rpcId": request.rpcId, "sessionId": sid])
+        pendingQuestion = nil
+    }
+
+    static func decodeApproval(_ frame: DSHFrame) -> DSHApprovalRequest? {
+        guard let approvalId = frame.string("approvalId") else { return nil }
+        var reason = frame.string("reason")
+        if let display = frame.dict("displayReason") {
+            reason = (display["zh-CN"] as? String)
+                ?? (display.keys.sorted().compactMap { display[$0] as? String }.first)
+                ?? reason
+        }
+        return DSHApprovalRequest(rpcId: frame.string("rpcId") ?? "",
+                                  approvalId: approvalId,
+                                  toolName: frame.string("toolName") ?? "",
+                                  reason: reason)
+    }
+
+    static func decodeQuestion(_ frame: DSHFrame) -> DSHQuestionRequest? {
+        guard let rpcId = frame.string("rpcId") else { return nil }
+        let items = frame.array("questions") ?? frame.json["questions"] as? [[String: Any]] ?? []
+        let questions = items.compactMap { q -> DSHQuestion? in
+            guard let id = q["id"] as? String, let text = q["question"] as? String else { return nil }
+            let options = (q["options"] as? [[String: Any]] ?? []).compactMap { o -> DSHQuestionOption? in
+                guard let label = o["label"] as? String else { return nil }
+                return DSHQuestionOption(label: label, description: o["description"] as? String)
+            }
+            return DSHQuestion(id: id, header: q["header"] as? String, question: text,
+                               detail: q["detail"] as? String, options: options,
+                               multiSelect: q["multiSelect"] as? Bool ?? false)
+        }
+        return DSHQuestionRequest(rpcId: rpcId, questions: questions)
     }
 
     // MARK: - More menu (usage, stats, fork, rename, archive)

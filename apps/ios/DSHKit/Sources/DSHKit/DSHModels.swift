@@ -194,6 +194,38 @@ public struct DSHTodo: Identifiable, Hashable, Sendable {
     public let status: String
 }
 
+/// A pending tool-approval request (`approval-requested`), shown in place of the input.
+public struct DSHApprovalRequest: Identifiable, Hashable, Sendable {
+    public var id: String { approvalId }
+    public let rpcId: String
+    public let approvalId: String
+    public let toolName: String
+    public let reason: String?
+}
+
+/// One option of a question.
+public struct DSHQuestionOption: Hashable, Sendable {
+    public let label: String
+    public let description: String?
+}
+
+/// One question of a `question-requested` request.
+public struct DSHQuestion: Identifiable, Hashable, Sendable {
+    public let id: String
+    public let header: String?
+    public let question: String
+    public let detail: String?
+    public let options: [DSHQuestionOption]
+    public let multiSelect: Bool
+}
+
+/// A pending user-question request (`question-requested`), shown in place of the input.
+public struct DSHQuestionRequest: Identifiable, Hashable, Sendable {
+    public var id: String { rpcId }
+    public let rpcId: String
+    public let questions: [DSHQuestion]
+}
+
 /// One item of a `schedule-list` reply (read-only display + delete).
 public struct DSHSchedule: Identifiable, Hashable, Sendable {
     public let id: String

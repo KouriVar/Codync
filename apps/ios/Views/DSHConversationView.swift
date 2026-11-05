@@ -39,7 +39,13 @@ struct DSHConversationView: View {
         // comes up with the keyboard. It has no backing of its own — only the field's glass — so the
         // messages stay visible behind it, exactly as on Coe's page.
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            DSHComposer(gateway: gateway, draft: $draft, status: statusLine)
+            if let approval = gateway.pendingApproval {
+                DSHApprovalCard(gateway: gateway, request: approval)
+            } else if let question = gateway.pendingQuestion {
+                DSHQuestionCard(gateway: gateway, request: question)
+            } else {
+                DSHComposer(gateway: gateway, draft: $draft, status: statusLine)
+            }
         }
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
@@ -1352,6 +1358,138 @@ private struct DSHTeamSheet: View {
             .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("关闭") { dismiss() } } }
             .task { members = await gateway.loadAgentTeam() }
         }
+    }
+}
+
+/// A tool-approval card that stands in for the input while the gateway waits for a decision.
+private struct DSHApprovalCard: View {
+    @ObservedObject var gateway: DSHGateway
+    let request: DSHApprovalRequest
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 6) {
+                Image(systemName: "lock.shield").foregroundStyle(Palette.danger)
+                Text("需要授权").font(.subheadline.weight(.semibold)).foregroundStyle(Palette.text)
+                Spacer(minLength: 0)
+                if !request.toolName.isEmpty {
+                    Text(request.toolName).font(.caption).foregroundStyle(Palette.secondary)
+                }
+            }
+            if let reason = request.reason, !reason.isEmpty {
+                Text(reason).font(.footnote).foregroundStyle(Palette.text).textSelection(.enabled)
+            }
+            HStack(spacing: 10) {
+                Button { gateway.respondApproval(request, outcome: "allowed-once") } label: {
+                    Text("允许一次").font(.subheadline).foregroundStyle(Palette.background)
+                        .frame(maxWidth: .infinity, minHeight: 40)
+                        .background(Palette.text, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                }.buttonStyle(.plain)
+                Button { gateway.respondApproval(request, outcome: "rejected") } label: {
+                    Text("拒绝").font(.subheadline).foregroundStyle(Palette.danger)
+                        .frame(maxWidth: .infinity, minHeight: 40)
+                        .background(Palette.background, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                }.buttonStyle(.plain)
+            }
+        }
+        .padding(16)
+        .background(Palette.surface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .padding(.horizontal, 16).padding(.top, 6).padding(.bottom, 12)
+    }
+}
+
+/// A user-question card that stands in for the input while the agent asks. Single/multi select plus a
+/// free-text answer; submitting sends `question-answer`, skipping sends `question-cancel`.
+private struct DSHQuestionCard: View {
+    @ObservedObject var gateway: DSHGateway
+    let request: DSHQuestionRequest
+    @State private var selections: [String: Set<String>] = [:]
+    @State private var customs: [String: String] = [:]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    ForEach(request.questions) { question in
+                        VStack(alignment: .leading, spacing: 8) {
+                            if let header = question.header, !header.isEmpty {
+                                Text(header).font(.caption).foregroundStyle(Palette.secondary)
+                            }
+                            Text(question.question).font(.subheadline.weight(.semibold)).foregroundStyle(Palette.text)
+                            if let detail = question.detail, !detail.isEmpty {
+                                Text(detail).font(.caption2).foregroundStyle(Palette.secondary)
+                            }
+                            ForEach(question.options, id: \.label) { option in
+                                let on = selections[question.id]?.contains(option.label) ?? false
+                                Button { toggle(question, option.label) } label: {
+                                    HStack(alignment: .top, spacing: 8) {
+                                        Image(systemName: icon(on: on, multi: question.multiSelect))
+                                            .foregroundStyle(on ? Palette.text : Palette.secondary)
+                                        VStack(alignment: .leading, spacing: 1) {
+                                            Text(option.label).font(.footnote).foregroundStyle(Palette.text)
+                                            if let d = option.description, !d.isEmpty {
+                                                Text(d).font(.caption2).foregroundStyle(Palette.secondary)
+                                            }
+                                        }
+                                        Spacer(minLength: 0)
+                                    }
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                }.buttonStyle(.plain)
+                            }
+                            TextField("自定义回答", text: Binding(get: { customs[question.id] ?? "" },
+                                                              set: { customs[question.id] = $0 }))
+                                .textFieldStyle(.roundedBorder).font(.footnote)
+                        }
+                        .padding(10).frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Palette.background.opacity(0.5), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    }
+                }
+            }
+            .frame(maxHeight: 320)
+            HStack(spacing: 10) {
+                Button { submit() } label: {
+                    Text("提交").font(.subheadline).foregroundStyle(Palette.background)
+                        .frame(maxWidth: .infinity, minHeight: 40)
+                        .background(Palette.text, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                }.buttonStyle(.plain)
+                Button { gateway.cancelQuestion(request) } label: {
+                    Text("跳过").font(.subheadline).foregroundStyle(Palette.text)
+                        .frame(maxWidth: .infinity, minHeight: 40)
+                        .background(Palette.background, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                }.buttonStyle(.plain)
+            }
+        }
+        .padding(16)
+        .background(Palette.surface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .padding(.horizontal, 16).padding(.top, 6).padding(.bottom, 12)
+    }
+
+    private func icon(on: Bool, multi: Bool) -> String {
+        multi ? (on ? "checkmark.square.fill" : "square") : (on ? "largecircle.fill.circle" : "circle")
+    }
+
+    private func toggle(_ question: DSHQuestion, _ label: String) {
+        var set = selections[question.id] ?? []
+        if question.multiSelect {
+            if set.contains(label) { set.remove(label) } else { set.insert(label) }
+        } else {
+            set = [label]
+            customs[question.id] = ""
+        }
+        selections[question.id] = set
+    }
+
+    private func submit() {
+        var answers: [[String: Any]] = []
+        for question in request.questions {
+            let selected = question.options.map(\.label).filter { selections[question.id]?.contains($0) ?? false }
+            var answer: [String: Any] = ["id": question.id, "selected": selected]
+            if let custom = customs[question.id], !custom.isEmpty {
+                if question.multiSelect || selected.isEmpty { answer["custom"] = custom }
+            }
+            answers.append(answer)
+        }
+        gateway.answerQuestion(request, answers: answers)
     }
 }
 

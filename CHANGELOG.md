@@ -3706,3 +3706,24 @@
 - 验证：`xcodebuild build ... -configuration DevDebug`（`generic/platform=iOS`）**BUILD SUCCEEDED，0 error**，
   构建号 **229**；已装到 iPhone 16 Pro（2.36.0 / 229）。不跑测试、不截图。
 - 关联：C0223e1、协议见 `/tmp/codync-audit/c0223-protocol.md` #20。
+
+### C0223f · 2026-11-05 · chat 页审批卡 / 提问卡
+
+- 说明：C0223 第九组。收到审批/提问请求时，卡片替换输入区（底部 inset）。
+- 变化（只动底部输入区在有卡时的替换与网关应答；不碰输入框本身设计/宽度/箭头/状态行/串流）：
+  - `DSHGateway`：新增 `pendingApproval`/`pendingQuestion`（发布）。接推送 `approval-requested`（解出
+    rpcId/approvalId/toolName/reason，`displayReason` 取 `zh-CN` 或首个字符串）、`approval-resolved`（按
+    approvalId 清）、`question-requested`（questions[]{id,header,question,detail,options[{label,description}],
+    multiSelect}）、`question-resolved`（清）。`respondApproval(_:outcome:)`（`allowed-once`/`rejected`，
+    `approval-response`）、`answerQuestion(_:answers:)`（`question-answer`，answers=`[{id,selected,custom?}]`）、
+    `cancelQuestion`（`question-cancel`）。均按 `sessionId` 过滤。
+  - `DSHModels`：`DSHApprovalRequest`、`DSHQuestion`/`DSHQuestionOption`/`DSHQuestionRequest`。
+  - UI：`DSHApprovalCard`（工具名 + 原因 + 「允许一次 / 拒绝」）；`DSHQuestionCard`（多题、单选/多选、自定义
+    回答、「提交 / 跳过」）。二者替换输入区，键盘收起时以卡片呈现。
+- 「未确认」：`displayReason` 多语言对象的取键顺序（优先 zh-CN，否则首个字符串）；`question` 的 `intent` 结构未
+  使用（按普通单选/多选处理）。
+- 待后续（C0223e3）：压缩/重试提示；C0223d3：步骤/轨迹、轮次导航；C0223g：文件交付卡/本地路径/工具结果图/长按复制。
+- 边界：不改 bot 页、底部输入框设计、串流。不加依赖/测试 target。
+- 验证：`xcodebuild build ... -configuration DevDebug`（`generic/platform=iOS`）**BUILD SUCCEEDED，0 error**，
+  构建号 **230**；已装到 iPhone 16 Pro（2.36.0 / 230）。不跑测试、不截图。
+- 关联：C0223e1/e2、协议见 `/tmp/codync-audit/c0223-protocol.md` #21/#22。
