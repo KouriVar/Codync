@@ -18,6 +18,9 @@ struct DSHConversationView: View {
     @State private var renameText = ""
     @State private var showingArchive = false
     @State private var moreMessage: String?
+    @State private var showFiles = false
+    @State private var showSchedules = false
+    @State private var showTeam = false
 
     var body: some View {
         ChatTranscriptView(items: items, following: $following,
@@ -60,6 +63,9 @@ struct DSHConversationView: View {
         }
         .sheet(isPresented: $showContextUsage) { DSHContextUsageSheet(gateway: gateway) }
         .sheet(isPresented: $showStats) { DSHStatsSheet(gateway: gateway) }
+        .sheet(isPresented: $showFiles) { DSHFilesSheet(gateway: gateway) }
+        .sheet(isPresented: $showSchedules) { DSHScheduleSheet(gateway: gateway) }
+        .sheet(isPresented: $showTeam) { DSHTeamSheet(gateway: gateway) }
         .alert("重命名", isPresented: $showingRename) {
             TextField("会话名", text: $renameText)
             Button("确定") { Task { _ = await gateway.renameSession(renameText) } }
@@ -85,6 +91,15 @@ struct DSHConversationView: View {
         Menu {
             Button { showContextUsage = true } label: { Label("上下文用量", systemImage: "chart.bar") }
             Button { showStats = true } label: { Label("Token 统计", systemImage: "number") }
+            if gateway.supportsFiles {
+                Button { showFiles = true } label: { Label("工作区文件", systemImage: "folder") }
+            }
+            if gateway.supportsSchedule {
+                Button { showSchedules = true } label: { Label("定时任务", systemImage: "clock") }
+            }
+            if gateway.supportsTeam {
+                Button { showTeam = true } label: { Label("团队", systemImage: "person.2") }
+            }
             if gateway.capabilities.contains("session-rename") {
                 Button {
                     renameText = title
@@ -1030,6 +1045,169 @@ private enum DSHNumberFormat {
         let d = n.doubleValue
         if d == d.rounded() { return String(Int64(d)) }
         return String(format: "%.1f", d)
+    }
+}
+
+/// Browse the session's workspace (`file-list`) and preview a file (`file-download-open/read`).
+private struct DSHFilesSheet: View {
+    @ObservedObject var gateway: DSHGateway
+    @Environment(\.dismissModal) private var dismiss
+    @State private var stack: [String] = ["."]
+    @State private var entries: [DSHFileEntry] = []
+    @State private var loading = false
+    @State private var preview: DSHFilePreview?
+    private var path: String { stack.last ?? "." }
+
+    var body: some View {
+        NavigationStack {
+            List {
+                if stack.count > 1 {
+                    Button { stack.removeLast() } label: { Label("上一级", systemImage: "chevron.up") }
+                }
+                ForEach(entries) { entry in
+                    Button {
+                        if entry.isDirectory {
+                            stack.append(entry.path)
+                        } else {
+                            Task {
+                                if let data = await gateway.downloadFile(path: entry.path) {
+                                    preview = DSHFilePreview(name: entry.name, data: data, mediaType: entry.mediaType)
+                                }
+                            }
+                        }
+                    } label: {
+                        HStack {
+                            Image(systemName: entry.isDirectory ? "folder" : "doc")
+                            Text(entry.name).lineLimit(1)
+                            Spacer()
+                            if let bytes = entry.bytes {
+                                Text(ByteCountFormatter.string(fromByteCount: Int64(bytes), countStyle: .file))
+                                    .font(.caption2).foregroundStyle(Palette.secondary)
+                            }
+                        }
+                    }
+                    .buttonStyle(.plain)
+                }
+                if loading { HStack { Spacer(); ProgressView(); Spacer() } }
+                if !loading && entries.isEmpty { Text("空目录").foregroundStyle(Palette.secondary) }
+            }
+            .navigationTitle(path == "." ? "工作区文件" : path)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("关闭") { dismiss() } } }
+            .task(id: path) {
+                loading = true
+                entries = await gateway.listFiles(path: path)
+                loading = false
+            }
+            .sheet(item: $preview) { DSHFilePreviewSheet(preview: $0) }
+        }
+    }
+}
+
+private struct DSHFilePreview: Identifiable {
+    let id = UUID()
+    let name: String
+    let data: Data
+    let mediaType: String?
+}
+
+private struct DSHFilePreviewSheet: View {
+    let preview: DSHFilePreview
+    @Environment(\.dismissModal) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                if let image = UIImage(data: preview.data) {
+                    Image(uiImage: image).resizable().scaledToFit().padding()
+                } else if let text = String(data: preview.data, encoding: .utf8) {
+                    Text(text).font(.system(.footnote, design: .monospaced))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding().textSelection(.enabled)
+                } else {
+                    Text("无法预览（\(preview.data.count) 字节）").foregroundStyle(Palette.secondary).padding()
+                }
+            }
+            .navigationTitle(preview.name)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("关闭") { dismiss() } } }
+        }
+    }
+}
+
+/// This session's scheduled tasks (`schedule-list`), with delete + confirm.
+private struct DSHScheduleSheet: View {
+    @ObservedObject var gateway: DSHGateway
+    @Environment(\.dismissModal) private var dismiss
+    @State private var items: [DSHSchedule] = []
+    @State private var deleteTarget: DSHSchedule?
+
+    var body: some View {
+        NavigationStack {
+            List {
+                if items.isEmpty { Text("没有定时任务").foregroundStyle(Palette.secondary) }
+                ForEach(items) { item in
+                    HStack {
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(item.title)
+                            if !item.detail.isEmpty {
+                                Text(item.detail).font(.caption2).foregroundStyle(Palette.secondary)
+                            }
+                        }
+                        Spacer()
+                        Button(role: .destructive) { deleteTarget = item } label: {
+                            Image(systemName: "trash")
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+            .navigationTitle("定时任务")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("关闭") { dismiss() } } }
+            .task { items = await gateway.listSchedules() }
+            .alert("删除这个定时任务？", isPresented: Binding(get: { deleteTarget != nil },
+                                                           set: { if !$0 { deleteTarget = nil } })) {
+                Button("删除", role: .destructive) {
+                    if let target = deleteTarget {
+                        Task {
+                            if await gateway.deleteSchedule(target.id) {
+                                items = await gateway.listSchedules()
+                            }
+                        }
+                    }
+                    deleteTarget = nil
+                }
+                Button("取消", role: .cancel) { deleteTarget = nil }
+            }
+        }
+    }
+}
+
+/// The team's members (`agent-team`), read-only.
+private struct DSHTeamSheet: View {
+    @ObservedObject var gateway: DSHGateway
+    @Environment(\.dismissModal) private var dismiss
+    @State private var members: [DSHTeamMember] = []
+
+    var body: some View {
+        NavigationStack {
+            List {
+                if members.isEmpty { Text("没有团队成员").foregroundStyle(Palette.secondary) }
+                ForEach(members) { member in
+                    HStack {
+                        Text(member.name)
+                        Spacer()
+                        Text(member.role + (member.phase.isEmpty ? "" : " · " + member.phase))
+                            .font(.caption).foregroundStyle(Palette.secondary)
+                    }
+                }
+            }
+            .navigationTitle("团队")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("关闭") { dismiss() } } }
+            .task { members = await gateway.loadAgentTeam() }
+        }
     }
 }
 

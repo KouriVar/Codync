@@ -68,6 +68,8 @@ public final class DSHGateway: ObservableObject {
         "models", "select-model", "agent-presets", "session-agent-preset", "select-agent-preset",
         "permission-options", "permission", "save-default-model",
         "context-usage", "session-stats", "fork", "session-renamed", "session-archived",
+        "file-list", "file-download-opened", "file-download-chunk", "file-download-cancelled",
+        "schedule-list", "schedule-delete", "agent-team", "subagents",
     ]
 
     public private(set) var profile: DSHGatewayProfile?
@@ -972,6 +974,94 @@ public final class DSHGateway: ObservableObject {
         let frame = await requestFrame(["type": "session-archive", "sessionId": sid],
                                        expecting: "session-archived")
         return frame?.kind == "session-archived"
+    }
+
+    // MARK: - Workspace files / schedules / agent team
+
+    public var supportsFiles: Bool { capabilities.contains("file-downloads") }
+    public var supportsSchedule: Bool { capabilities.contains("schedule-management") }
+    public var supportsTeam: Bool { capabilities.contains("agent-team-v1") }
+
+    /// One directory of the workspace (`path` is relative to the session cwd).
+    public func listFiles(path: String) async -> [DSHFileEntry] {
+        guard supportsFiles, phase == .ready, let sid = openSessionId,
+              let frame = await requestFrame(["type": "file-list", "sessionId": sid, "path": path,
+                                              "requestId": UUID().uuidString], expecting: "file-list"),
+              frame.kind == "file-list" else { return [] }
+        let entries = frame.json["entries"] as? [[String: Any]] ?? []
+        return entries.compactMap { e in
+            guard let name = e["name"] as? String, let p = e["path"] as? String else { return nil }
+            return DSHFileEntry(name: name, path: p,
+                                isDirectory: (e["kind"] as? String) == "directory",
+                                bytes: (e["bytes"] as? NSNumber)?.intValue,
+                                mediaType: e["mediaType"] as? String)
+        }
+    }
+
+    /// Downloads one workspace file: open a transfer, then read chunks until eof.
+    public func downloadFile(path: String) async -> Data? {
+        guard supportsFiles, phase == .ready, let sid = openSessionId,
+              let opened = await requestFrame(["type": "file-download-open", "sessionId": sid, "path": path,
+                                               "requestId": UUID().uuidString], expecting: "file-download-opened"),
+              opened.kind == "file-download-opened", let transferId = opened.string("transferId")
+        else { return nil }
+        var data = Data()
+        var offset = 0
+        while true {
+            guard let chunk = await requestFrame(["type": "file-download-read", "transferId": transferId,
+                                                  "offset": offset], expecting: "file-download-chunk"),
+                  chunk.kind == "file-download-chunk" else { return nil }
+            if let encoded = chunk.string("data"), let part = Data(base64Encoded: encoded) {
+                data.append(part)
+                offset += part.count
+            }
+            if chunk.bool("eof") == true { break }
+            if chunk.string("data") == nil { break }
+        }
+        return data
+    }
+
+    public func listSchedules() async -> [DSHSchedule] {
+        guard supportsSchedule, phase == .ready, let sid = openSessionId,
+              let frame = await requestFrame(["type": "schedule-list", "sessionId": sid],
+                                             expecting: "schedule-list"), frame.kind == "schedule-list"
+        else { return [] }
+        let items = frame.json["items"] as? [[String: Any]] ?? []
+        return items.compactMap { item in
+            guard let id = item["id"] as? String else { return nil }
+            return DSHSchedule(id: id, title: item["title"] as? String ?? id,
+                               detail: Self.scheduleDetail(item))
+        }
+    }
+
+    public func deleteSchedule(_ id: String) async -> Bool {
+        guard supportsSchedule, let sid = openSessionId,
+              let frame = await requestFrame(["type": "schedule-delete", "sessionId": sid, "id": id],
+                                             expecting: "schedule-delete"), frame.kind == "schedule-delete"
+        else { return false }
+        return frame.bool("deleted") == true
+    }
+
+    public func loadAgentTeam() async -> [DSHTeamMember] {
+        guard supportsTeam, phase == .ready, let sid = openSessionId,
+              let frame = await requestFrame(["type": "agent-team", "sessionId": sid],
+                                             expecting: "agent-team"), frame.kind == "agent-team"
+        else { return [] }
+        let members = ((frame.json["agentTeam"] as? [String: Any])?["members"] as? [[String: Any]]) ?? []
+        return members.compactMap { m in
+            guard let id = m["id"] as? String else { return nil }
+            return DSHTeamMember(id: id, name: m["name"] as? String ?? id,
+                                 role: m["role"] as? String ?? "", phase: m["phase"] as? String ?? "")
+        }
+    }
+
+    /// A one-line summary of a schedule's timing for the list row.
+    private static func scheduleDetail(_ item: [String: Any]) -> String {
+        if let kind = item["kind"] as? String { return kind }
+        for key in ["time", "expression", "scheduledAt", "afterSeconds", "everySeconds"] {
+            if let v = item[key] { return "\(key): \(v)" }
+        }
+        return ""
     }
 
     // MARK: - Pictures (attachment fetch)

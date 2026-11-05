@@ -3647,3 +3647,24 @@
 - 验证：`xcodebuild build ... -configuration DevDebug`（`generic/platform=iOS`）**BUILD SUCCEEDED，0 error**，
   构建号 **226**；已装到 iPhone 16 Pro（2.36.0 / 226）。不跑测试、不截图。
 - 关联：C0223a/a2/b/c、协议见 `/tmp/codync-audit/c0223-protocol.md` #10–#14。
+
+### C0223d2 · 2026-11-05 · chat 页「更多」：工作区文件 / 定时任务 / 团队（只读）
+
+- 说明：C0223 第六组，「更多」第二批。均为请求-响应型面板。
+- 变化（只动 chat 页「更多」菜单与相应 sheet/请求；不碰底部布局/宽度/按钮/箭头/状态行/串流）：
+  - `DSHGateway`：`supportsFiles`(`file-downloads`)/`supportsSchedule`(`schedule-management`)/
+    `supportsTeam`(`agent-team-v1`)；`listFiles(path:)`（`file-list`，按 `entries[]{name,path,kind,bytes,mediaType}`）、
+    `downloadFile(path:)`（`file-download-open`→循环 `file-download-read` 到 `eof`）、`listSchedules()`/`deleteSchedule(_:)`
+    （`schedule-list`/`schedule-delete`）、`loadAgentTeam()`（`agent-team` → `agentTeam.members[]`）。
+  - `DSHModels`：新增 `DSHFileEntry`/`DSHSchedule`/`DSHTeamMember`。
+  - 「更多」增三入口（按能力显示）：工作区文件、定时任务、团队。
+  - `DSHFilesSheet`：逐级浏览（目录进入/上一级），点文件下载后就地预览（图片显示；文本按 UTF-8 显示；其它显示字节数）。
+  - `DSHScheduleSheet`：列出本会话定时任务，删除带**二次确认**（`schedule-delete`），成功后刷新。
+  - `DSHTeamSheet`：只读成员列表（name/role/phase）。
+- 「未确认」/未做：`schedule-*` 的 `items[]`/`change` 完整字段未在协议中展开，列表只显示 `title` 与一个 `kind`/时间字段
+  摘要；**编辑（schedule-update）需完整 `expected` 记录，本轮未做**，留后续。团队只读列表完成，点成员进入其会话
+  （需 `parentSessionId`+`subagentMode` 子地址订阅）留后续。步骤/轨迹页、轮次导航（turn-outline）仍留 C0223d3。
+- 边界：不改 bot 页、底部输入框设计、串流。不加依赖/测试 target。
+- 验证：`xcodebuild build ... -configuration DevDebug`（`generic/platform=iOS`）**BUILD SUCCEEDED，0 error**，
+  构建号 **227**；已装到 iPhone 16 Pro（2.36.0 / 227）。不跑测试、不截图。
+- 关联：C0223d1、协议见 `/tmp/codync-audit/c0223-protocol.md` #15–#17。

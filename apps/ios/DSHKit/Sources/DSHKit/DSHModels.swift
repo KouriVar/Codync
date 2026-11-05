@@ -166,6 +166,31 @@ public struct DSHPermissionOption: Identifiable, Hashable, Sendable {
     public let detail: String?
 }
 
+/// One entry of a `file-list` reply (a workspace file or directory).
+public struct DSHFileEntry: Identifiable, Hashable, Sendable {
+    public var id: String { path }
+    public let name: String
+    public let path: String
+    public let isDirectory: Bool
+    public let bytes: Int?
+    public let mediaType: String?
+}
+
+/// One item of a `schedule-list` reply (read-only display + delete).
+public struct DSHSchedule: Identifiable, Hashable, Sendable {
+    public let id: String
+    public let title: String
+    public let detail: String
+}
+
+/// One member of an `agent-team` reply (read-only).
+public struct DSHTeamMember: Identifiable, Hashable, Sendable {
+    public let id: String
+    public let name: String
+    public let role: String   // "lead" | "teammate"
+    public let phase: String
+}
+
 public struct DSHImageRef: Identifiable, Hashable, Sendable {
     public let attachmentId: String
     public let mediaType: String
