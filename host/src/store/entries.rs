@@ -231,6 +231,18 @@ impl Store {
         Ok(st.query_map(rusqlite::params_from_iter(args), row_entry)?.collect::<rusqlite::Result<_>>()?)
     }
 
+    /// Chat-visible messages in `bot_id`'s chat up to `from` (a `seq`), newest first. Cross-bot recall
+    /// (C0104) reads these when the query has no keyword but a time or bot bound.
+    pub fn recent_messages(&self, bot_id: &str, from: Option<i64>, limit: i64) -> Result<Vec<Entry>> {
+        let c = self.db.locked();
+        let mut st = c.prepare(&format!(
+            "SELECT {ENTRY_COLS} FROM entries WHERE bot_id = ?1 AND seq <= ?3 AND {NOT_REMOVED} AND
+               (kind = 'user' OR (kind = 'agent' AND json_extract(data, '$.final') = 1))
+             ORDER BY seq DESC LIMIT ?2"
+        ))?;
+        Ok(st.query_map(params![bot_id, limit, from.unwrap_or(i64::MAX)], row_entry)?.collect::<rusqlite::Result<_>>()?)
+    }
+
     /// The newest `limit` bot-to-bot notices in `bot_id`'s main chat that involve `peer_id`, oldest first.
     pub fn bot_conversation(&self, bot_id: &str, peer_id: &str, limit: i64) -> Result<Vec<Entry>> {
         let c = self.db.locked();

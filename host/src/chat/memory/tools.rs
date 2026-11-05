@@ -53,6 +53,21 @@ pub fn tools() -> Value {
             },
             "annotations": {"readOnlyHint": true},
         },
+        {
+            "name": "search_all_history",
+            "description": "Search across ALL of the user's bots' chats, not only this one, for messages containing every given word (case-insensitive), optionally limited to some bots and a time window. Before you answer a question about past work, earlier decisions or something the user mentioned before, call this and cite what you use in your answer as [[cite:<botId>/<entryId>]] so the app can link back to the message. Secrets (passwords, keys, tokens) are never returned.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string", "description": "Words that must all appear, separated by spaces. Leave empty with bots/from/to to browse recent messages."},
+                    "bots": {"type": "array", "items": {"type": "string"}, "description": "Only these bot ids."},
+                    "from": {"type": "integer", "description": "Earliest time to include, Unix milliseconds."},
+                    "to": {"type": "integer", "description": "Latest time to include, Unix milliseconds."},
+                    "limit": {"type": "integer", "description": "Maximum results (default 10, at most 50)."},
+                },
+            },
+            "annotations": {"readOnlyHint": true},
+        },
     ]);
     if let Some(list) = tools.as_array_mut() {
         list.extend(super::file_tools::definitions());
@@ -65,6 +80,7 @@ pub async fn call(hub: &Arc<Hub>, bot_id: &str, name: &str, args: &Value) -> Res
     match name {
         "search_memory" => search_memory(hub, &cfg, args["query"].as_str().unwrap_or_default()).await,
         "search_history" => search_history(hub, &cfg, args).await,
+        "search_all_history" => crate::chat::recall::tool(hub, &cfg, args).await,
         "read_memory" | "edit_memory" => super::file_tools::call(hub, &cfg, name, args).await,
         _ => bail!("unknown memory tool: {name}"),
     }

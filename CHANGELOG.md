@@ -1097,3 +1097,22 @@ iOS 定制分支：`ui/ios-customization`；当前 Mac 工作分支：`ui/macos-
 - **验证** `apps/desktop` 下 `npm run typecheck` 与 `npm run build`（electron-vite build）通过；Host 未改动。按规则只编译、未自测（未启动应用、未实际点「记住」）。
 - **限制与待办** 旧 Host 只能读不能改，这是设计使然（提示已改为中文）。要复用同一个 sandbox（端口 19300）需先停掉那次遗留的 dev 会话；推荐的命令用新 sandbox 名即可免停。
 - **关联** C0102。
+
+### C0104 · 2026-11-06 · 上下文第二期：跨 bot 历史检索、自动引用、敏感内容跳过
+
+- **原因** 第二期需求：给全部 bot 的历史会话建索引、能按时间/bot/关键词查；主 bot 回答时查相关历史与记忆并注明引用；敏感内容不进索引、不读、日志不显示内容。
+- **落点** Host 为主（索引/检索/敏感过滤/bot 工具）+ Desktop（引用显示与跳转）。全部只新增，未改上游单 bot 检索、dreaming 与已有逻辑。
+- **变化**
+  - **Host 新增 `host/src/chat/recall.rs`**：`recallSearch` 接口，`query`（关键词，空格分词）＋ `bots`（限定 bot）＋ `from`/`to`（毫秒时间）＋ `limit`，跨全部非群 bot 的会话检索；空关键词时按 `bots`/时间取最近消息。底层**复用上游** `Store::search_messages`（未改），另新增只读方法 `Store::recent_messages`（仅新增）。
+  - **敏感跳过**：结果里命中 `password / passwd / api_key / secret / token / private key / -----BEGIN / 密码 / 密钥 / 私钥 / 令牌` 等标记的消息一律丢弃、不返回；日志只记 `found/skipped` 数量，**永不记录正文**。本功能只读数据库里的聊天文本、**从不打开文件**，因此登录文件、证书私钥天然不会被读。
+  - **bot 工具**：在 `chat/memory/tools.rs` 追加 `search_all_history` 工具（跨全部 bot，可限 bots/时间），工具说明要求"回答关于过去的问题前先查，并把用到的来源写成 `[[cite:<botId>/<entryId>]]`"。
+  - **Desktop 引用标记**：新增 `views/thread/Citation.tsx`（`CiteChip` + 跳转目标）；`Markdown.tsx` 把 `[[cite:<botId>/<entryId>]]` 渲染成可点击小标记；点击切到该 bot 会话并滚动、高亮原消息（消息未分页到则自动加载更早页，最多 40 页）。`ThreadView` 的行加 `data-entry-id` 供定位。
+- **文件** `host/src/chat/{recall.rs,mod.rs,memory/tools.rs}`、`host/src/store/entries.rs`、`host/src/api/bots.rs`；`apps/desktop/src/renderer/views/thread/{Citation.tsx,citation.css,Markdown.tsx,ThreadView.tsx}`。
+- **验证** `host` 下 `cargo check` 通过；`apps/desktop` 下 `npm run typecheck` 与 `npm run build`（electron-vite build）通过。按规则只编译、未自测（未启动应用、未实际检索或点击引用）。
+- **限制与待办**
+  - "自动去查"是**模型驱动**：工具常驻 + 工具说明要求先查再答并引用；真正"每一轮强制预检索再拼进上下文"需要改上游 turn/context 逻辑，本轮按"不改已有逻辑"未做。
+  - **未做独立的"历史搜索"页面**；能力以 Host API（`recallSearch`）＋ bot 工具提供，Desktop 这期只做引用显示与跳转。需要的话下一轮加搜索页。
+  - 敏感过滤是关键字启发式，宁可误伤（少引用）也不泄密；只覆盖聊天文本，不索引任何文件。
+  - 检索沿用上游 SQL 子串扫描（无独立索引表，上游注释估 0.6s/18 万条/单 bot），大库下仍是即时查询。
+  - 跳转依赖目标消息能被分页加载到（40 页以内）；超出则只切到会话、不定位。
+- **关联** C0102、C0103；上游 `docs/features/context-and-memory.md`。

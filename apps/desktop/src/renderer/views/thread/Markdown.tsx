@@ -3,6 +3,7 @@ import { parseMarkdown, type Block } from './markdown-blocks.ts'
 import { Hairline } from '../../components/Controls'
 import { HStack, VStack } from '../../components/Stack'
 import { Text } from '../../components/Text'
+import { CiteChip } from './Citation'
 import './markdown.css'
 
 // The Mac's Markdown for messages: the blocks from `markdown-blocks.ts`, with inline styling like
@@ -19,8 +20,28 @@ export function inline(text: string, key = 'i'): ReactNode[] {
           {part.slice(1, -1)}
         </code>,
       )
-    } else if (part) out.push(...emphasis(part, `${key}${i}-`))
+    } else if (part) out.push(...citations(part, `${key}${i}-`))
   })
+  return out
+}
+
+/** `[[cite:<botId>/<entryId>]]` becomes a chip (C0104); everything else is styled as before. */
+const citePattern = /\[\[cite:([^\]/\s]+)\/([^\]\s]+)\]\]/
+function citations(text: string, key: string): ReactNode[] {
+  const out: ReactNode[] = []
+  let rest = text
+  let n = 0
+  while (rest) {
+    const m = citePattern.exec(rest)
+    if (!m) {
+      out.push(...emphasis(rest, `${key}c${n}`))
+      break
+    }
+    if (m.index > 0) out.push(...emphasis(rest.slice(0, m.index), `${key}a${n}`))
+    out.push(<CiteChip key={`${key}b${n}`} botId={m[1]!} entryId={m[2]!} />)
+    rest = rest.slice(m.index + m[0].length)
+    n++
+  }
   return out
 }
 

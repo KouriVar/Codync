@@ -16,6 +16,7 @@ import { buildChat, rowIn, useArrivals, type ChatItem } from './chat-items'
 import { BotConversationView, BotMessageRow } from './BotConversation'
 import { BotChatPanel } from './BotChatPanel'
 import { MemoryNotice } from './MemoryNotice'
+import { useCiteJump } from './Citation'
 import { useMainBotMenu } from '../MainBotMenu'
 import { isMac } from '../settings/parts'
 import { CallConversationView, CallLineRow } from '../call/CallRows'
@@ -359,6 +360,10 @@ const Transcript = memo(function Transcript({ botId, openTrace, onReply, openRou
   const last = items[items.length - 1]
   const jump = usePresence(!following && items.length > 0, 200)
   const arrivals = useArrivals(items.map((i) => i.id), following)
+  // C0104: a clicked citation scrolls to the message it quotes, paging older in as needed.
+  const cite = useCiteJump(botId)
+  const citeTries = useRef(0)
+  const citeDone = useRef(0)
 
   const toBottom = (smooth = false) => {
     const el = scroller.current
@@ -414,6 +419,28 @@ const Transcript = memo(function Transcript({ botId, openTrace, onReply, openRou
     return () => observer.disconnect()
   }, [])
 
+  useEffect(() => { citeTries.current = 0 }, [cite?.n])
+  useEffect(() => {
+    // Act once per click, even as more pages arrive.
+    if (!cite || citeDone.current === cite.n) return
+    const el = scroller.current?.querySelector<HTMLElement>(`[data-entry-id="${CSS.escape(cite.entryId)}"]`)
+    if (el) {
+      citeDone.current = cite.n
+      el.scrollIntoView({ block: 'center', behavior: 'smooth' })
+      el.classList.add('cite-flash')
+      const timer = setTimeout(() => el.classList.remove('cite-flash'), 1500)
+      return () => clearTimeout(timer)
+    }
+    // Not paged in yet: pull one earlier page at a time, bounded, then give up quietly.
+    if (citeTries.current >= 40 || !more) {
+      citeDone.current = cite.n
+      return
+    }
+    if (loadingEarlier) return
+    citeTries.current += 1
+    void showEarlier()
+  }, [cite, items, more, loadingEarlier])
+
   return (
     <div className="transcript-frame">
       <div
@@ -438,7 +465,7 @@ const Transcript = memo(function Transcript({ botId, openTrace, onReply, openRou
           ) : null}
           {items.length === 0 && bot ? <div className="transcript-intro">{isGroup(bot) ? <GroupIntroCard group={bot} /> : <IntroCard bot={bot} />}</div> : null}
           {items.map((item) => (
-            <div key={item.id} className={arrivals.has(item.id) ? rowIn(item) : undefined}>
+            <div key={item.id} data-entry-id={item.kind === 'entry' ? item.entry.id : undefined} className={arrivals.has(item.id) ? rowIn(item) : undefined}>
               <Row item={item} chat={bot} openTrace={openTrace} onReply={onReply} openRoutine={openRoutine} openAgent={openAgent} openBotChat={openBotChat} openArtifact={openArtifact} openCall={openCall} />
             </div>
           ))}

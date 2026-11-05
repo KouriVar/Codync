@@ -18,6 +18,7 @@ pub mod oneshot;
 pub mod outbox;
 pub mod profile;
 pub mod prompt;
+pub mod recall;
 pub mod reactions;
 pub mod replies;
 pub mod skills;
