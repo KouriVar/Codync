@@ -3453,3 +3453,29 @@
   不跑测试、不截图。
 - 关联：C0222（`0726b46b`，本次回退其代码改法）、C0221（`69568869`）、C0219/C0220；备份 tag
   `backup/before-bottom-align-c0222`（`294b9a85`，C0222 前）。回滚本次即回到 C0222 的崩溃状态，不建议。
+
+### C0222c · 2026-11-05 · 输入框按钮间距回 6、置底箭头回 32
+
+- 现象（穗真机核对）：① 输入框高 48、按钮 36，按理四边间距都是 6，但加号左侧、发送右侧实测是 10；② 回到底部
+  箭头离输入框顶约 74，不是 32。
+- 根因：
+  1. **10 不是 6**：`Composer.swift` 里给 Coe 的加号/发送套了一个 `ControlMetrics.Size.compact.hitTarget = 44`
+     宽的点击框，36 的圆在 44 的框里居中，左右各多出 (44−36)/2 = 4pt，再叠加胶囊的 6pt 内边距 → 10。间距应只由
+     内边距决定，点击框不该占布局宽度。
+  2. **74 不是 32**：输入框为对齐首页用了 `.ignoresSafeArea(.bottom)`，`safeAreaInset` 预留的高度因此包含
+     home indicator 那一段（约 34pt），内容底边被抬高；箭头是按「内容底边 − 常数」定位的，于是被顶到 ~74。这是
+     和机型相关的 inset，不能用固定常数硬减。
+- 变化（只改这三处，不动层级/外观/其他）：
+  - `Composer.swift`：加号与发送/停止按钮的**布局宽度**从 44 改为 36（`compact.side`），点击响应区仍用
+    `.contentShape` 覆盖圆本身。胶囊四边间距回到 **6**。删掉不再用的 `buttonHitSize`。
+  - `ConversationBottomMetrics.jumpGap` 改为 **32**。
+  - `ConversationList.swift`：`JumpToLatest` 的定位改为按**实测底部 inset** 反算——
+    `gapPadding = restingBottomPadding(28) + inputHeight(48) + jumpGap(32) − inset`，其中
+    `inset = fullFrame.maxY − safeFrame.maxY`（列表已有的两处 GeometryReader 测量）。用 `.offset(y: -gapPadding)`
+    （正负都能处理，inset 大时 gapPadding 为负，箭头落进那段空隙），保证箭头底边离输入框顶恰好 **32**，换机型也对。
+- 已知未处理（本次穗只点了箭头与按钮间距）：**状态行**同样受这个 inset 影响（C0222b 让它从 24 变成约 58）。是否
+  用同一个实测修正把状态行也调回 24，等穗确认（改法与箭头相同，一行参数）。
+- 边界：不改层级、外观、共用组件结构、胶囊/展开两态、C0220 单一 TextField、串流；不加新功能。
+- 验证：`xcodebuild build ... -configuration DevDebug`（`generic/platform=iOS`）**BUILD SUCCEEDED，0 error**，
+  构建号 **218**；已装到 iPhone 16 Pro（2.36.0 / 218）。不跑测试、不截图。
+- 关联：C0222b（`d930dd6d`）、C0221（`69568869`）。

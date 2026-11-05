@@ -56,8 +56,22 @@ struct ConversationList: View {
             if refresh != nil { PullIndicator(pull: pull).padding(.top, 8) }
         }
         .overlay(alignment: .bottom) {
-            JumpToLatest(visible: !following && !rows.isEmpty) { following = true }
+            JumpToLatest(visible: !following && !rows.isEmpty, gapPadding: jumpPadding) { following = true }
         }
+    }
+
+    /// The arrow's offset from the content's bottom. The content stops `inset` above the screen's
+    /// bottom (the composer escapes the bottom safe area, so that inset includes the home-indicator
+    /// band for a `safeAreaInset`); the input's glass top is `restingBottomPadding + inputHeight`
+    /// above the screen's bottom. Solving for "arrow bottom = input top − jumpGap" gives this, so the
+    /// gap is exact whatever the inset — no device-specific constant.
+    private var jumpPadding: CGFloat {
+        let inset = max(0, fullFrame.maxY - safeFrame.maxY)
+        guard inset > 0 else { return ConversationBottomMetrics.jumpPadding }
+        return ConversationBottomMetrics.restingBottomPadding
+            + ConversationBottomMetrics.inputHeight
+            + ConversationBottomMetrics.jumpGap
+            - inset
     }
 }
 
@@ -397,6 +411,9 @@ private struct ConversationCell: View {
 /// Scrolled away from the newest messages: a round button back down to them.
 struct JumpToLatest: View {
     let visible: Bool
+    /// How far the button's bottom sits above the content's bottom. Negative means it drops into the
+    /// gap the composer's safe-area escape leaves below the content; `offset` handles both signs.
+    var gapPadding: CGFloat = ConversationBottomMetrics.jumpPadding
     let action: () -> Void
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -405,8 +422,7 @@ struct JumpToLatest: View {
             if visible {
                 jumpButton
                     .help(L10n.tr("Jump to latest"))
-                    // The shared gap to the input's top; the composer adds the rest of it above.
-                    .padding(.bottom, ConversationBottomMetrics.jumpPadding)
+                    .offset(y: -gapPadding)
                     .transition(.scale(scale: 0.8).combined(with: .opacity))
             }
         }

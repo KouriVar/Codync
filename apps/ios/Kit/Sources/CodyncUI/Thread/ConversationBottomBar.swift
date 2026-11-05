@@ -21,7 +21,7 @@ public enum ConversationBottomMetrics {
     /// Below the glass while the keyboard is up.
     public static let keyboardBottomPadding: CGFloat = 8
     /// The jump-to-latest arrow's bottom edge sits this far above the input's top edge.
-    public static let jumpGap: CGFloat = 36
+    public static let jumpGap: CGFloat = 32
     /// What the arrow pads above the content's bottom, so that gap holds once the composer's top is
     /// added: `jumpGap - composerTopPadding`.
     public static var jumpPadding: CGFloat { jumpGap - composerTopPadding }

@@ -109,8 +109,6 @@ struct Composer: View {
 
     /// Send/stop circle inside the conversation frame: the compact size.
     private var buttonSize: CGFloat { ControlMetrics.Size.compact.side }
-    /// The row height, and the tap target of the buttons on both sides of the field.
-    private var buttonHitSize: CGFloat { ControlMetrics.Size.compact.hitTarget }
     /// The send/stop arrow: 20pt, a touch smaller than the 24pt glyph of the + beside it.
     private var sendGlyph: CGFloat { 20 }
 
@@ -201,8 +199,7 @@ struct Composer: View {
                 .foregroundStyle(ink)
                 .frame(width: buttonSize, height: buttonSize)
                 .background(fill, in: Circle())
-                // Wider than the circle for a comfortable tap, but no taller: the frame is the 48pt bar.
-                .frame(width: buttonHitSize, height: buttonSize)
+                // Tapped area matches the circle's box: the capsule's 6pt inset then stays 6pt.
                 .contentShape(Circle())
         }
         .buttonStyle(PressScale())
@@ -263,8 +260,8 @@ struct Composer: View {
 
     private var addLabel: some View {
         GlassGlyph(glyph: .remix("add-line"), size: .compact, glyphSize: 24, ink: Palette.text, style: .plain)
-            // Wider for a comfortable tap, but no taller than the compact circle: the frame is 48pt.
-            .frame(width: ControlMetrics.Size.compact.hitTarget, height: ControlMetrics.Size.compact.side)
+            // Exactly the compact circle: the capsule's 6pt inset then stays 6pt on every side.
+            .frame(width: ControlMetrics.Size.compact.side, height: ControlMetrics.Size.compact.side)
             .contentShape(Rectangle())
     }
 
