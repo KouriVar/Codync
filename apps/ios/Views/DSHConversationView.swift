@@ -309,6 +309,10 @@ struct DSHComposer: View {
     // Commands: a `select` command opens a small options list.
     @State private var selectedCommand: DSHCommand?
     @State private var commandOptions: [DSHCommandOption] = []
+    @State private var tasksExpanded = false
+    @State private var editingGoal = false
+    @State private var goalObjective = ""
+    @State private var confirmClearGoal = false
 
     private var trimmed: String { draft.trimmingCharacters(in: .whitespacesAndNewlines) }
     private var isEmpty: Bool { trimmed.isEmpty }
@@ -334,14 +338,27 @@ struct DSHComposer: View {
         // frame's slots (the model button in `trailing`) and its two-state mode.
         ConversationBottomBar(
             mode: focused ? .expanded : .capsule,
-            accessory: attachmentAccessory,
+            accessory: aboveInput,
             leading: AnyView(addButton),
             field: AnyView(field),
             trailing: AnyView(trailing),
             status: status,
             focused: focused
         )
-        .onAppear { if gateway.supportsCommands, gateway.commandGroups.isEmpty { Task { await gateway.loadCommands() } } }
+        .onAppear {
+            if gateway.supportsCommands, gateway.commandGroups.isEmpty { Task { await gateway.loadCommands() } }
+            if gateway.supportsGoals { Task { await gateway.loadGoal() } }
+            if gateway.supportsTasks { Task { await gateway.loadTasks() } }
+        }
+        .alert("编辑目标", isPresented: $editingGoal) {
+            TextField("目标", text: $goalObjective)
+            Button("保存") { Task { await gateway.editGoal(objective: goalObjective, maxGoalRounds: nil) } }
+            Button("取消", role: .cancel) {}
+        }
+        .alert("删除目标？", isPresented: $confirmClearGoal) {
+            Button("删除", role: .destructive) { Task { await gateway.clearGoal() } }
+            Button("取消", role: .cancel) {}
+        } message: { Text("会清空这个会话的目标。") }
         .sheet(isPresented: $showAddSheet) {
             DSHAddSheet(
                 canPhoto: gateway.capabilities.contains("images"),
@@ -384,19 +401,101 @@ struct DSHComposer: View {
         }
     }
 
-    /// What sits above the input: pending files and pictures, or the `/` command menu while typing.
-    private var attachmentAccessory: AnyView? {
+    /// What sits above the input, from top to bottom: the goal panel, the task list, then the pending
+    /// files/pictures or the `/` command menu.
+    private var aboveInput: AnyView? {
         let hasFiles = !gateway.fileUploads.isEmpty
-        if hasFiles || !pendingImages.isEmpty {
-            return AnyView(
-                VStack(spacing: 4) {
-                    if hasFiles { fileCards }
-                    if !pendingImages.isEmpty { pendingStrip }
+        let hasGoal = gateway.supportsGoals && gateway.goal != nil
+        let hasTasks = gateway.supportsTasks && !gateway.todos.isEmpty
+        let hasAttach = hasFiles || !pendingImages.isEmpty
+        let hasCommandMenu = !commandSuggestions.isEmpty
+        guard hasGoal || hasTasks || hasAttach || hasCommandMenu else { return nil }
+        return AnyView(
+            VStack(spacing: 6) {
+                if hasGoal { goalPanel }
+                if hasTasks { taskPanel }
+                if hasAttach {
+                    VStack(spacing: 4) {
+                        if hasFiles { fileCards }
+                        if !pendingImages.isEmpty { pendingStrip }
+                    }
+                } else if hasCommandMenu {
+                    commandMenu
                 }
-            )
+            }
+        )
+    }
+
+    /// The session goal: objective, phase and progress, with pause/resume, edit and delete.
+    @ViewBuilder private var goalPanel: some View {
+        if let goal = gateway.goal {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 6) {
+                    Text("目标 · " + (goal.phase.isEmpty ? "进行中" : goal.phase))
+                        .font(.caption.weight(.semibold)).foregroundStyle(Palette.secondary)
+                    Spacer(minLength: 0)
+                    Button(goal.phase == "paused" ? "继续" : "暂停") {
+                        Task {
+                            if goal.phase == "paused" { await gateway.resumeGoal() }
+                            else { await gateway.pauseGoal() }
+                        }
+                    }
+                    .font(.caption)
+                    Button("编辑") { goalObjective = goal.objective; editingGoal = true }.font(.caption)
+                    Button("删除") { confirmClearGoal = true }.font(.caption).foregroundStyle(Palette.danger)
+                }
+                if !goal.objective.isEmpty {
+                    Text(goal.objective).font(.footnote).foregroundStyle(Palette.text).lineLimit(3)
+                }
+                if let max = goal.maxGoalRounds, let started = goal.roundsStarted {
+                    Text("轮次 \(started)/\(max)").font(.caption2).foregroundStyle(Palette.tertiary)
+                }
+            }
+            .padding(.horizontal, 12).padding(.vertical, 10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Palette.surface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .padding(.horizontal, 10).padding(.top, 8)
         }
-        if !commandSuggestions.isEmpty { return AnyView(commandMenu) }
-        return nil
+    }
+
+    /// The session task list (read-only, collapsible).
+    @ViewBuilder private var taskPanel: some View {
+        if !gateway.todos.isEmpty {
+            VStack(alignment: .leading, spacing: 4) {
+                Button { tasksExpanded.toggle() } label: {
+                    HStack(spacing: 6) {
+                        Text("任务清单 · \(gateway.todos.count)").font(.caption.weight(.semibold))
+                            .foregroundStyle(Palette.secondary)
+                        Image(systemName: tasksExpanded ? "chevron.up" : "chevron.down")
+                            .font(.caption2).foregroundStyle(Palette.tertiary)
+                        Spacer(minLength: 0)
+                    }
+                }
+                .buttonStyle(.plain)
+                if tasksExpanded {
+                    ForEach(gateway.todos) { todo in
+                        HStack(spacing: 6) {
+                            Image(systemName: Self.todoIcon(todo.status)).font(.caption2)
+                                .foregroundStyle(Palette.secondary)
+                            Text(todo.content).font(.caption).foregroundStyle(Palette.text).lineLimit(2)
+                            Spacer(minLength: 0)
+                        }
+                    }
+                }
+            }
+            .padding(.horizontal, 12).padding(.vertical, 8)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Palette.surface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .padding(.horizontal, 10).padding(.top, 8)
+        }
+    }
+
+    private static func todoIcon(_ status: String) -> String {
+        switch status {
+        case "completed", "done": return "checkmark.circle"
+        case "in_progress", "active": return "circle.dotted"
+        default: return "circle"
+        }
     }
 
     /// Cards for files being uploaded or ready: name, size, progress, retry when failed, remove.

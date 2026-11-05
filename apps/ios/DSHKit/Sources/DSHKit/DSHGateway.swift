@@ -60,6 +60,12 @@ public final class DSHGateway: ObservableObject {
     @Published public private(set) var permissionOptions: [DSHPermissionOption] = []
     public var supportsAgentPreset: Bool { capabilities.contains("session-agent-preset") }
 
+    // In-session panels.
+    @Published public private(set) var goal: DSHGoal?
+    @Published public private(set) var todos: [DSHTodo] = []
+    public var supportsGoals: Bool { capabilities.contains("goals") }
+    public var supportsTasks: Bool { capabilities.contains("tasks") }
+
     /// The single outstanding request/reply (commands, options, …). The UI serialises them.
     private var commandAwaiter: CheckedContinuation<DSHFrame, Never>?
     private static let requestKinds: Set<String> = [
@@ -70,6 +76,7 @@ public final class DSHGateway: ObservableObject {
         "context-usage", "session-stats", "fork", "session-renamed", "session-archived",
         "file-list", "file-download-opened", "file-download-chunk", "file-download-cancelled",
         "schedule-list", "schedule-delete", "agent-team", "subagents",
+        "goal", "goal-edit", "goal-pause", "goal-resume", "goal-clear", "tasks",
     ]
 
     public private(set) var profile: DSHGatewayProfile?
@@ -336,6 +343,12 @@ public final class DSHGateway: ObservableObject {
             handleSubscribed(frame)
         case "session-status":
             handleSessionStatus(frame)
+        case "goal-updated":
+            guard frame.string("sessionId") == openSessionId else { return }
+            goal = Self.decodeGoal(frame.json["goal"])
+        case "tasks-updated":
+            guard frame.string("sessionId") == openSessionId else { return }
+            todos = Self.decodeTodos(frame.json["todos"])
         case "session-agent-preset-updated":
             // The gateway pushes the lock (and any preset change) when a turn starts.
             guard frame.string("sessionId") == openSessionId else { return }
@@ -1052,6 +1065,70 @@ public final class DSHGateway: ObservableObject {
             guard let id = m["id"] as? String else { return nil }
             return DSHTeamMember(id: id, name: m["name"] as? String ?? id,
                                  role: m["role"] as? String ?? "", phase: m["phase"] as? String ?? "")
+        }
+    }
+
+    // MARK: - Goal & tasks (in-session panels)
+
+    public func loadGoal() async {
+        guard supportsGoals, phase == .ready, let sid = openSessionId,
+              let frame = await requestFrame(["type": "goal", "sessionId": sid], expecting: "goal"),
+              frame.kind == "goal" else { goal = nil; return }
+        goal = Self.decodeGoal(frame.json["goal"])
+    }
+
+    public func loadTasks() async {
+        guard supportsTasks, phase == .ready, let sid = openSessionId,
+              let frame = await requestFrame(["type": "tasks", "sessionId": sid], expecting: "tasks"),
+              frame.kind == "tasks" else { todos = []; return }
+        todos = Self.decodeTodos(frame.json["todos"])
+    }
+
+    public func pauseGoal() async { await goalMutation("goal-pause", extra: [:]) }
+    public func resumeGoal() async { await goalMutation("goal-resume", extra: [:]) }
+    public func clearGoal() async {
+        guard let payload = goalPayload([:]) else { return }
+        _ = await requestFrame(payload.merging(["type": "goal-clear"]) { _, b in b }, expecting: "goal-clear")
+        await loadGoal()
+    }
+    public func editGoal(objective: String?, maxGoalRounds: Int?) async {
+        var extra: [String: Any] = [:]
+        if let objective, !objective.isEmpty { extra["objective"] = objective }
+        if let maxGoalRounds { extra["maxGoalRounds"] = maxGoalRounds }
+        guard !extra.isEmpty else { return }
+        await goalMutation("goal-edit", extra: extra)
+    }
+
+    private func goalMutation(_ type: String, extra: [String: Any]) async {
+        guard let payload = goalPayload(extra) else { return }
+        _ = await requestFrame(payload.merging(["type": type]) { _, b in b }, expecting: type)
+        await loadGoal()
+    }
+
+    /// `{sessionId, ref:{id,revision}}` plus extras; the ref is the latest the client saw.
+    private func goalPayload(_ extra: [String: Any]) -> [String: Any]? {
+        guard let g = goal, let sid = openSessionId else { return nil }
+        var payload: [String: Any] = ["sessionId": sid, "ref": ["id": g.id, "revision": g.revision]]
+        for (k, v) in extra { payload[k] = v }
+        return payload
+    }
+
+    static func decodeGoal(_ value: Any?) -> DSHGoal? {
+        guard let g = value as? [String: Any], let id = g["id"] as? String else { return nil }
+        let goal = g["goal"] as? [String: Any] ?? g
+        return DSHGoal(id: id,
+                       revision: (g["revision"] as? NSNumber)?.intValue ?? 0,
+                       objective: goal["objective"] as? String ?? "",
+                       phase: goal["phase"] as? String ?? "",
+                       maxGoalRounds: (goal["maxGoalRounds"] as? NSNumber)?.intValue,
+                       roundsStarted: (g["roundsStarted"] as? NSNumber)?.intValue)
+    }
+
+    static func decodeTodos(_ value: Any?) -> [DSHTodo] {
+        guard let items = value as? [[String: Any]] else { return [] }
+        return items.enumerated().compactMap { index, item in
+            guard let content = item["content"] as? String else { return nil }
+            return DSHTodo(index: index, content: content, status: item["status"] as? String ?? "")
         }
     }
 

@@ -176,6 +176,24 @@ public struct DSHFileEntry: Identifiable, Hashable, Sendable {
     public let mediaType: String?
 }
 
+/// A session goal (`goal` projection): objective, phase and progress.
+public struct DSHGoal: Identifiable, Hashable, Sendable {
+    public let id: String
+    public let revision: Int
+    public let objective: String
+    public let phase: String
+    public let maxGoalRounds: Int?
+    public let roundsStarted: Int?
+}
+
+/// One todo of the session's task list (`todos[]{content,status}`); `index` is its stable row id.
+public struct DSHTodo: Identifiable, Hashable, Sendable {
+    public var id: Int { index }
+    public let index: Int
+    public let content: String
+    public let status: String
+}
+
 /// One item of a `schedule-list` reply (read-only display + delete).
 public struct DSHSchedule: Identifiable, Hashable, Sendable {
     public let id: String

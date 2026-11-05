@@ -3668,3 +3668,23 @@
 - 验证：`xcodebuild build ... -configuration DevDebug`（`generic/platform=iOS`）**BUILD SUCCEEDED，0 error**，
   构建号 **227**；已装到 iPhone 16 Pro（2.36.0 / 227）。不跑测试、不截图。
 - 关联：C0223d1、协议见 `/tmp/codync-audit/c0223-protocol.md` #15–#17。
+
+### C0223e1 · 2026-11-05 · chat 页会话内：目标面板 + 任务清单
+
+- 说明：C0223 第七组。挂在输入框上方（共用底部组件的 accessory 槽，消息为其让位、不遮消息）。
+- 变化（只动输入框上方面板与网关请求；不碰底部布局/宽度/按钮/箭头/状态行/串流）：
+  - `DSHGateway`：`supportsGoals`(`goals`)/`supportsTasks`(`tasks`)；`loadGoal()`（`goal`→`{goal:{id,revision,
+    objective,phase,maxGoalRounds},roundsStarted}`）、`loadTasks()`（`tasks`→`todos[]{content,status}`）；写操作
+    `pauseGoal/resumeGoal/clearGoal/editGoal(objective:maxGoalRounds:)`，都带最新 `ref{id,revision}`。接
+    `goal-updated` / `tasks-updated` 推送刷新。请求/响应复用「发请求→等回复帧」机制（新增 goal*/tasks 到 kinds）。
+  - `DSHModels`：`DSHGoal`、`DSHTodo`。
+  - `DSHComposer.aboveInput`：目标面板（目标/阶段/轮次；暂停/继续、编辑、删除）+ 任务清单（可折叠，按状态图标）
+    + 原有的待发文件/图片/`/`菜单，统一排在输入框上方。
+  - 删除目标、编辑目标均二次确认（编辑带输入框；删除红色确认）。
+- 「未确认」：目标 `phase` 取值（源码未列全，按非 "paused" 视为进行中）；`roundsStarted/maxGoalRounds` 缺失时不显示轮次。
+- 待后续（C0223e2）：排队消息（session-queues/session-queue + queue-update）、压缩/重试提示（compaction*/llm/retry
+  在状态行/消息流）。审批/提问卡 C0223f，文件交付卡/工具图/长按复制 C0223g。
+- 边界：不改 bot 页、底部输入框设计、串流。不加依赖/测试 target。
+- 验证：`xcodebuild build ... -configuration DevDebug`（`generic/platform=iOS`）**BUILD SUCCEEDED，0 error**，
+  构建号 **228**；已装到 iPhone 16 Pro（2.36.0 / 228）。不跑测试、不截图。
+- 关联：C0223d2、协议见 `/tmp/codync-audit/c0223-protocol.md` #18/#19。
