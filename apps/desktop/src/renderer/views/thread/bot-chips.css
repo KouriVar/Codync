@@ -1,6 +1,7 @@
-/* The bots a chat has worked with, over its message box (C0095), and the Mac's revamp (C0096):
-   a column per bot — a count card over its tag — plus a row of whoever is running right now. One
-   row each, scrolled sideways, flush with the box's column. */
+/* The bots a chat has worked with, over its message box (C0095), aligned to the Figma frame
+   (C0100): a status row 28 tall, then a row of 30-tall tags. Each tag and its “N messages” summary
+   share one rounded container, 62 tall — summary on top, tag below — so the text no longer floats
+   loose above the tag. One row each, scrolled sideways, flush with the box's column. */
 .bot-chip-bar-wrap {
   /* The four status dots: red broke · orange running · blue awaiting you · green done. */
   --status-problem: #d92d20;
@@ -9,10 +10,10 @@
   --status-idle: #1f9d55;
   max-width: var(--column);
   margin: 0 auto;
-  padding: 2px 14px;
+  padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 8px;
   min-width: 0;
 }
 @media (prefers-color-scheme: dark) {
@@ -23,15 +24,16 @@
     --status-idle: #4fc17f;
   }
 }
-/* The row of running bots, above the tags: one strip each, scrolled sideways when they don't fit. */
+/* The row of running bots, above the tags: 28 tall, one strip each, scrolled sideways when they
+   don't fit. */
 .bot-chip-running {
   display: flex;
   flex-wrap: nowrap;
   align-items: center;
   gap: 6px;
+  min-height: 28px;
   overflow-x: auto;
   scrollbar-width: none;
-  padding-bottom: 2px;
 }
 .bot-chip-running::-webkit-scrollbar {
   display: none;
@@ -41,8 +43,9 @@
   align-items: center;
   gap: 5px;
   flex: none;
+  height: 28px;
   max-width: 220px;
-  padding: 4px 9px;
+  padding: 0 8px;
   border-radius: var(--radius-pill);
   background: var(--surface);
 }
@@ -50,34 +53,40 @@
   display: flex;
   flex-wrap: nowrap;
   align-items: flex-end;
-  gap: 8px;
+  gap: 4px;
   overflow-x: auto;
   scrollbar-width: none;
 }
 .bot-chip-bar::-webkit-scrollbar {
   display: none;
 }
-/* The card over a tag and the tag itself, as one column: the card lines up over its bot. */
+/* One tag with its summary: a single rounded container, 62 tall. The tag (30) sits at the bottom,
+   the summary fills the rest above it. */
 .bot-chip-col {
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: 3px;
   flex: none;
-  max-width: 200px;
+  height: 62px;
+  max-width: 220px;
+  border-radius: var(--radius-l);
+  background: var(--surface);
+  overflow: hidden;
 }
 .bot-chip-count {
-  padding: 1px 6px;
-  text-align: center;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  min-height: 0;
+  padding: 0 10px;
+  text-align: left;
   font-size: var(--text-caption);
   color: var(--secondary);
-  border-radius: var(--radius-xs);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .bot-chip-count:hover {
-  background: var(--surface);
   color: var(--text);
 }
 .bot-chip {
@@ -85,13 +94,14 @@
   align-items: center;
   gap: 6px;
   flex: none;
-  max-width: 200px;
-  padding: 4px 9px 4px 5px;
-  border-radius: var(--radius-pill);
-  background: var(--surface);
+  height: 30px;
+  max-width: 220px;
+  padding: 0 8px 0 4px;
+  border-radius: 0;
+  background: transparent;
 }
 .bot-chip.chosen {
-  background: color-mix(in srgb, var(--text) 12%, var(--surface));
+  background: color-mix(in srgb, var(--text) 8%, transparent);
 }
 /* The avatar with its status dot on its bottom-right corner. */
 .bot-chip-avatar {
@@ -107,7 +117,7 @@
   height: 8px;
   border-radius: 50%;
   box-sizing: border-box;
-  /* A ring of the chip's own fill, so the dot reads on the avatar's edge. */
+  /* A ring of the container's fill, so the dot reads on the avatar's edge. */
   box-shadow: 0 0 0 1.5px var(--surface);
 }
 .bot-chip-status.problem {

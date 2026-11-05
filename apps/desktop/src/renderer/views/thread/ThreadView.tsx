@@ -84,8 +84,6 @@ export const ThreadView = memo(function ThreadView({ botId }: { botId: string })
   const width = useRef(800)
   const [wide, setWide] = useState(true)
   const [, setSqueezed] = useState(0)
-  /** The measured width, in state: the docked panel beside the chat sizes itself to it (C0096). */
-  const [viewWidth, setViewWidth] = useState(800)
   const squeezeBelow = useRef(0)
   const [detailsWidth, setDetailsWidth] = usePref(prefs.detailsPanelWidth)
   useReading(store, botId)
@@ -98,7 +96,6 @@ export const ThreadView = memo(function ThreadView({ botId }: { botId: string })
     const observer = new ResizeObserver(([e]) => {
       const w = e!.contentRect.width
       width.current = w
-      setViewWidth(w)
       setWide(w >= WIDE)
       setSqueezed(w - 380 < squeezeBelow.current ? w : 0)
     })
@@ -154,9 +151,9 @@ export const ThreadView = memo(function ThreadView({ botId }: { botId: string })
   // C0096: the bot's name button opens the menu the left sidebar used to be — its own conversation's
   // entries, the other bots, and the app's.
   const mainMenu = useMainBotMenu({ onRoutines: () => presentRoutine(null), onFullConversation: openTrace, onDetails: toggleDetails })
-  // The docked conversation (Mac): the chat keeps 560 at least, the panel 320 at least.
+  // The docked conversation (Mac): a fixed 320 wide (C0100), the chat keeping 560 at least.
   const chatOpen = isMac && botChat !== null
-  const chatPanelWidth = chatOpen ? Math.max(320, Math.min(420, viewWidth - 560)) : 0
+  const chatPanelWidth = chatOpen ? 320 : 0
 
   const details = (
     <DetailsPanel
@@ -185,7 +182,8 @@ export const ThreadView = memo(function ThreadView({ botId }: { botId: string })
           <TopFade />
           <div className="top-chrome-row">
             <Spacer />
-            {(!showSettings || !wide) && !compactDetails ? (
+            {/* C0100: the Mac's top-right « is gone; its action is the menu's 对话详情 row. */}
+            {!isMac && (!showSettings || !wide) && !compactDetails ? (
               <MacChatButton className="ringed" title="Conversation details" icon="chevron.left.2" direction={[-1, 0]} onClick={toggleDetails} />
             ) : null}
           </div>
@@ -202,7 +200,7 @@ export const ThreadView = memo(function ThreadView({ botId }: { botId: string })
               : tr('{name}, view details').replaceAll('{name}', () => bot?.name ?? tr('Conversation'))}
             title={isMac ? tr('Open menu') : 'View conversation details'}
           >
-            <HStack as="span" gap={7}>
+            <HStack as="span" gap={8}>
               {bot ? isGroup(bot) ? <GroupAvatar members={store.members(bot)} size={22} /> : <BotAvatar bot={bot} size={22} /> : null}
               <Text size="body" weight="medium" tone="text" truncate>{bot?.name ?? ''}</Text>
               {/* Grok Bot's hint on hover: the pill opens the details. */}

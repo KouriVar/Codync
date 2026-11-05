@@ -453,9 +453,9 @@
    first: the panel shrinks to 320 before the chat shrinks to 560 (both set in `ThreadView`). */
 html[data-platform="darwin"] .conversation {
   min-width: 560px;
-}
-html[data-platform="darwin"] .conversation {
-  --column: min(888px, 100%);
+  /* C0100: the content column keeps its 80px side inset inside the main area (782 at 1280),
+     capped at 888 and floored at 560. */
+  --column: clamp(560px, calc(100% - 160px), 888px);
 }
 html[data-platform="darwin"] {
   --agent-bubble-max: min(560px, max(80px, (100cqw + 32px) * 0.8 - 32px), 100cqw - 88px);
@@ -467,4 +467,66 @@ html[data-platform="darwin"] {
   min-width: 0;
   height: 100%;
   display: flex;
+}
+/* C0100: the Mac's two columns — 6 from the window on every side, 12 apart, a full-height 1px
+   hairline drawn down the middle of that gap. */
+html[data-platform="darwin"] .thread-view {
+  box-sizing: border-box;
+  padding: 6px;
+}
+html[data-platform="darwin"] .bot-chat-dock {
+  position: relative;
+  margin-left: 12px;
+}
+html[data-platform="darwin"] .bot-chat-dock::before {
+  content: '';
+  position: absolute;
+  left: -7px;
+  top: -6px;
+  bottom: -6px;
+  width: 1px;
+  background: var(--border);
+  pointer-events: none;
+}
+
+/* ============================================================================
+   C0100 — Mac main layout aligned to the Figma frame (1280×800). Only geometry:
+   the window is inset 6 all round (padding on .thread-view), the two columns sit 12 apart
+   with a hairline, and everything
+   in the conversation column follows the frame's measured sizes.
+   ============================================================================ */
+/* The title pill: 38 tall, 8 from the top, 8 padding, avatar 22 + 8 gap (JSX). */
+html[data-platform="darwin"] .top-chrome {
+  padding-top: 8px;
+}
+html[data-platform="darwin"] .title-pill {
+  min-height: 38px;
+  padding: 0 10px 0 8px;
+  justify-content: center;
+}
+/* The first message sits 90 from the top, which also clears the title pill (and any red error
+   notice at the head of the transcript). The column carries the 80px side inset, so the scroll
+   content adds none; the bottom reserves the floating composer plus its 8px gap. */
+html[data-platform="darwin"] .transcript-content {
+  padding: 90px 0 calc(var(--composer-height, 70px) + 8px);
+}
+html[data-platform="darwin"] .transcript-content > div:first-of-type .chat-row {
+  padding-top: 0;
+}
+/* Bubbles: 12 padding, 12 between bubbles, 24 where the speaker changes, 12 between paragraphs. */
+html[data-platform="darwin"] .bubble {
+  padding: 12px;
+}
+html[data-platform="darwin"] .chat-row {
+  padding-top: 12px;
+}
+html[data-platform="darwin"] .chat-row.group-start {
+  padding-top: 24px;
+}
+html[data-platform="darwin"] .md-body > * + * {
+  margin-top: 12px;
+}
+/* The composer floats 8 above the bottom edge of the main area. */
+html[data-platform="darwin"] .composer-dock {
+  bottom: 8px;
 }

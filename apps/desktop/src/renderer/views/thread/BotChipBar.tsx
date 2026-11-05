@@ -48,14 +48,16 @@ export function BotChipBar({ botId, mention, pick, openChat }: {
           const chosen = mention?.id === peerId
           const dot = DELEGATE_STATUS_DOTS[state]
           const label = `@${name} · ${tr(DELEGATE_STATUS_LABELS[state])}`
+          // C0100: the summary and the tag share one container — “N messages · name” on top.
+          const summary = `${tr('{count} messages').replaceAll('{count}', () => String(exchanges.length))} ${name}`
           return (
             <div key={peerId} className="bot-chip-col">
               <button
                 className="press bot-chip-count"
-                title={tr('{count} messages').replaceAll('{count}', () => String(exchanges.length))}
+                title={summary}
                 onClick={() => openChat(peerId, name)}
               >
-                {tr('{count} messages').replaceAll('{count}', () => String(exchanges.length))}
+                {summary}
               </button>
               <button
                 className={chosen ? 'press bot-chip chosen' : 'press bot-chip'}

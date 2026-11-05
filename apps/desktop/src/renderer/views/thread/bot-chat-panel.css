@@ -1,83 +1,142 @@
-/* The conversation with one peer, docked beside the main chat (C0096). A hairline splits the two —
-   one window, not two cards — so the panel carries no background or border of its own. */
+/* The conversation with one peer, docked beside the main chat (C0096), laid out to the Figma
+   frame (C0100): 320 wide, a centred 38-tall title, messages inset 8 with the sender named in its
+   own colour and an avatar at the bubble's bottom-left, and a 44-tall box at the foot, 8 from the
+   bottom. No border of its own — the dock draws the hairline between the columns. */
 .bot-chat-panel {
   display: flex;
   flex-direction: column;
   height: 100%;
+  width: 320px;
   min-width: 320px;
   min-height: 0;
-  border-left: 0.5px solid var(--border);
   background: var(--background);
 }
+/* The title band: 54 tall (8 + 38 + 8), the pill centred with the two actions absolute at the top
+   right, so they never push the title off centre. */
 .bot-chat-panel-head {
+  position: relative;
+  flex: none;
+  height: 54px;
+  padding: 8px;
+  display: grid;
+  place-items: center;
+}
+.bot-chat-panel-title {
+  height: 38px;
+  max-width: calc(100% - 72px);
   display: flex;
   align-items: center;
-  gap: 4px;
-  flex: none;
-  padding: 10px 10px 10px 14px;
-  /* Clears the traffic lights on the Mac's top band like the chat's own chrome. */
-  min-height: 48px;
+  padding: 0 10px 0 8px;
+  border-radius: var(--radius-pill);
+  background: var(--panel);
+  overflow: hidden;
+}
+.bot-chat-panel-head-actions {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
 }
 .bot-chat-panel-scroll {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  container-type: inline-size;
+  /* The title band is 54; 58 more puts the first message 112 from the panel's top. */
+  padding: 58px 8px 8px;
 }
-.bot-chat-panel-scroll .bot-conversation-scroll {
-  /* The panel scrolls as one; the rows body must not scroll on its own. */
-  overflow: visible;
+.bot-chat-panel-note {
+  padding: 8px 4px;
+  text-align: center;
+}
+.bot-chat-panel-status {
+  padding: 6px 4px;
+}
+/* One message: avatar at the bubble's bottom-left corner, name in the bot's colour above the
+   bubble. 24 apart from the next message. */
+.panel-msg {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+}
+.panel-msg + .panel-msg,
+.panel-msg + .time-separator,
+.time-separator + .panel-msg,
+.bot-chat-panel-status + .panel-msg,
+.panel-msg + .bot-chat-panel-status {
+  margin-top: 24px;
+}
+.panel-msg-avatar {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: flex-end;
+}
+.panel-msg-content {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+.panel-msg-name {
+  height: 28px;
+  padding: 4px 12px;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+.panel-msg-name > * {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.panel-msg .bubble {
+  max-width: 100%;
 }
 .bot-chat-panel-mine {
-  padding: 6px 16px 12px;
+  margin-top: 24px;
+  padding-top: 8px;
   border-top: 0.5px solid var(--border);
 }
 .bot-chat-panel-mine-title {
   padding: 6px 0;
 }
-/* Every row is the exchange's: left-aligned, whichever side wrote it. */
-.bot-chat-panel .message.agent .message-body,
-.bot-chat-panel .message .message-body {
-  align-items: flex-start;
-  margin-left: 0;
-  margin-right: 0;
-  max-width: 100%;
-}
-.bot-chat-panel .bubble {
-  max-width: min(100%, 560px);
-}
+/* The box at the foot: 44 tall, 9 padding, its bottom 8 above the panel's edge. */
 .bot-chat-panel-composer {
   flex: none;
-  padding: 10px 12px 12px;
-  border-top: 0.5px solid var(--border);
+  padding: 8px;
 }
 .bot-chat-panel-box {
-  align-items: flex-end;
-  padding: 6px 6px 6px 12px;
-  border-radius: var(--radius-l);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 44px;
+  padding: 9px 9px 9px 12px;
+  border-radius: var(--radius-pill);
   background: var(--surface);
 }
 .bot-chat-panel-box textarea {
   flex: 1;
   min-width: 0;
-  min-height: calc(20px * var(--scale));
-  max-height: calc(120px * var(--scale));
-  padding: 4px 0;
+  max-height: calc(26px * 1);
+  padding: 0;
   border: 0;
   resize: none;
   background: transparent;
   color: var(--text);
   font: inherit;
   font-size: var(--text-callout);
-  line-height: 1.4;
+  line-height: 22px;
 }
 .bot-chat-panel-box textarea::placeholder {
   color: var(--tertiary);
 }
 .bot-chat-panel-send {
   flex: none;
-  width: 28px;
-  height: 28px;
+  width: 26px;
+  height: 26px;
   border-radius: 50%;
   display: grid;
   place-items: center;
@@ -88,5 +147,6 @@
   opacity: 0.4;
 }
 .bot-chat-panel-hint {
-  padding: 4px 2px;
+  padding: 8px 2px;
+  text-align: center;
 }

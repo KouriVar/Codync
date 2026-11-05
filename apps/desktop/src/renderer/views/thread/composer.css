@@ -267,3 +267,29 @@
 .command-detail.warning {
   color: var(--attention);
 }
+
+/* C0100 — the Mac composer matches the Figma frame: the box is 44 tall (9 padding + a 26 control
+   each side), its bottom 8 above the main area's edge, and it is 4 below the tag bar. */
+html[data-platform="darwin"] .composer {
+  padding: 4px 0 8px;
+}
+html[data-platform="darwin"] .composer-surface {
+  min-height: 44px;
+  border-radius: var(--radius-pill);
+}
+html[data-platform="darwin"] .composer-box {
+  padding: 9px;
+  align-items: center;
+}
+html[data-platform="darwin"] .composer-add,
+html[data-platform="darwin"] .composer-send,
+html[data-platform="darwin"] .composer-mic {
+  width: 26px;
+  height: 26px;
+  margin-bottom: 0;
+}
+html[data-platform="darwin"] .composer-mic-group,
+html[data-platform="darwin"] .composer-mention {
+  height: 26px;
+  margin-bottom: 0;
+}

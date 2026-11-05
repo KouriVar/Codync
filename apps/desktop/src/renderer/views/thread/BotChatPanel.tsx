@@ -1,20 +1,23 @@
 import { useState } from 'react'
+import { BotAvatar } from '../../components/Avatar'
 import { IconButton } from '../../components/Controls'
 import { Icon } from '../../components/Icon'
-import { HStack } from '../../components/Stack'
 import { Text } from '../../components/Text'
 import { useTr } from '../../lib/use-language'
+import { avatarColor } from '../../lib/theme'
 import { useStore } from '../../store/context'
 import { BotPair } from './BotPair'
-import { BotConversationScroll, useBotConversation } from './BotConversation'
+import { useBotConversation } from './BotConversation'
+import { Bubble, TimeSeparator } from './ChatRows'
 import { MarkdownText } from './Markdown'
 import './bot-chat-panel.css'
 
 /**
- * The conversation with one peer, docked beside the main chat (C0096): the bot-to-bot exchange the
- * tag bar's “N messages” card opens, drawn as rows rather than as a sheet, all left-aligned. Its own
- * box below sends straight to that peer — the same `store.send` the rest of the app uses — when the
- * peer is a bot on this computer; a peer on another computer has nothing here to carry a message.
+ * The conversation with one peer, docked beside the main chat (C0096), laid out to the Figma frame
+ * (C0100): a centred title, each message's sender named in that bot's own colour with its avatar at
+ * the bubble's bottom-left corner, and a 44-tall box at the foot. It draws the bot-to-bot exchange
+ * the tag bar's “N messages” card opens; the box sends straight to that peer with the app's own
+ * `store.send` when the peer is a bot on this computer.
  */
 export function BotChatPanel({ botId, peerId, peerName, onClose }: {
   botId: string
@@ -25,7 +28,7 @@ export function BotChatPanel({ botId, peerId, peerName, onClose }: {
 }) {
   const tr = useTr()
   const store = useStore()
-  const { rows, error, fetched, peer } = useBotConversation(botId, peerId)
+  const { rows, error, fetched } = useBotConversation(botId, peerId)
   const mine = store.bots.get(peerId)
   const sent = mine ? store.allEntries(peerId).filter((e) => e.kind === 'user' && e.data.text) : []
   const [draft, setDraft] = useState('')
@@ -35,26 +38,52 @@ export function BotChatPanel({ botId, peerId, peerName, onClose }: {
     store.send(text, peerId)
     setDraft('')
   }
+  const name = (id: string) => store.authorName(id, id === peerId ? peerName : undefined)
   return (
     <aside className="bot-chat-panel" aria-label={tr('Conversation with {name}').replaceAll('{name}', () => peerName)}>
       <div className="bot-chat-panel-head">
-        <HStack gap={8} grow>
-          <BotPair botId={botId} peer={{ ...peer, name: peer.name ?? peerName }} />
-        </HStack>
+        <div className="bot-chat-panel-title">
+          <BotPair botId={botId} peer={{ id: peerId, name: peerName }} />
+        </div>
         {/* A placeholder for now: no menu behind it yet. */}
-        <IconButton title="More" icon="ellipsis" onClick={() => undefined} />
-        <IconButton title="Close" icon="xmark" onClick={onClose} />
+        <div className="bot-chat-panel-head-actions">
+          <IconButton title="More" icon="ellipsis" size={26} onClick={() => undefined} />
+          <IconButton title="Close" icon="xmark" size={26} onClick={onClose} />
+        </div>
       </div>
       <div className="bot-chat-panel-scroll">
-        <BotConversationScroll rows={rows} peer={peer} error={error} fetched={fetched} />
+        {error ? <Text as="div" size="footnote" tone="danger" className="bot-chat-panel-note">{error}</Text> : null}
+        {!error && fetched && rows.length === 0 ? <Text as="div" size="footnote" tone="tertiary" className="bot-chat-panel-note">{tr('No messages yet.')}</Text> : null}
+        {rows.map((row) => {
+          if (row.kind === 'separator') return <TimeSeparator key={row.id} date={row.at} />
+          if (row.kind === 'status') {
+            const text = row.outcome.kind === 'failed' ? row.outcome.detail || tr("Didn't complete.") : tr('Waiting for {name}…').replaceAll('{name}', () => name(row.awaiting))
+            return <Text key={row.id} as="div" size="footnote" tone={row.outcome.kind === 'failed' ? 'danger' : 'secondary'} className="bot-chat-panel-status">{text}</Text>
+          }
+          const bot = store.bots.get(row.author)
+          return (
+            <div key={row.id} className="panel-msg">
+              <span className="panel-msg-avatar">{bot ? <BotAvatar bot={bot} size={24} animated={false} /> : null}</span>
+              <div className="panel-msg-content">
+                <div className="panel-msg-name">
+                  <Text size="subheadline" weight="medium" style={{ color: avatarColor(bot?.avatarColor ?? '') }}>{name(row.author)}</Text>
+                </div>
+                <Bubble className="bubble agent selectable" items={() => [{ title: 'Copy', icon: 'square.on.square', action: () => window.codync.app.copy(row.text) }]}>
+                  <MarkdownText text={row.text} />
+                </Bubble>
+              </div>
+            </div>
+          )
+        })}
         {mine && sent.length ? (
           <div className="bot-chat-panel-mine">
             <Text as="div" size="footnote" tone="tertiary" className="bot-chat-panel-mine-title">
               {tr('You to {name}').replaceAll('{name}', () => peerName)}
             </Text>
             {sent.map((e) => (
-              <div key={e.id} className="message agent">
-                <div className="message-body">
+              <div key={e.id} className="panel-msg">
+                <span className="panel-msg-avatar" />
+                <div className="panel-msg-content">
                   <div className="bubble agent selectable"><MarkdownText text={e.data.text ?? ''} /></div>
                 </div>
               </div>
@@ -64,7 +93,7 @@ export function BotChatPanel({ botId, peerId, peerName, onClose }: {
       </div>
       {mine ? (
         <div className="bot-chat-panel-composer">
-          <HStack gap={6} className="bot-chat-panel-box">
+          <div className="bot-chat-panel-box">
             <textarea
               rows={1}
               value={draft}
@@ -81,7 +110,7 @@ export function BotChatPanel({ botId, peerId, peerName, onClose }: {
             <button className="press bot-chat-panel-send" aria-label={tr('Send')} title={tr('Send')} disabled={!draft.trim()} onClick={send}>
               <Icon name="arrow.up" size={13} weight="bold" />
             </button>
-          </HStack>
+          </div>
         </div>
       ) : (
         <div className="bot-chat-panel-composer">
