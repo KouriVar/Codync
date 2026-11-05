@@ -3745,3 +3745,25 @@
 - 验证：`xcodebuild build ... -configuration DevDebug`（`generic/platform=iOS`）**BUILD SUCCEEDED，0 error**，
   构建号 **231**；已装到 iPhone 16 Pro（2.36.0 / 231）。不跑测试、不截图。
 - 关联：C0223e1/e2、协议见 `/tmp/codync-audit/c0223-protocol.md` #26/#27/#28。
+
+### C0223g · 2026-11-05 · chat 页交付文件提示 + 复制能力核对
+
+- 说明：C0223 第十一组。
+- 变化：
+  - `DSHConversationState.project()` 新增 `deliverables/presented` → 消息流中性提示行「交付文件：a.pdf、b.txt」
+    （取 `files[].path` 的文件名）。source capability `file-references-v1`。
+  - 复制：DSH 的 agent 行用 `MarkdownText`（`.textSelection(.enabled)`），长按可选中/复制文字；这是既有能力，
+    本轮核对确认可用，未改。
+- 「未确认」/未做（按协议或范围）：
+  - **工具结果图**：协议第 28 节确认网关实时 `tool/result` **不输出 images**，无法展示 → 不做（若需，只能从历史
+    原始 content 块自行解析，属另一项）。
+  - **交付文件的卡片样式 + 点卡片预览**：本轮只做成提示行（列出文件名），未做可点卡片（需在消息行引入新的卡片
+    行类型与点击下载，较大改动，留后续）。
+  - **正文里的本地路径可点 → file-resolve → 下载预览**：未做（需在 Markdown 里识别路径并接 `file-resolve`，
+    留后续，标「未确认 UI」）。
+  - 代码块/表格「复制为文本」：依赖 `MarkdownText` 既有行为，未单独加按钮。
+- 待后续：C0223d3（步骤/轨迹页、轮次导航 turn-outline）。
+- 边界：不改 bot 页、底部输入框设计、串流。不加依赖/测试 target。
+- 验证：`xcodebuild build ... -configuration DevDebug`（`generic/platform=iOS`）**BUILD SUCCEEDED，0 error**，
+  构建号 **232**；已装到 iPhone 16 Pro（2.36.0 / 232）。不跑测试、不截图。
+- 关联：C0223e3、协议见 `/tmp/codync-audit/c0223-protocol.md` #23/#28。

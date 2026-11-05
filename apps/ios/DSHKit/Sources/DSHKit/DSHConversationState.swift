@@ -319,6 +319,14 @@ struct DSHConversationState: Sendable {
             return noticeRow(event, text: Self.retryText(event.payload))
         case "llm/retry-started":
             return nil
+        case "deliverables/presented":
+            let names = event.payload["files"].array.compactMap { value -> String? in
+                guard let path = value["path"].string, !path.isEmpty else { return nil }
+                let name = (path as NSString).lastPathComponent
+                return name.isEmpty ? path : name
+            }
+            guard !names.isEmpty else { return nil }
+            return noticeRow(event, text: "交付文件：" + names.joined(separator: "、"))
         default:
             return nil
         }
