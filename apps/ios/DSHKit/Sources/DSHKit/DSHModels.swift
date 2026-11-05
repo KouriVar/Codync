@@ -93,6 +93,38 @@ public struct DSHTool: Identifiable, Hashable, Sendable {
 /// One picture a message refers to. The bytes are never kept here: they are fetched with an
 /// `attachment` request when the row becomes visible, and cached in memory by
 /// `(gatewayId, sessionId, attachmentId)`.
+/// One command or skill from the gateway's `commands` catalogue.
+public struct DSHCommand: Identifiable, Hashable, Sendable {
+    public enum Kind: String, Sendable { case immediate, input, select, unknown }
+    public let id: String
+    public let name: String
+    public let description: String
+    /// `commands` or `skills` — the group title it came from.
+    public let groupTitle: String
+    public let kind: Kind
+    /// For `input`: the text inserted into the field (e.g. "/plan ").
+    public let insertText: String
+    /// For `immediate`: the slash line sent to `command-execute` (e.g. "/compact").
+    public let submitText: String
+    /// True when the command accepts attached images (`ui.input.images`).
+    public let acceptsImages: Bool
+}
+
+/// One group of the `commands` reply (`commands`, `skills`, …).
+public struct DSHCommandGroup: Identifiable, Hashable, Sendable {
+    public let id: String
+    public let title: String
+    public let commands: [DSHCommand]
+}
+
+/// One option of a `select` command (`command-options`).
+public struct DSHCommandOption: Identifiable, Hashable, Sendable {
+    public let id: String
+    public let label: String
+    public let detail: String?
+    public let selected: Bool
+}
+
 public struct DSHImageRef: Identifiable, Hashable, Sendable {
     public let attachmentId: String
     public let mediaType: String

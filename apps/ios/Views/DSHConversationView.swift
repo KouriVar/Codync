@@ -236,6 +236,10 @@ struct DSHComposer: View {
     @State private var attachError: String?
     @Environment(\.capturePhoto) private var capturePhoto
 
+    // Commands: a `select` command opens a small options list.
+    @State private var selectedCommand: DSHCommand?
+    @State private var commandOptions: [DSHCommandOption] = []
+
     private var trimmed: String { draft.trimmingCharacters(in: .whitespacesAndNewlines) }
     private var isEmpty: Bool { trimmed.isEmpty }
 
@@ -253,24 +257,34 @@ struct DSHComposer: View {
         // frame's slots (the model button in `trailing`) and its two-state mode.
         ConversationBottomBar(
             mode: focused ? .expanded : .capsule,
-            accessory: pendingImages.isEmpty ? nil : AnyView(pendingStrip),
+            accessory: attachmentAccessory,
             leading: AnyView(addButton),
             field: AnyView(field),
             trailing: AnyView(trailing),
             status: status,
             focused: focused
         )
+        .onAppear { if gateway.supportsCommands, gateway.commandGroups.isEmpty { Task { await gateway.loadCommands() } } }
         .sheet(isPresented: $showAddSheet) {
             DSHAddSheet(
                 canPhoto: gateway.capabilities.contains("images"),
+                groups: gateway.supportsCommands ? gateway.commandGroups : [],
                 onPhotos: { pickingPhotos = true },
-                onCamera: { capturePhoto { image in add(captured: image) } }
+                onCamera: { capturePhoto { image in add(captured: image) } },
+                onCommand: runCommand
             )
             .presentationDetents([.medium, .large])
         }
         .sheet(isPresented: $showModelSheet) {
             PlaceholderSheet(title: "模型")
                 .presentationDetents([.medium, .large])
+        }
+        .sheet(item: $selectedCommand) { command in
+            DSHCommandOptionsSheet(command: command, options: commandOptions) { option in
+                gateway.selectCommandOption(command: command.name, optionId: option.id)
+                selectedCommand = nil
+            } onCancel: { selectedCommand = nil }
+            .presentationDetents([.medium, .large])
         }
         .photosPicker(isPresented: $pickingPhotos, selection: $photoItems,
                       maxSelectionCount: 20, matching: .images)
@@ -284,6 +298,81 @@ struct DSHComposer: View {
             Button("好", role: .cancel) { attachError = nil }
         } message: {
             Text(attachError ?? "")
+        }
+    }
+
+    /// What sits above the input: the pending pictures, or the `/` command menu while one is being typed.
+    private var attachmentAccessory: AnyView? {
+        if !pendingImages.isEmpty { return AnyView(pendingStrip) }
+        if !commandSuggestions.isEmpty { return AnyView(commandMenu) }
+        return nil
+    }
+
+    /// A leading `/partial` in the field (no space yet), as a lowercase query.
+    private var slashQuery: String? {
+        guard draft.hasPrefix("/") else { return nil }
+        let rest = draft.dropFirst()
+        guard !rest.contains(" "), !rest.contains("\n") else { return nil }
+        return String(rest).lowercased()
+    }
+
+    /// The commands/skills matching the `/` query, plan/goal/compact first.
+    private var commandSuggestions: [DSHCommand] {
+        guard gateway.supportsCommands, let query = slashQuery else { return [] }
+        let all = orderedCommands(gateway.commandGroups.flatMap(\.commands))
+        guard !query.isEmpty else { return Array(all.prefix(12)) }
+        return all.filter {
+            $0.name.lowercased().contains(query) || $0.description.lowercased().contains(query)
+        }.prefix(12).map { $0 }
+    }
+
+    private var commandMenu: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            ForEach(commandSuggestions) { command in
+                Button { runCommand(command) } label: {
+                    HStack(spacing: 8) {
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text("/" + command.name).font(.subheadline).foregroundStyle(Palette.text)
+                            if !command.description.isEmpty {
+                                Text(command.description).font(.caption2).foregroundStyle(Palette.secondary).lineLimit(1)
+                            }
+                        }
+                        Spacer(minLength: 0)
+                    }
+                    .padding(.horizontal, 12).padding(.vertical, 8)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .background(Palette.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .padding(.horizontal, 10)
+        .padding(.top, 8)
+    }
+
+    /// plan / goal / compact first, then the rest, keeping each group's order.
+    private func orderedCommands(_ commands: [DSHCommand]) -> [DSHCommand] {
+        let pinned = ["plan", "goal", "compact"]
+        let head = pinned.compactMap { name in commands.first { $0.name == name } }
+        return head + commands.filter { !pinned.contains($0.name) }
+    }
+
+    /// Runs a command the way its `ui.kind` says: immediate executes, input fills the field, select
+    /// opens its options.
+    private func runCommand(_ command: DSHCommand) {
+        showAddSheet = false
+        switch command.kind {
+        case .immediate:
+            gateway.executeCommand(command.submitText)
+            draft = ""
+        case .input:
+            draft = command.insertText
+        case .select:
+            selectedCommand = command
+            commandOptions = []
+            Task { commandOptions = await gateway.commandOptions(for: command.name) }
+        case .unknown:
+            break
         }
     }
 
@@ -425,24 +514,55 @@ struct DSHComposer: View {
 /// `message.images`; the rest arrive in later steps.
 private struct DSHAddSheet: View {
     let canPhoto: Bool
+    let groups: [DSHCommandGroup]
     let onPhotos: () -> Void
     let onCamera: () -> Void
+    let onCommand: (DSHCommand) -> Void
     @Environment(\.dismissModal) private var dismiss
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 12) {
-                HStack(spacing: 12) {
-                    tile("照片", icon: "image-line", enabled: canPhoto, action: onPhotos)
-                    tile("拍照", icon: "camera-line", enabled: canPhoto, action: onCamera)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    HStack(spacing: 12) {
+                        tile("照片", icon: "image-line", enabled: canPhoto, action: onPhotos)
+                        tile("拍照", icon: "camera-line", enabled: canPhoto, action: onCamera)
+                    }
+                    if !canPhoto {
+                        Text("这个网关不支持发图片")
+                            .font(.footnote).foregroundStyle(Palette.secondary)
+                    }
+                    ForEach(groups) { group in
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text(group.title == "skills" ? "技能" : "命令")
+                                .font(.footnote.weight(.semibold)).foregroundStyle(Palette.secondary)
+                            ForEach(group.commands) { command in
+                                Button { onCommand(command); dismiss() } label: {
+                                    HStack(spacing: 8) {
+                                        VStack(alignment: .leading, spacing: 1) {
+                                            Text("/" + command.name).font(.subheadline).foregroundStyle(Palette.text)
+                                            if !command.description.isEmpty {
+                                                Text(command.description).font(.caption2)
+                                                    .foregroundStyle(Palette.secondary).lineLimit(1)
+                                            }
+                                        }
+                                        Spacer(minLength: 0)
+                                        if command.kind == .select {
+                                            Image(systemName: "chevron.right").font(.caption2)
+                                                .foregroundStyle(Palette.tertiary)
+                                        }
+                                    }
+                                    .padding(.horizontal, 12).padding(.vertical, 8)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .background(Palette.surface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
                 }
-                if !canPhoto {
-                    Text("这个网关不支持发图片")
-                        .font(.footnote).foregroundStyle(Palette.secondary)
-                }
-                Spacer(minLength: 0)
+                .padding(16)
             }
-            .padding(16)
             .navigationTitle("添加")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -464,6 +584,46 @@ private struct DSHAddSheet: View {
         }
         .buttonStyle(.plain)
         .disabled(!enabled)
+    }
+}
+
+/// The options of a `select` command (`model`, `permission`).
+private struct DSHCommandOptionsSheet: View {
+    let command: DSHCommand
+    let options: [DSHCommandOption]
+    let onPick: (DSHCommandOption) -> Void
+    let onCancel: () -> Void
+
+    var body: some View {
+        NavigationStack {
+            List {
+                if options.isEmpty {
+                    Text("选项加载中…").foregroundStyle(Palette.secondary)
+                }
+                ForEach(options) { option in
+                    Button { onPick(option) } label: {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(option.label).foregroundStyle(Palette.text)
+                                if let detail = option.detail, !detail.isEmpty {
+                                    Text(detail).font(.caption2).foregroundStyle(Palette.secondary)
+                                }
+                            }
+                            Spacer()
+                            if option.selected {
+                                Image(systemName: "checkmark").foregroundStyle(Palette.text)
+                            }
+                        }
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .navigationTitle("/" + command.name)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) { Button("取消") { onCancel() } }
+            }
+        }
     }
 }
 

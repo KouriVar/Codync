@@ -40,6 +40,15 @@ public final class DSHGateway: ObservableObject {
     /// A gateway that did not announce `images` must not be sent one.
     public var supportsImages: Bool { capabilities.contains("images") }
 
+    /// The command/skill catalogue from the last `commands` reply (empty until loaded).
+    @Published public private(set) var commandGroups: [DSHCommandGroup] = []
+    /// A gateway that did not announce `commands` shows no command menu.
+    public var supportsCommands: Bool { capabilities.contains("commands") }
+
+    /// The single outstanding request/reply (commands, options, …). The UI serialises them.
+    private var commandAwaiter: CheckedContinuation<DSHFrame, Never>?
+    private static let requestKinds: Set<String> = ["commands", "command-executed", "command-options", "command-selected"]
+
     public private(set) var profile: DSHGatewayProfile?
 
     private var task: URLSessionWebSocketTask?
@@ -284,6 +293,11 @@ public final class DSHGateway: ObservableObject {
               let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let kind = object["kind"] as? String else { return }
         let frame = DSHFrame(kind: kind, json: object)
+
+        // A pending request/reply (commands, options, …): hand it its frame before the event switch.
+        if Self.requestKinds.contains(kind) || (kind == "error" && commandAwaiter != nil) {
+            resolveCommandAwaiter(frame)
+        }
 
         switch kind {
         case "hello":
@@ -662,6 +676,77 @@ public final class DSHGateway: ObservableObject {
         return bytes > DSHImageProcessor.maxMessageBytes ? .messageTooLarge(bytes) : nil
     }
 
+    // MARK: - Commands & skills
+
+    /// Loads the command/skill catalogue for the open session. No-op when the gateway doesn't offer it.
+    public func loadCommands() async {
+        guard supportsCommands, phase == .ready, let sid = openSessionId else { commandGroups = []; return }
+        guard let frame = await requestFrame(["type": "commands", "sessionId": sid, "locale": "zh-CN"],
+                                             expecting: "commands"), frame.kind == "commands" else { return }
+        commandGroups = Self.decodeCommandGroups(frame)
+    }
+
+    /// Runs an `immediate` command (or a `/` line the reader typed). The turn's own events follow.
+    public func executeCommand(_ line: String) {
+        guard supportsCommands, let sid = openSessionId else { return }
+        send(["type": "command-execute", "sessionId": sid, "line": line])
+    }
+
+    /// The options of a `select` command (`model`, `permission`).
+    public func commandOptions(for command: String) async -> [DSHCommandOption] {
+        guard supportsCommands, phase == .ready, let sid = openSessionId else { return [] }
+        guard let frame = await requestFrame(
+            ["type": "command-options", "sessionId": sid, "command": command],
+            expecting: "command-options"), frame.kind == "command-options" else { return [] }
+        let options = frame.json["options"] as? [[String: Any]] ?? []
+        return options.compactMap { option in
+            guard let id = option["id"] as? String else { return nil }
+            return DSHCommandOption(id: id,
+                                    label: option["label"] as? String ?? id,
+                                    detail: (option["detail"] as? String) ?? (option["description"] as? String),
+                                    selected: option["selected"] as? Bool ?? false)
+        }
+    }
+
+    public func selectCommandOption(command: String, optionId: String) {
+        guard supportsCommands, let sid = openSessionId else { return }
+        send(["type": "command-select", "sessionId": sid, "command": command, "optionId": optionId])
+    }
+
+    private func requestFrame(_ payload: [String: Any], expecting kind: String) async -> DSHFrame? {
+        guard send(payload) else { return nil }
+        let frame = await withCheckedContinuation { commandAwaiter = $0 }
+        return (frame.kind == kind || frame.kind == "error") ? frame : nil
+    }
+
+    private func resolveCommandAwaiter(_ frame: DSHFrame) {
+        commandAwaiter?.resume(returning: frame)
+        commandAwaiter = nil
+    }
+
+    static func decodeCommandGroups(_ frame: DSHFrame) -> [DSHCommandGroup] {
+        let groups = frame.json["groups"] as? [[String: Any]] ?? []
+        return groups.compactMap { group in
+            guard let title = group["title"] as? String else { return nil }
+            let items = group["items"] as? [[String: Any]] ?? []
+            let commands = items.compactMap { item -> DSHCommand? in
+                guard let name = item["name"] as? String else { return nil }
+                let ui = item["ui"] as? [String: Any] ?? [:]
+                let kindRaw = ui["kind"] as? String ?? "unknown"
+                return DSHCommand(
+                    id: item["id"] as? String ?? name,
+                    name: name,
+                    description: item["description"] as? String ?? "",
+                    groupTitle: title,
+                    kind: DSHCommand.Kind(rawValue: kindRaw) ?? .unknown,
+                    insertText: ui["insertText"] as? String ?? "/\(name) ",
+                    submitText: ui["submitText"] as? String ?? "/\(name)",
+                    acceptsImages: (ui["images"] as? Bool) ?? false)
+            }
+            return DSHCommandGroup(id: group["id"] as? String ?? title, title: title, commands: commands)
+        }
+    }
+
     // MARK: - Pictures (attachment fetch)
 
     /// The bytes of one picture, fetched once and then read from the in-memory cache. Returns nil when
@@ -902,6 +987,9 @@ public final class DSHGateway: ObservableObject {
         // and may ask again once the connection is back. That is a read retry, never a resend.
         for (_, waiters) in imageWaiters { for waiter in waiters { waiter.resume(returning: nil) } }
         imageWaiters = [:]; imageInFlight = []; imageQueue = []
+        commandAwaiter?.resume(returning: DSHFrame(kind: "error", json: ["code": "disconnected"]))
+        commandAwaiter = nil
+        commandGroups = []
         for timeout in operationTimeouts.values { timeout.cancel() }
         operationTimeouts = [:]
         for scope in Array(conversations.keys) {

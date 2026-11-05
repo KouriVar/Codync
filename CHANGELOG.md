@@ -3556,3 +3556,23 @@
 - 验证：`xcodebuild build ... -configuration DevDebug`（`generic/platform=iOS`）**BUILD SUCCEEDED，0 error**，
   构建号 **222**；已装到 iPhone 16 Pro（2.36.0 / 222）。不跑测试、不截图。
 - 关联：C0218（图片后端 `DSHImageProcessor`/`message.images`）、C0221 共用底部组件 `accessory` 槽。
+
+### C0223b · 2026-11-05 · chat 页命令与技能（加号 sheet + `/` 过滤菜单）
+
+- 说明：C0223 第二组。命令数据完全按网关 `commands{sessionId, locale:"zh-CN"}` 返回动态渲染，不写死。
+- 变化（只动 chat 页加号 sheet、输入区的 `/` 菜单与命令处理；不碰底部布局/宽度/按钮/箭头/状态行/串流）：
+  - `DSHGateway`：新增 `supportsCommands`（capability `commands`）、`commandGroups`（发布）、`loadCommands()`
+    （发 `commands` 请求，等 `commands` 回复，按 `groups[].items[]` 解出 `{id,name,description,ui.kind,
+    ui.insertText,ui.submitText,ui.images}`）；`executeCommand(line)`（`command-execute`）；`commandOptions(for:)`
+    （`command-options`）与 `selectCommandOption`（`command-select`）。加了一套「发请求→等对应回复帧」的挂起机制
+    （`requestFrame`，一次一个、UI 串行），断线时以 error 收尾避免悬挂。
+  - `DSHModels`：新增 `DSHCommand` / `DSHCommandGroup` / `DSHCommandOption`。
+  - 加号 sheet（`DSHAddSheet`）：在图片两项下面按 `groups` 渲染「命令」「技能」两组（`/plan /goal /compact`
+    若存在则置顶，其余保持原顺序；`select` 类带 `›`）。点按按 `ui.kind` 处理：`immediate` 直接 `command-execute`；
+    `input` 把 `insertText` 填进输入框让读者补全再发；`select` 打开二级选项（`command-options` → `command-select`）。
+  - 输入框里打 `/`：输入框上方弹出同样的命令/技能列表，按已输入内容过滤（去重、最多 12 条）。
+  - 能力开关：网关没有 `commands` capability 时不显示命令区、也不弹 `/` 菜单。
+- 边界：不改 bot 页；不改底部输入框设计；不改串流。不加依赖/测试 target。
+- 验证：`xcodebuild build ... -configuration DevDebug`（`generic/platform=iOS`）**BUILD SUCCEEDED，0 error**，
+  构建号 **223**；已装到 iPhone 16 Pro（2.36.0 / 223）。不跑测试、不截图。
+- 关联：C0223a（图片附件同属加号 sheet）、C0221 共用底部组件 `accessory` 槽。
