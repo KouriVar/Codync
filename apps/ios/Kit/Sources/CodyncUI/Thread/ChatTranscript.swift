@@ -18,6 +18,13 @@ public struct TranscriptSummary: Identifiable, Hashable, Sendable {
     }
 }
 
+/// A file a row delivers: the caller downloads it when tapped.
+public struct TranscriptFileRef: Identifiable, Hashable, Sendable {
+    public let id: String
+    public let name: String
+    public init(id: String, name: String) { self.id = id; self.name = name }
+}
+
 /// One row of a borrowed transcript: a message, or a folded turn summary.
 public struct TranscriptItem: Identifiable, Sendable {
     public enum Content: Sendable {
@@ -30,19 +37,23 @@ public struct TranscriptItem: Identifiable, Sendable {
     public let isUserMessage: Bool
     /// Pictures this row shows, loaded by whoever owns the transcript.
     public let images: [TranscriptImageRef]
+    /// Files this row delivers, downloaded by the caller when tapped.
+    public let files: [TranscriptFileRef]
 
     public init(entry: Entry, displayRowId: String? = nil, scrollToWhenAdded: Bool? = nil,
-                images: [TranscriptImageRef] = []) {
+                images: [TranscriptImageRef] = [], files: [TranscriptFileRef] = []) {
         id = displayRowId ?? entry.id
         content = .entry(entry)
         isUserMessage = scrollToWhenAdded ?? (entry.kind == "user")
         self.images = images
+        self.files = files
     }
 
     public init(summary: TranscriptSummary) {
         id = summary.id
         content = .summary(summary)
         isUserMessage = false
+        files = []
         images = []
     }
 }
@@ -81,6 +92,8 @@ public struct ChatTranscriptView: View {
     let imageReloadKey: String
     /// Loads one picture by its `TranscriptImageRef.id`; nil draws no pictures at all.
     let loadImage: (@MainActor (String) async -> Data?)?
+    /// Opens a delivered file by its id (path); nil draws no file chips.
+    let onOpenFile: ((String) -> Void)?
 
     public init(items: [TranscriptItem], following: Binding<Bool>, working: Bool = false,
                 workingTitle: String = WorkingPhrase.processing,
@@ -88,7 +101,8 @@ public struct ChatTranscriptView: View {
                 hasMore: Bool = false, loadingEarlier: Bool = false, historyError: String? = nil,
                 accessory: AnyView? = nil, sendingRevision: Int = 0,
                 onOpenSummary: @escaping (TranscriptSummary) -> Void = { _ in },
-                imageReloadKey: String = "", loadImage: (@MainActor (String) async -> Data?)? = nil) {
+                imageReloadKey: String = "", loadImage: (@MainActor (String) async -> Data?)? = nil,
+                onOpenFile: ((String) -> Void)? = nil) {
         self.items = items
         _following = following
         self.working = working
@@ -100,6 +114,7 @@ public struct ChatTranscriptView: View {
         self.sendingRevision = sendingRevision
         self.imageReloadKey = imageReloadKey
         self.loadImage = loadImage
+        self.onOpenFile = onOpenFile
     }
 
     public var body: some View {
@@ -134,8 +149,8 @@ public struct ChatTranscriptView: View {
                 lastDate = date
                 out.append(ConversationRow(item.id, isUserMessage: item.isUserMessage,
                                            revision: Self.revision(of: item)) {
-                    ChatEntryRow(entry: entry, images: item.images, reloadKey: imageReloadKey,
-                                 loadImage: loadImage)
+                    ChatEntryRow(entry: entry, images: item.images, files: item.files,
+                                 reloadKey: imageReloadKey, loadImage: loadImage, onOpenFile: onOpenFile)
                 })
             case .summary:
                 // A folded "thinking for 12s · ran 3 commands" line is a step, not the bot talking:
@@ -165,6 +180,7 @@ public struct ChatTranscriptView: View {
             hasher.combine(entry.rev)
         }
         hasher.combine(item.images.map(\.id).joined(separator: "\u{1F}"))
+        hasher.combine(item.files.map(\.id).joined(separator: "\u{1E}"))
         return hasher.finalize()
     }
 
@@ -184,8 +200,10 @@ public struct ChatTranscriptView: View {
 private struct ChatEntryRow: View {
     let entry: Entry
     let images: [TranscriptImageRef]
+    let files: [TranscriptFileRef]
     let reloadKey: String
     let loadImage: (@MainActor (String) async -> Data?)?
+    let onOpenFile: ((String) -> Void)?
 
     var body: some View {
         switch entry.kind {
@@ -193,6 +211,7 @@ private struct ChatEntryRow: View {
             HStack(spacing: 0) {
                 Spacer(minLength: 40)
                 VStack(alignment: .trailing, spacing: 4) {
+                    fileList
                     pictureList
                     // A message that is only pictures has no text to put in a bubble.
                     if let text = entry.data.text, !text.isEmpty {
@@ -210,6 +229,7 @@ private struct ChatEntryRow: View {
         case "agent":
             HStack(spacing: 0) {
                 VStack(alignment: .leading, spacing: 4) {
+                    fileList
                     pictureList
                     if let text = entry.data.text, !text.isEmpty {
                         MarkdownText(text).equatable()
@@ -225,6 +245,7 @@ private struct ChatEntryRow: View {
         default:
             // A notice is a neutral line; a picture riding on one (a context photo) still shows, above it.
             VStack(alignment: .leading, spacing: 4) {
+                fileList
                 pictureList
                 NoticeRow(entry: entry)
             }
@@ -236,6 +257,27 @@ private struct ChatEntryRow: View {
     @ViewBuilder private var pictureList: some View {
         if let loadImage, !images.isEmpty {
             TranscriptImageList(images: images, reloadKey: reloadKey, load: loadImage)
+        }
+    }
+
+    /// The row's delivered files: a tappable chip each that opens/downloads it.
+    @ViewBuilder private var fileList: some View {
+        if let onOpenFile, !files.isEmpty {
+            VStack(alignment: .leading, spacing: 6) {
+                ForEach(files) { file in
+                    Button { onOpenFile(file.id) } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "doc")
+                            Text(file.name).lineLimit(1).truncationMode(.middle)
+                            Image(systemName: "arrow.down.circle")
+                        }
+                        .font(.footnote)
+                        .padding(.horizontal, 10).padding(.vertical, 6)
+                        .background(Palette.surface, in: Capsule())
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
         }
     }
 }

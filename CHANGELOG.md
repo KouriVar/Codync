@@ -3798,3 +3798,20 @@
 - 验证：`xcodebuild build ... -configuration DevDebug`（`generic/platform=iOS`）**BUILD SUCCEEDED，0 error**，
   构建号 **234**；已装到 iPhone 16 Pro（2.36.0 / 234）。不跑测试、不截图。
 - 关联：C0223d2、协议 `/tmp/codync-audit/c0223-protocol.md` #16。
+
+### C0223g2 · 2026-11-05 · chat 页交付文件卡片（可点下载预览）
+
+- 说明：把 C0223g 里"交付文件只做提示行"升级为可点卡片。
+- 变化（跨 CodyncUI 与 DSHKit，均沿用 C0218 图片的"通用 ref + 回调"模式）：
+  - `CodyncUI`：新增 `TranscriptFileRef{id,name}`；`TranscriptItem.files`；`ChatTranscriptView.onOpenFile` 回调；
+    `ChatEntryRow` 在 user/agent/notice 行渲染文件 chip（图标+文件名+下载箭头，点按调用 `onOpenFile(id)`）；行
+    revision 计入文件 id。
+  - `DSHKit`：新增 `DSHFileRef{path,name}`；`DSHMessage.files`/`DSHTranscriptItem.files`；`deliverables/presented`
+    投影为一条带 `files` 的 notice 行（标题「交付文件」）。
+  - `DSHConversationView`：把行内 files 映射成 `TranscriptFileRef`，`onOpenFile` 走 `gateway.downloadFile(path:)`
+    下载后用现有 `DSHFilePreviewSheet` 预览（图片/文本/字节）。
+- 「未确认」：正文本地路径点击 → `file-resolve` 仍未做（需在 Markdown 里识别路径）。
+- 边界：不改 bot 页、底部输入框设计、串流。不改 Coe 现有调用（`onOpenFile` 默认 nil）。不加依赖/测试 target。
+- 验证：`xcodebuild build ... -configuration DevDebug`（`generic/platform=iOS`）**BUILD SUCCEEDED，0 error**，
+  构建号 **235**；已装到 iPhone 16 Pro（2.36.0 / 235）。不跑测试、不截图。
+- 关联：C0223g、C0218（图片通用层思路）、协议 `/tmp/codync-audit/c0223-protocol.md` #23/#15。

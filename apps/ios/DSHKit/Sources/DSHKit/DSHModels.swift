@@ -166,6 +166,13 @@ public struct DSHPermissionOption: Identifiable, Hashable, Sendable {
     public let detail: String?
 }
 
+/// A workspace file a message delivered (`deliverables/presented`); downloading is done on demand.
+public struct DSHFileRef: Identifiable, Hashable, Sendable {
+    public var id: String { path }
+    public let path: String
+    public let name: String
+}
+
 /// One entry of a `file-list` reply (a workspace file or directory).
 public struct DSHFileEntry: Identifiable, Hashable, Sendable {
     public var id: String { path }
@@ -369,6 +376,8 @@ public struct DSHMessage: Identifiable, Hashable, Sendable {
     /// Pictures this message carries. A message may hold pictures and no text at all, and it is still
     /// a row: the bytes are fetched separately, so the references are all that live here.
     public var images: [DSHImageRef]
+    /// Files this message delivered; they are downloaded on demand too.
+    public var files: [DSHFileRef]
     /// What a `.notice` row is: its style, and the controlled source name when it is a context line.
     public var notice: DSHNotice?
     /// The turn this message belongs to.
@@ -380,7 +389,7 @@ public struct DSHMessage: Identifiable, Hashable, Sendable {
 
     public init(id: String, role: Role, text: String, streaming: Bool = false,
                 reasoning: String = "", tools: [DSHTool] = [], images: [DSHImageRef] = [],
-                notice: DSHNotice? = nil,
+                files: [DSHFileRef] = [], notice: DSHNotice? = nil,
                 turn: Int? = nil, durationSeconds: Int? = nil,
                 createdAt: Int64 = 0, seq: Int64 = 0, step: Int? = nil,
                 displayRowId: String? = nil, revision: Int64 = 0) {
@@ -395,6 +404,7 @@ public struct DSHMessage: Identifiable, Hashable, Sendable {
         self.reasoning = reasoning
         self.tools = tools
         self.images = images
+        self.files = files
         self.notice = notice
         self.turn = turn
         self.durationSeconds = durationSeconds
@@ -433,18 +443,21 @@ public struct DSHTranscriptItem: Identifiable, Sendable {
     public let summary: DSHSummary?
     /// Pictures this row carries. A row with pictures and no text is still shown.
     public let images: [DSHImageRef]
+    /// Files this row delivered, downloaded on demand.
+    public let files: [DSHFileRef]
     /// What a `.notice` row is: its style and, for a context line, its controlled source name.
     public let notice: DSHNotice?
     /// When the message was written (ms since epoch), for the page's time separators.
     public let createdAt: Int64
 
     public init(id: String, kind: Kind, text: String, summary: DSHSummary?, createdAt: Int64,
-                images: [DSHImageRef] = [], notice: DSHNotice? = nil) {
+                images: [DSHImageRef] = [], files: [DSHFileRef] = [], notice: DSHNotice? = nil) {
         self.id = id
         self.kind = kind
         self.text = text
         self.summary = summary
         self.images = images
+        self.files = files
         self.notice = notice
         self.createdAt = createdAt
     }
@@ -467,10 +480,11 @@ public enum DSHConversationAdapter {
         case .notice:
             return DSHTranscriptItem(id: message.id, kind: .notice, text: message.text,
                                      summary: nil, createdAt: message.createdAt,
-                                     images: message.images, notice: message.notice)
+                                     images: message.images, files: message.files, notice: message.notice)
         case .user:
             return DSHTranscriptItem(id: message.id, kind: .user, text: message.text,
-                                     summary: nil, createdAt: message.createdAt, images: message.images)
+                                     summary: nil, createdAt: message.createdAt, images: message.images,
+                                     files: message.files)
         case .assistant:
             let hasDetail = !message.reasoning.isEmpty || !message.tools.isEmpty
             let summary = hasDetail
@@ -478,7 +492,8 @@ public enum DSHConversationAdapter {
                              reasoning: message.reasoning, tools: message.tools)
                 : nil
             return DSHTranscriptItem(id: message.id, kind: .assistant, text: message.text,
-                                     summary: summary, createdAt: message.createdAt, images: message.images)
+                                     summary: summary, createdAt: message.createdAt, images: message.images,
+                                     files: message.files)
         }
     }
 

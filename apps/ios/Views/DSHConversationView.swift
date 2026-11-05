@@ -22,6 +22,7 @@ struct DSHConversationView: View {
     @State private var showSchedules = false
     @State private var showTeam = false
     @State private var showTurnOutline = false
+    @State private var filePreview: DSHFilePreview?
 
     var body: some View {
         ChatTranscriptView(items: items, following: $following,
@@ -34,7 +35,15 @@ struct DSHConversationView: View {
                            accessory: gateway.submissions.isEmpty ? nil : AnyView(sendingStatus),
                            sendingRevision: gateway.submissions.hashValue &+ gateway.queueHints.hashValue &+ (gateway.queueIsKnown ? 1 : 0),
                            imageReloadKey: gateway.phase == .ready ? "ready" : "waiting",
-                           loadImage: { id in await gateway.imageData(attachmentId: id) })
+                           loadImage: { id in await gateway.imageData(attachmentId: id) },
+                           onOpenFile: { path in
+                               Task {
+                                   if let data = await gateway.downloadFile(path: path) {
+                                       filePreview = DSHFilePreview(name: (path as NSString).lastPathComponent,
+                                                                    data: data, mediaType: nil)
+                                   }
+                               }
+                           })
         .background(Palette.background)
         // The input bar is an inset rather than a stacked row: the transcript runs under it and
         // comes up with the keyboard. It has no backing of its own — only the field's glass — so the
@@ -74,6 +83,7 @@ struct DSHConversationView: View {
         .sheet(isPresented: $showSchedules) { DSHScheduleSheet(gateway: gateway) }
         .sheet(isPresented: $showTeam) { DSHTeamSheet(gateway: gateway) }
         .sheet(isPresented: $showTurnOutline) { DSHTurnOutlineSheet(gateway: gateway) }
+        .sheet(item: $filePreview) { DSHFilePreviewSheet(preview: $0) }
         .alert("重命名", isPresented: $showingRename) {
             TextField("会话名", text: $renameText)
             Button("确定") { Task { _ = await gateway.renameSession(renameText) } }
@@ -145,8 +155,13 @@ struct DSHConversationView: View {
         DSHConversationAdapter.transcript(from: gateway.messages).compactMap { row in
             guard let entry = Self.entry(for: row) else { return nil }
             return TranscriptItem(entry: entry, displayRowId: row.displayRowId, scrollToWhenAdded: false,
-                                  images: Self.images(for: row))
+                                  images: Self.images(for: row), files: Self.files(for: row))
         }
+    }
+
+    /// One DSH row's delivered files as the transcript's refs.
+    private static func files(for row: DSHTranscriptItem) -> [TranscriptFileRef] {
+        row.files.map { TranscriptFileRef(id: $0.path, name: $0.name) }
     }
 
     /// One DSH row's pictures as the transcript's refs. The id is what the gateway caches a picture

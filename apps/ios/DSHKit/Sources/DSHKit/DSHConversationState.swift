@@ -320,13 +320,17 @@ struct DSHConversationState: Sendable {
         case "llm/retry-started":
             return nil
         case "deliverables/presented":
-            let names = event.payload["files"].array.compactMap { value -> String? in
+            let files = event.payload["files"].array.compactMap { value -> DSHFileRef? in
                 guard let path = value["path"].string, !path.isEmpty else { return nil }
                 let name = (path as NSString).lastPathComponent
-                return name.isEmpty ? path : name
+                return DSHFileRef(path: path, name: name.isEmpty ? path : name)
             }
-            guard !names.isEmpty else { return nil }
-            return noticeRow(event, text: "交付文件：" + names.joined(separator: "、"))
+            guard !files.isEmpty else { return nil }
+            return DSHMessage(id: scope.identity([.text("deliverable"), .seq(event.seq)]),
+                              role: .notice, text: "交付文件", files: files,
+                              notice: DSHNotice(style: .info, title: "交付文件"), turn: event.turn,
+                              createdAt: event.time, seq: event.seq, step: event.step,
+                              revision: event.revision)
         default:
             return nil
         }
