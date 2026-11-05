@@ -305,9 +305,49 @@ struct DSHConversationState: Sendable {
                               revision: event.revision)
         case "turn/end":
             return projectTermination(event)
+        case "compaction/start":
+            return noticeRow(event, text: "正在压缩上下文…")
+        case "compaction/summary":
+            return noticeRow(event, text: Self.compactionSummary(event.payload))
+        case "compaction/end":
+            // A successful compaction already showed its summary; only an error adds a line.
+            if let error = event.payload["error"].string, !error.isEmpty {
+                return noticeRow(event, text: "压缩出错：" + error)
+            }
+            return nil
+        case "llm/retry":
+            return noticeRow(event, text: Self.retryText(event.payload))
+        case "llm/retry-started":
+            return nil
         default:
             return nil
         }
+    }
+
+    /// One neutral line in the message flow (a notice row) for a status-only event, at its own seq.
+    private func noticeRow(_ event: DSHWireEvent, text: String) -> DSHMessage {
+        DSHMessage(id: scope.identity([.text("notice"), .seq(event.seq)]), role: .notice, text: text,
+                   notice: DSHNotice(style: .info, title: text), turn: event.turn,
+                   createdAt: event.time, seq: event.seq, step: event.step, revision: event.revision)
+    }
+
+    private static func compactionSummary(_ payload: DSHJSON) -> String {
+        let items = payload["shadowedItemCount"].integer
+        let tokens = payload["shadowedTokenCount"].integer
+        var text = "已压缩历史记录"
+        var details: [String] = []
+        if let items { details.append("\(items) 条") }
+        if let tokens { details.append("约 \(tokens) tokens") }
+        if !details.isEmpty { text += "（" + details.joined(separator: "，") + "）" }
+        return text
+    }
+
+    private static func retryText(_ payload: DSHJSON) -> String {
+        let retry = payload["retry"].integer
+        let maxRetries = payload["maxRetries"].integer
+        guard let retry else { return "正在重试模型请求" }
+        let of = maxRetries.map { "/\($0)" } ?? ""
+        return "正在重试模型请求（第 \(retry)\(of) 次）"
     }
 
     /// A `user/message` is only the reader's own when the wire says so. Anything with another explicit

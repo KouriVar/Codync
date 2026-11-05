@@ -3727,3 +3727,21 @@
 - 验证：`xcodebuild build ... -configuration DevDebug`（`generic/platform=iOS`）**BUILD SUCCEEDED，0 error**，
   构建号 **230**；已装到 iPhone 16 Pro（2.36.0 / 230）。不跑测试、不截图。
 - 关联：C0223e1/e2、协议见 `/tmp/codync-audit/c0223-protocol.md` #21/#22。
+
+### C0223e3 · 2026-11-05 · chat 页压缩事件与重试提示
+
+- 说明：C0223 第十组。把压缩/重试这类"过程"事件投影成消息流里的中性提示行。
+- 变化（只动 `DSHConversationState` 的投影；不碰布局/输入框/箭头/状态行/串流）：
+  - `compact/*`：`compaction/start` → 「正在压缩上下文…」；`compaction/summary` → 「已压缩历史记录（N 条，
+    约 T tokens）」（`shadowedItemCount`/`shadowedTokenCount`）；`compaction/end` 仅在有 `error` 时显示
+    「压缩出错：…」。
+  - `llm/retry` → 「正在重试模型请求（第 N/M 次）」（`retry`/`maxRetries`）；`llm/retry-started` 不显示。
+  - 实现：`project()` 新增这些 type 的 `notice` 行（复用现有 NoticeRow 中性样式），按各自 seq 定位、随消息流滚动。
+- 「未确认」/偏离：任务希望"重试"显示在**状态行**；但状态行属 C0212 已定实现（不改状态行），所以本轮把重试也做成
+  消息流中性提示行。要改成状态行显示需单独动 C0212 的 reducer，届时再定。重复重试会按 seq 各显示一行。
+- `tool/result` 的图片：协议第 28 节确认**网关实时不输出 images** → C0223g 的"工具结果图"标「未确认/不做」。
+- 待后续：C0223d3（步骤/轨迹、轮次导航）、C0223g（文件交付卡/本地路径/长按复制；工具结果图不可做）。
+- 边界：不改 bot 页、底部输入框设计、串流。不加依赖/测试 target。
+- 验证：`xcodebuild build ... -configuration DevDebug`（`generic/platform=iOS`）**BUILD SUCCEEDED，0 error**，
+  构建号 **231**；已装到 iPhone 16 Pro（2.36.0 / 231）。不跑测试、不截图。
+- 关联：C0223e1/e2、协议见 `/tmp/codync-audit/c0223-protocol.md` #26/#27/#28。
