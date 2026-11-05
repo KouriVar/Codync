@@ -308,9 +308,15 @@ extension ThreadView {
             &* 31 &+ Int(truncatingIfNeeded: entry.updatedAt)
     }
 
-    /// The working row changes as steps come in.
+    /// The working row's one line: the bot's name and the step under way.
+    private var workingTitle: String {
+        guard let bot else { return WorkingPhrase.processing }
+        return WorkingPhrase.title(for: Entry.workingSteps(model.chat(botId)), name: bot.name)
+    }
+
+    /// The working row changes as steps come in, and when the line's own text changes.
     private var workingRevision: Int {
-        Int(truncatingIfNeeded: bot?.startedAt ?? 0) &+ Entry.workingSteps(model.chat(botId)).count
+        Int(truncatingIfNeeded: bot?.startedAt ?? 0) &+ workingTitle.hashValue
     }
 
     /// iPhone's messages: all this device has, earlier ones from the computer as the reader
@@ -344,13 +350,13 @@ extension ThreadView {
         // Offline, "working" is only what the computer last said; don't show it as live.
         if let bot, working {
             rows.append(ConversationRow("working", revision: workingRevision) {
-                // One line, no steps and nothing to open: what kind of work is under way, swept.
-                ConversationStatusLine(
-                    bot: bot,
-                    title: WorkingPhrase.title(for: Entry.workingSteps(model.chat(botId)))
-                )
-                .padding(.top, 12)
-                .transition(.opacity)
+                // One line, no steps and nothing to open: the bot's name and what kind of work is
+                // under way, swept. 12 above it; 24 below it to the composer's field, which the
+                // list's 8pt section inset and the composer's own 6pt top leave 10 here.
+                ConversationStatusLine(bot: bot, title: workingTitle)
+                    .padding(.top, 12)
+                    .padding(.bottom, 10)
+                    .transition(.opacity)
             })
         }
         // Pull to refresh reconnects, like Reconnect in the computer menu, until the link is back.

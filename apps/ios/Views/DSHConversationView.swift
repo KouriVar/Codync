@@ -19,13 +19,13 @@ struct DSHConversationView: View {
         }
         .background(Palette.background)
         // The input bar is an inset rather than a stacked row: the transcript runs under it and
-        // comes up with the keyboard.
+        // comes up with the keyboard. It has no backing of its own — only the field's glass — so the
+        // messages stay visible behind it, exactly as on Coe's page.
         .safeAreaInset(edge: .bottom, spacing: 0) {
             ConversationComposer(text: $draft, placeholder: "给 DSH 发一条消息",
                                  canSend: canSend, bottomPadding: 12) {
                 send()
             }
-            .background(Palette.background)
         }
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
@@ -101,13 +101,19 @@ struct DSHConversationView: View {
         return sections.joined(separator: "\n\n")
     }
 
+    /// A DSH conversation has no bot of its own, so the line names the model: "DeepSeek 思考中".
     private static func workingTitle(for activity: DSHActivityKind?) -> String {
+        WorkingPhrase.line(name: "DeepSeek", phrase: phrase(for: activity))
+    }
+
+    private static func phrase(for activity: DSHActivityKind?) -> String {
         switch activity {
         case .thinking: return WorkingPhrase.thinking
+        case .typing: return WorkingPhrase.typing
         case .executing: return WorkingPhrase.executing
         case .reading: return WorkingPhrase.reading
         case .editing: return WorkingPhrase.editing
-        case .processing, nil: return WorkingPhrase.generic
+        case .processing, nil: return WorkingPhrase.processing
         }
     }
 

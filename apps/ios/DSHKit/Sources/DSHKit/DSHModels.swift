@@ -217,6 +217,8 @@ public enum DSHSystemMessageFilter {
 /// The model's own words are never read to guess, and a name outside the whitelist is `processing`.
 public enum DSHActivityKind: String, Sendable, Equatable, CaseIterable {
     case thinking
+    /// The model is writing its answer (`text-delta`).
+    case typing
     case executing
     case reading
     case editing
@@ -542,7 +544,7 @@ public struct DSHActivityState: Sendable, Equatable {
             if pending.isEmpty, !degraded {
                 switch frame.chunkType {
                 case "reasoning-delta": kind = .thinking
-                case "text-delta": kind = .processing
+                case "text-delta": kind = .typing
                 default: break
                 }
             }
@@ -629,7 +631,7 @@ public struct DSHActivityState: Sendable, Equatable {
             step = attempt.step ?? step
             if pending.isEmpty {
                 switch attempt.lastDeltaType {
-                case "text-delta": kind = .processing
+                case "text-delta": kind = .typing
                 default: kind = .thinking
                 }
             }

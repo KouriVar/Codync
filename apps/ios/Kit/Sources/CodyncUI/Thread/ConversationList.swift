@@ -405,7 +405,8 @@ struct JumpToLatest: View {
             if visible {
                 jumpButton
                     .help(L10n.tr("Jump to latest"))
-                    .padding(.bottom, 10)
+                    // 36 from the composer's field: the composer adds 6 of its own above it.
+                    .padding(.bottom, 30)
                     .transition(.scale(scale: 0.8).combined(with: .opacity))
             }
         }

@@ -67,7 +67,7 @@ public struct ChatTranscriptView: View {
     let onOpenSummary: (TranscriptSummary) -> Void
 
     public init(items: [TranscriptItem], following: Binding<Bool>, working: Bool = false,
-                workingTitle: String = WorkingPhrase.generic,
+                workingTitle: String = WorkingPhrase.processing,
                 onOpenSummary: @escaping (TranscriptSummary) -> Void) {
         self.items = items
         _following = following
@@ -107,6 +107,10 @@ public struct ChatTranscriptView: View {
                     // A DSH gateway has no bot: the source's own face, dot and all.
                     SourceAvatar(.dsh, size: 24)
                 }
+                // The same 12 above and 24 below as Coe's page: the list's 8pt section inset and the
+                // composer's 6pt top leave 10 of the 24 here.
+                .padding(.top, 12)
+                .padding(.bottom, 10)
                 .transition(.opacity)
             })
         }

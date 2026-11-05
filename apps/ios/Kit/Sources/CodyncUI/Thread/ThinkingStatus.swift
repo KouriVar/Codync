@@ -114,7 +114,7 @@ private struct StatusText: View {
 struct ShimmeringText: View {
     let text: String
     let startedAt: Date
-    /// 17pt for the working line; the status line asks for footnote.
+    /// 17pt for the working line; the status line asks for 16pt regular.
     var font = Font.system(size: 17)
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 

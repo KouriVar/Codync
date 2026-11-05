@@ -2903,3 +2903,61 @@
   装到 iPhone 16 Pro（`com.suiyikou.codync.uipreview` 2.36.0 / 200）成功。按要求**不自测**。
 - 关联：C0210（状态行）、C0211（头像与来源点）、设计 `streaming-step1.md`（Q1=A）、
   备份 tag `backup/before-dsh-activity-c0212`（`b5e25c39`）。
+
+### C0213 · 2026-11-05 · 会话页状态行尺寸与文案、DSH 页底部透明、回到底部按钮位置
+
+- 原因：C0210/C0212 之后状态行只有一句短语（「在想 / 在处理」），没有名字，尺寸也是临时值（footnote 13pt、
+  左右 16、上下 6）；DSH 页输入框后面还垫了一层不透明底色，消息滑不过去；回到底部的 ↓ 按钮离输入框只有 10。
+  穗要求两个会话页统一成「名字 + 状态」的 16pt 一行，并给出具体尺寸。
+- 行为（两个会话页一致，pt 为一倍图）：
+  | 项 | 值 |
+  |---|---|
+  | 头像 | 24×24（来源点照旧：DSH 右下 6pt，Coe bot 无点） |
+  | 头像左边缘到屏幕左边框 | 24（列表 cell 的 16 + 状态行自身 8） |
+  | 状态行顶部到上一条消息气泡底部 | 12 |
+  | 状态行底部到输入框（玻璃框）顶部 | 24（行下 10 + 列表 section 下 8 + 输入框自身顶部 6） |
+  | 头像与标题文字之间 | 10 |
+  | 标题 | 16pt 常规字重，扫光保留（1.6s 扫 + 0.3s 停不变） |
+  | 回到底部按钮底边到输入框顶部 | 36（按钮下 30 + 输入框顶部 6） |
+- 文案改成「名字 + 状态」：
+  | 短语 | Coe 来源 | DSH 来源 |
+  |---|---|---|
+  | 思考中 | `thought`；`tool` 且 `toolKind=think` | turn/step 开始、attempt start、reasoning-delta |
+  | 正在输入中 | 非 final 的 `agent`（模型正在写正文） | `text-delta` |
+  | 处理会话中 | `plan`、`tool` 的 search/fetch/其他/未知 | 认不出的工具、assistant/message、attempt end 等 |
+  | 正在跑命令（**建议，待穗确认**） | `toolKind=execute` | bash / pwsh / shell / exec / exec_command / terminal |
+  | 正在看文件（**建议，待穗确认**） | `toolKind=read` | read / read_file / readfile |
+  | 正在改代码（**建议，待穗确认**） | `toolKind=edit` / `move` / `delete` | write / edit / apply_patch 等 |
+  - Coe 用该 bot 的名字（「<bot 名> 思考中」）；DSH 没有 bot 名字，固定用「DeepSeek」（「DeepSeek 正在输入中」）。
+  - Coe 对不上的状态一律「处理会话中」。
+- 变化：
+  - `Kit/Sources/CodyncUI/Thread/ConversationStatusLine.swift`：`HStack` 间距 8→10；标题字体 `.footnote`→
+    `.system(size: 16, weight: .regular)`；左右内边距 16→8、去掉上下 6（改由两个页面按 12 / 10 给）。
+    `WorkingPhrase` 改成「名字 + 短语」：新增 `typing`（正在输入中）与 `processing`（处理会话中，替换原 `generic`）、
+    `line(name:phrase:)`、`title(for:name:)`；原 `title(for:)` 拆出 `phrase(for:)`；Coe 的 `agent` 步骤映射到「正在输入中」。
+  - `Kit/Sources/CodyncUI/Thread/ThreadView.swift`：状态行标题改成 `WorkingPhrase.title(for:name:)`；
+    行加 `.padding(.top, 12)` / `.padding(.bottom, 10)`；working 行的 revision 改为「启动时间 + 标题哈希」，
+    标题一变就重绘。
+  - `Kit/Sources/CodyncUI/Thread/ChatTranscript.swift`：working 行同样加 12 / 10；`workingTitle` 默认值
+    `WorkingPhrase.generic` → `WorkingPhrase.processing`。
+  - `Kit/Sources/CodyncUI/Thread/ConversationList.swift`：`JumpToLatest` 底边距 10 → 30（到玻璃框 36）。
+  - `Kit/Sources/CodyncUI/Thread/ThinkingStatus.swift`：`ShimmeringText.font` 的注释同步为 16pt 常规（只改注释）。
+  - `apps/ios/Views/DSHConversationView.swift`：状态行标题 = 「DeepSeek + 短语」；去掉输入框那层
+    `.background(Palette.background)`，底部与 Coe 一样只留输入框自己的玻璃效果。
+  - `apps/ios/DSHKit/Sources/DSHKit/DSHModels.swift`：`DSHActivityKind` 增加 `typing`；`text-delta`
+    （以及快照恢复时的最后一段正文）映射到它。
+- 未做 / 需要你注意：
+  - 三条建议短语（正在跑命令 / 正在看文件 / 正在改代码）已按建议写，穗确认前随时可改字符串。
+  - 「输入框顶部」按**可见的玻璃输入框上边缘**算：输入框组件自己还有 6pt 顶部内边距，所以布局上的数字是
+    状态行下 10、按钮下 30。若你要按输入框外框（含那 6pt）算，应改成 16 / 36。
+  - Coe 的「正在输入中」来自非 final 的 `agent` 步骤；若某一轮 host 不产生 `agent` 步骤，那一轮只会看到
+    「思考中」或「处理会话中」。
+  - 按你的要求没跑测试、没截图、没用 CDP；只编译和安装。
+- 文件：`apps/ios/Kit/Sources/CodyncUI/Thread/ConversationStatusLine.swift`、
+  `apps/ios/Kit/Sources/CodyncUI/Thread/ThreadView.swift`、`apps/ios/Kit/Sources/CodyncUI/Thread/ChatTranscript.swift`、
+  `apps/ios/Kit/Sources/CodyncUI/Thread/ConversationList.swift`、`apps/ios/Kit/Sources/CodyncUI/Thread/ThinkingStatus.swift`、
+  `apps/ios/Views/DSHConversationView.swift`、`apps/ios/DSHKit/Sources/DSHKit/DSHModels.swift`、`CHANGELOG.md`。
+- 验证：`xcodebuild build -project apps/Codync.xcodeproj -scheme 'iOS Dev' -configuration DevDebug`（真机 destination、
+  ui-preview 覆盖、构建号 201）**编译通过，0 error**，0 warning；`xcrun devicectl device install app` 装到
+  iPhone 16 Pro（`com.suiyikou.codync.uipreview` 2.36.0 / 201）成功。按要求**不自测**。
+- 关联：C0210（状态行）、C0212（DSH 当前步骤）、备份 tag `backup/before-status-line-c0213`（`95fb3af9`）。
