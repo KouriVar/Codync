@@ -1,0 +1,50 @@
+/* The bots a chat has worked with, over its message box (C0095): one row, scrolled sideways, flush
+   with the box's column and left edge. */
+.bot-chip-bar {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 6px;
+  max-width: var(--column);
+  margin: 0 auto;
+  padding: 2px 14px 2px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.bot-chip-bar::-webkit-scrollbar {
+  display: none;
+}
+.bot-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  max-width: 200px;
+  padding: 5px 9px;
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+}
+.bot-chip.chosen {
+  background: color-mix(in srgb, var(--text) 12%, var(--surface));
+}
+/* A dot per state: grey while it works, a ring once it answered, amber when it waits on the user,
+   red when it failed. */
+.bot-chip-status {
+  width: 6px;
+  height: 6px;
+  flex: none;
+  border-radius: 50%;
+  box-sizing: border-box;
+}
+.bot-chip-status.working {
+  background: var(--secondary);
+}
+.bot-chip-status.replied {
+  border: 1px solid var(--tertiary);
+}
+.bot-chip-status.needs-decision {
+  background: var(--attention);
+}
+.bot-chip-status.failed {
+  background: var(--danger);
+}

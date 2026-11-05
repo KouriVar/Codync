@@ -1,5 +1,5 @@
-/* The delegation card (C0094): an agent bubble's grey and the same corner scale, no wider than an
-   agent bubble, in the message flow where the old one-line row was. */
+/* The delegation card (C0094): an agent bubble's grey and corner, no wider than an agent bubble,
+   in the message flow where the old one-line row was. */
 .delegate-card {
   display: flex;
   flex-direction: column;
@@ -8,7 +8,7 @@
   max-width: var(--agent-bubble-max);
   margin: 6px 0;
   padding: 12px;
-  border-radius: var(--radius-m);
+  border-radius: var(--radius-l);
   background: var(--chat-agent);
   color: var(--text);
   text-align: left;

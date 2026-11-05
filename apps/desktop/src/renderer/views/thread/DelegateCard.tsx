@@ -1,28 +1,13 @@
 import { needsInput } from '@shared/models'
 import { HStack } from '../../components/Stack'
-import { Text, type Tone } from '../../components/Text'
+import { Text } from '../../components/Text'
 import { messagePreviewLines } from '../../lib/message-preview'
 import { useTr } from '../../lib/use-language'
 import { useStore } from '../../store/context'
 import { groupSummary, verbOf, type BotExchange } from './bot-exchange'
 import { BotPair } from './BotPair'
-import { delegateStatus, peerLatestMessage, type DelegateStatus } from './delegate-card'
+import { DELEGATE_STATUS_LABELS, DELEGATE_STATUS_TONES, delegateStatus, peerLatestMessage } from './delegate-card'
 import './delegate-card.css'
-
-/** The card's three states, plus the failure the transcript already reports (C0094). */
-const LABELS: Record<DelegateStatus, string> = {
-  working: 'Working on it',
-  replied: 'Replied',
-  'needs-decision': 'Needs your decision',
-  failed: "Didn't complete",
-}
-
-const TONES: Record<DelegateStatus, Tone> = {
-  working: 'secondary',
-  replied: 'tertiary',
-  'needs-decision': 'attention',
-  failed: 'danger',
-}
 
 /**
  * One card in place of a run of bot-to-bot messages with one peer: the pair (the conversation
@@ -43,13 +28,13 @@ export function DelegateCard({ exchanges, open }: { exchanges: BotExchange[]; op
       className="press delegate-card"
       onClick={() => open(peerId)}
       title="Open conversation"
-      aria-label={`${lead} ${name}, ${tr(LABELS[state])}`}
+      aria-label={`${lead} ${name}, ${tr(DELEGATE_STATUS_LABELS[state])}`}
     >
       <HStack justify="space-between" gap={8}>
         <HStack grow>
           <BotPair botId={exchanges[0]!.chat} peer={{ id: peerId, name: peerName }} />
         </HStack>
-        <Text size="caption" weight="medium" tone={TONES[state]} className="delegate-card-status">{tr(LABELS[state])}</Text>
+        <Text size="caption" weight="medium" tone={DELEGATE_STATUS_TONES[state]} className="delegate-card-status">{tr(DELEGATE_STATUS_LABELS[state])}</Text>
       </HStack>
       {preview ? <Text as="div" size="footnote" tone="secondary" lines={2} className="delegate-card-preview">{preview}</Text> : null}
     </button>

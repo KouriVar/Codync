@@ -968,3 +968,21 @@ iOS 定制分支：`ui/ios-customization`；当前 Mac 工作分支：`ui/macos-
   - 失败/取消不在三种状态之内，作为已有失败信号保留为红色「未完成」；如果设计只要三种，可把这一支并到「已回复」或另议。
   - 新增状态文案只有简体与繁体中文，其他语言回退英文；未加单元测试。
 - **关联** 编号接 C0093。
+
+### C0095 · 2026-11-05 · Mac 主会话输入框上方加派活 bot 标签栏
+
+- **原因** C0094 的派活卡片只出现在消息流里，派活之后没有一个随手能再找该 bot 的入口；另外卡片的圆角是 12，和会话气泡的 16 不一致。
+- **变化** 卡片圆角由 `--radius-m`（12）改为 `--radius-l`（16），与会话气泡同一刻度，其余样式不动。
+  主会话输入框正上方新增一排 bot 标签（chip）：只取本会话里出现过的派活对象——派过活的、或在这条会话里回过话的 bot（数据来自会话里已有的 bot 消息 notice，按最近活跃排序）；每个标签是头像 + 名字 + 状态点，状态判断沿用派活卡片（在做 / 已回复 / 要你拍板 / 未完成），一排横排、放不下横向滚动、不换行；一个都没有时整排不显示；群聊不显示。输入框、左边列表、标签栏和手机端未动。
+  点标签会在输入框最前面插入「@名字」小标签并把光标放到它后面；再点同一个标签、或在光标紧贴标签时按退格，就删掉；一次只能 @ 一个，点另一个即替换。
+  发送仍走原来的 `store.send(text, botId, …)`，消息照常只发给当前会话的 bot；因为没有承载 @ 的协议字段，`@名字` 以纯文本前缀拼在消息正文开头，由主 bot 自己理解并转给该 bot。
+  状态文案与色板的定义从 `DelegateCard.tsx` 提到 `delegate-card.ts` 共用，卡片与标签栏取同一份。
+- **文件** 新增 `apps/desktop/src/renderer/views/thread/{BotChipBar.tsx,bot-chips.ts,bot-chips.css}`；
+  修改 `apps/desktop/src/renderer/views/thread/{Composer.tsx,ThreadView.tsx,composer.css,DelegateCard.tsx,delegate-card.ts,delegate-card.css}`。
+- **验证** `apps/desktop` 下 `npm run typecheck` 与 `npm run build`（electron-vite build）通过。按用户要求只编译、不做功能自测：未启动应用、未点标签、未实际发送带 @ 的消息。本地提交，未 push。
+- **限制与待办**
+  - 桌面端 `send` 接口（host `client.send(botId, text, nonce, ids, pasted, replyTo, call)`）只带文本，没有 mention/委派字段，所以 @ 只能是文本前缀；主 bot 是否真的转给该 bot 取决于它自己的判断。要稳定，需要在 Host/协议里新增结构化字段（例如 `mentions` 或 bot 消息的 target 提示），客户端再据此发送。
+  - 「要你拍板」仍沿用 C0094 的近似判断（对方 bot 全局 `needsInput`），不是会话级判据。
+  - 标签栏数据取自当前已加载的会话记录；还没翻到的更早历史里的派活对象要等加载后才会出现。
+  - 未加单元测试。
+- **关联** C0094。

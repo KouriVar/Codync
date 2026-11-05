@@ -17,6 +17,7 @@ import { useStore } from '../../store/context'
 import { MAX_FILE_SIZE, type OutgoingFile } from '../../store/bot-store'
 import { pluginsFor } from '../marketplace/plugins'
 import { pastedFiles, readPicked } from './composer-files'
+import type { Mention } from './bot-chips'
 import { composerEnter } from './composer-keyboard'
 import { CommandMenu, useCommandMenu } from './CommandMenu'
 import { ComposerAttachment } from './ComposerAttachment'
@@ -32,9 +33,10 @@ type Trailing = 'interrupt' | 'stop' | 'call' | 'send'
  * The message box under a chat: send, or stop while the bot (or the group) is working there. A leading `/` lists
  * the commands (a group's are its bots'); in a group, typing `@` suggests its bots. While `reply` is set, the
  * message it quotes sits at the top of the box and goes out with the next send. Under an artifact, `about` is the
- * artifact: the box keeps a draft of its own, and every message replies to the artifact's card.
+ * artifact: the box keeps a draft of its own, and every message replies to the artifact's card. While `mention` is
+ * set, its tag sits at the front of the box and `@name` leads the sent message.
  */
-export function Composer({ botId, reply = null, about = null, cancelReply, onCall, onInterrupt }: {
+export function Composer({ botId, reply = null, about = null, cancelReply, onCall, onInterrupt, mention = null, cancelMention }: {
   botId: string
   reply?: Entry | null
   about?: Artifact | null
@@ -43,15 +45,20 @@ export function Composer({ botId, reply = null, about = null, cancelReply, onCal
   onCall?: (() => void) | null
   /** Interrupts the bot while it is speaking in a voice call. */
   onInterrupt?: (() => void) | null
+  /** The bot this message addresses; the chat's own bot passes it on. */
+  mention?: Mention | null
+  cancelMention?: () => void
 }) {
   const store = useStore()
   // Remount transient editor state (selection, attachments, IME) when its destination changes.
   return <DestinationComposer key={JSON.stringify([store.contextId, store.computer.id, botId, about?.id])}
-    botId={botId} reply={reply} about={about} cancelReply={cancelReply} onCall={onCall} onInterrupt={onInterrupt} />
+    botId={botId} reply={reply} about={about} cancelReply={cancelReply} onCall={onCall} onInterrupt={onInterrupt}
+    mention={mention} cancelMention={cancelMention} />
 }
 
-function DestinationComposer({ botId, reply, about, cancelReply, onCall, onInterrupt }: {
+function DestinationComposer({ botId, reply, about, cancelReply, onCall, onInterrupt, mention, cancelMention }: {
   botId: string; reply: Entry | null; about: Artifact | null; cancelReply?: () => void; onCall?: (() => void) | null; onInterrupt?: (() => void) | null
+  mention: Mention | null; cancelMention?: () => void
 }) {
   const store = useStore()
   const tr = useTr()
@@ -92,6 +99,15 @@ function DestinationComposer({ botId, reply, about, cancelReply, onCall, onInter
     if (reply) field.current?.focus()
   }, [reply])
 
+  // Addressing a bot puts the caret right after its tag.
+  useEffect(() => {
+    if (!mention) return
+    const el = field.current
+    if (!el) return
+    el.focus()
+    if (!el.value) el.setSelectionRange(0, 0)
+  }, [mention])
+
   // Measure a separate, wrapping copy: collapsing the live textarea to zero breaks its
   // height transition, caret scroll and IME composition. Observe font/width changes too.
   useLayoutEffect(() => {
@@ -122,7 +138,7 @@ function DestinationComposer({ botId, reply, about, cancelReply, onCall, onInter
   const suggestions: Bot[] =
     mentionQuery !== null ? members.filter((m) => !mentionQuery || m.name.toLowerCase().includes(mentionQuery.toLowerCase())) : []
 
-  const mention = (member: Bot) => {
+  const pickMention = (member: Bot) => {
     const at = draft.lastIndexOf('@')
     if (at < 0) return
     setDraft(`${draft.slice(0, at)}@${member.name} `)
@@ -172,8 +188,11 @@ function DestinationComposer({ botId, reply, about, cancelReply, onCall, onInter
     // Words still on their way would land in the emptied box (and the shortcut's tap would send them again).
     dictation.cancel()
     if (command) return run(command)
-    store.send(draft, botId, { files, pasted: pasted.current, replyTo: reply ? quoteOf(reply) : about && artifactQuote(about) })
+    // No field carries the address to the host, so it leads the text: this chat's bot passes it on.
+    const text = mention ? `@${mention.name} ${draft}` : draft
+    store.send(text, botId, { files, pasted: pasted.current, replyTo: reply ? quoteOf(reply) : about && artifactQuote(about) })
     cancelReply?.()
+    cancelMention?.()
     pasted.current = []
     setDraft('')
     setFiles([])
@@ -195,7 +214,7 @@ function DestinationComposer({ botId, reply, about, cancelReply, onCall, onInter
       <ComposerReveal open={suggestions.length > 0}>
         <div className="mentions">
           {suggestions.map((m) => (
-            <button key={m.id} className="press mention" onClick={() => mention(m)}>
+            <button key={m.id} className="press mention" onClick={() => pickMention(m)}>
               <BotAvatar bot={m} size={18} animated={false} />
               <Text size="subheadline" tone="text">{m.name}</Text>
             </button>
@@ -237,6 +256,11 @@ function DestinationComposer({ botId, reply, about, cancelReply, onCall, onInter
                 <Icon name="plus" size={13} weight="medium" color="var(--text)" />
               </button>
             ) : null}
+            {mention ? (
+              <span className="composer-mention" title={`@${mention.name}`}>
+                <Text size="footnote" weight="medium" truncate>{`@${mention.name}`}</Text>
+              </span>
+            ) : null}
             <div className="composer-field">
               <div ref={measure} className="composer-measure" aria-hidden="true">{draft + '\u200b'}</div>
               <textarea
@@ -256,6 +280,12 @@ function DestinationComposer({ botId, reply, about, cancelReply, onCall, onInter
                 }}
                 onKeyDown={(e) => {
                   if (menu.onKey(e, composing.current || e.nativeEvent.isComposing || e.keyCode === 229)) return
+                  // Backspace right after the addressed bot's tag takes the tag back.
+                  if (mention && e.key === 'Backspace' && e.currentTarget.selectionStart === 0 && e.currentTarget.selectionEnd === 0) {
+                    e.preventDefault()
+                    cancelMention?.()
+                    return
+                  }
                   if (e.key === 'Escape' && reply) {
                     e.preventDefault()
                     cancelReply?.()

@@ -1,3 +1,4 @@
+import type { Tone } from '../../components/Text'
 import { isOutgoing, type BotExchange } from './bot-exchange'
 
 /**
@@ -5,6 +6,22 @@ import { isOutgoing, type BotExchange } from './bot-exchange'
  * flags (C0094), not one of the three states the card was designed for.
  */
 export type DelegateStatus = 'working' | 'replied' | 'needs-decision' | 'failed'
+
+/** The labels the card and the chip bar show for a state, in English; `useTr` translates them. */
+export const DELEGATE_STATUS_LABELS: Record<DelegateStatus, string> = {
+  working: 'Working on it',
+  replied: 'Replied',
+  'needs-decision': 'Needs your decision',
+  failed: "Didn't complete",
+}
+
+/** How each state reads: grey while it works, dim once answered, amber when it waits on the user, red when it failed. */
+export const DELEGATE_STATUS_TONES: Record<DelegateStatus, Tone> = {
+  working: 'secondary',
+  replied: 'tertiary',
+  'needs-decision': 'attention',
+  failed: 'danger',
+}
 
 /** The peer has said something in this exchange: it replied to ours, or its message started it. */
 const answered = (x: BotExchange) => (isOutgoing(x) ? Boolean(x.message.reply) : true)

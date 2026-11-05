@@ -21,6 +21,8 @@ import { WorkingTransition } from './WorkingTransition'
 import { RoutineNotice } from './RoutineNotice'
 import { Composer } from './Composer'
 import { QueuedMessages } from './QueuedMessages'
+import { BotChipBar } from './BotChipBar'
+import type { Mention } from './bot-chips'
 import { fill } from '../../lib/fill.ts'
 import { outsideQueue } from './queued-messages'
 import { ChatSidePanel } from './ChatSidePanel'
@@ -52,6 +54,8 @@ export const ThreadView = memo(function ThreadView({ botId }: { botId: string })
   const [showTrace, setShowTrace] = useState(false)
   const [replyTo, setReplyTo] = useState<Entry | null>(null)
   const cancelReply = useCallback(() => setReplyTo(null), [])
+  /** The bot the message box addresses with a chip below the transcript. */
+  const [mention, setMention] = useState<Mention | null>(null)
   const [botChat, setBotChat] = useState<string | null>(null)
   /** The voice call whose conversation is open (its line's entry id). */
   const [callLine, setCallLine] = useState<string | null>(null)
@@ -196,9 +200,13 @@ export const ThreadView = memo(function ThreadView({ botId }: { botId: string })
             // The artifact over the chat has its own box (two would both take the voice shortcut).
             <>
               <QueuedMessages botId={botId} />
+              {/* A main chat's chips over its box; a group addresses its members with @ in the text. */}
+              {bot && !isGroup(bot) ? <BotChipBar botId={botId} mention={mention} pick={setMention} /> : null}
               <Composer
                 botId={botId}
                 reply={replyTo}
+                mention={mention}
+                cancelMention={() => setMention(null)}
                 cancelReply={cancelReply}
                 onCall={!calling && bot ? () => setCalling(true) : null}
                 onInterrupt={callSpeaking ? () => interruptCall.current?.() : null}
