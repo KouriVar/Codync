@@ -1,0 +1,23 @@
+@font-face {
+  font-family: 'Codync Remix';
+  src: url('../assets/remix/remixicon.ttf') format('truetype');
+  font-style: normal;
+  font-weight: 400;
+  font-display: block;
+}
+
+.remix-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  font-family: 'Codync Remix';
+  font-weight: 400;
+  font-style: normal;
+  font-synthesis: none;
+  line-height: 1;
+  letter-spacing: 0;
+  text-transform: none;
+  user-select: none;
+  -webkit-font-smoothing: antialiased;
+}

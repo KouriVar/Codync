@@ -6,6 +6,7 @@ import { defineConfig } from 'electron-vite'
 // Fresh macOS checkouts must include SF Symbols without a separate manual icons step.
 if (process.platform === 'darwin') {
   execFileSync('swift', [resolve('tools/export-symbols.swift')], { stdio: 'inherit' })
+  execFileSync('swift', [resolve('tools/export-remix-menu.swift')], { stdio: 'inherit' })
 }
 
 export default defineConfig({

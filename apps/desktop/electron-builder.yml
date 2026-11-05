@@ -55,6 +55,10 @@ mac:
   # The host ships inside the Mac app; Linux uses the installed codync-host (an AppImage's
   # mount path changes every launch, so a service can't point into it).
   extraResources:
+    - from: resources/remix-menu
+      to: remix-menu
+    - from: src/renderer/assets/remix/remixicon-LICENSE.txt
+      to: licenses/remixicon-LICENSE.txt
     - from: build/native/codync-host
       to: codync-host
     - from: build/native/codync-speech

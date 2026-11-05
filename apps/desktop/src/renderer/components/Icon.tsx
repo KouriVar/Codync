@@ -1,5 +1,7 @@
 import { useSyncExternalStore, type CSSProperties } from 'react'
 import { fallbackSvg } from './icon-fallbacks'
+import { remixIconProps } from './remix-icons'
+import './remix-icons.css'
 
 export type Weight = 'light' | 'regular' | 'medium' | 'semibold' | 'bold' | 'black'
 
@@ -52,9 +54,12 @@ interface Props {
   title?: string
 }
 
-/** An SF Symbol (`Image(systemName:)`) in the current text color. */
+/** Remix on macOS; original SF/Lucide fallback for unknown names and other platforms. */
 export function Icon({ name, size, weight = 'regular', color, style, className, scaled = true, title }: Props) {
   const m = useManifest()
+  const remix = window.codync?.platform === 'darwin'
+    ? remixIconProps({ name, size, color, style, className, scaled, title }) : null
+  if (remix) return <span {...remix} />
   const metrics = m?.[name]
   const unit = scaled ? `${size}px * var(--scale)` : `${size}px`
   if (metrics) {

@@ -80,6 +80,8 @@ function openChat() {
     show: false,
     backgroundColor: background(),
     titleBarStyle: isMac ? 'hidden' : 'default',
+    // Center the native 14pt controls in the renderer's 54px sidebar header.
+    ...(isMac ? { trafficLightPosition: { x: 14, y: 20 } } : {}),
     webPreferences: { preload: join(__dirname, '../preload/index.js'), sandbox: true, contextIsolation: true },
   })
   // CODYNC_SHOW_INACTIVE: development and UI checks open the window without taking focus.

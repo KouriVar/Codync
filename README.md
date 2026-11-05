@@ -17,7 +17,7 @@
 </div>
 
 > [!NOTE]
-> 本仓库是 Codync 的**个人 fork**：只重做 **iOS 端的界面与交互**，不改 host（Rust）与桌面端逻辑，也不改上游的协议与数据模型。上游项目见 [leepokai/Codync](https://github.com/leepokai/Codync)。
+> 本仓库是 Codync 的**个人 fork**：保留已完成的 **iOS 界面与交互定制**，并在独立的 `ui/macos-customization` 分支增加 Mac 界面定制；不改 Host（Rust）与连接认证协议。Mac 本地安装以可用的官方 2.34.2 为底包，包含窗口按钮对齐与 Remix 图标，详见 [Mac 定制开发与安装](docs/guides/macos-ui-preview.md)。上游项目见 [leepokai/Codync](https://github.com/leepokai/Codync)。
 
 Codync 的定位是把电脑上的编码智能体（Claude Code、Codex、Cursor、Gemini、OpenCode 等 40 多个）变成可以随时发消息的 **Bot**。这个 fork 保留全部能力，只解决一件事：**iPhone 上的观感与操作，做得更像原生 iOS。**
 

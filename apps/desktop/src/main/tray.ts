@@ -76,9 +76,14 @@ export class Tray {
     return image
   }
 
-  /** The symbol beside an action: SF Symbols on macOS, the renderer's drawing of it on Windows and Linux. */
+  /** Remix template images on macOS; retain fallbacks when a generated image is missing. */
   private symbol(name: TraySymbol) {
-    if (process.platform === 'darwin') return nativeImage.createMenuSymbol(name)
+    if (process.platform === 'darwin') {
+      const image = nativeImage.createFromPath(join(resources(), 'remix-menu', `${name}.png`))
+      if (image.isEmpty()) return nativeImage.createMenuSymbol(name)
+      image.setTemplateImage(true)
+      return image
+    }
     return this.image(this.summary?.symbols?.[name] ?? null)
   }
 

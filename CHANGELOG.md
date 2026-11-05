@@ -3,7 +3,7 @@
 本文件记录本 fork 的定制与修复；上游发布说明仍在原有文档中维护。
 每次修改必须同步更新本文件，格式见 [改动记录规则](docs/guides/change-recording.md)。
 
-当前工作分支：`ui/ios-customization`；目标仓库：`KouriVar/Codync`。
+iOS 定制分支：`ui/ios-customization`；当前 Mac 工作分支：`ui/macos-customization`；目标仓库：`KouriVar/Codync`。
 以下记录根据 2026-11-03 本次实际修改补记，创建记录时均尚未提交或推送。
 后续提交状态以 Git 历史为准，可用记录编号查询提交。
 
@@ -813,3 +813,90 @@
 - 验证：构建号 115 编译、签名、安装成功；截图确认箭头一致。
 - 限制/待办：分隔线右侧是否顶死、线宽是否变细：已调研（见下），未改。
 - 关联：C0084。
+
+### C0087 · 2026-11-03 · 建立独立 Mac 定制工作目录与开发约定
+
+- 原因：用户开始 Mac 桌面端定制，要求保留既有 iOS 成果、其他助手的工作现场，以及官方 2.34.2 Host 与 iPhone 本地配对。
+- 变化：从已提交的 iOS 定制版本 `9583dd51` 新建 `/Users/halfsignal/src/Codync-macos-ui` worktree 和 `ui/macos-customization` 分支；
+  保留基线中的 iOS 定制，不复制或改动 iOS 工作目录的未提交修改。明确本分支只改 Mac，禁止自行提交、推送、合并或发布。
+  新增 Mac 开发说明，确认主界面为 Electron + React + TypeScript，并记录已有独立沙盒的启动方式、专用数据目录与端口分配，
+  以及禁止复用官方 Host、凭据和手机配对的边界；显式清空开发密钥以避免启动脚本自动创建云端测试账户。
+- 文件：`AGENTS.md`、`docs/guides/macos-ui-preview.md`、`CHANGELOG.md`。
+- 验证：核对 fork 远端、基线与 worktree 分支；基线比远端 iOS 分支多 6 个本地提交，现有成果均包含。
+  在独立 Mac 目录安装桌面依赖；`npm run typecheck` 与 `npm run build` 通过；`npm test` 共 371 项，370 通过、1 失败。
+  失败项为 `all shipped catalogs have the same keys and preserve interpolation tokens`，测试读取 `apps/ios/Kit` 的共享语言文件，
+  基线已有翻译键不一致；本轮所有运行时代码与语言目录均无 diff，未为通过测试改动 iOS。
+  只读确认官方应用为 2.34.2 且应用/Host 正在运行，没有停止或替换它们。文档链接检查与 `git diff --check` 通过。
+- 限制/待办：本轮仅完成工作区与开发约定准备，尚未启动开发沙盒、构建独立开发 Host、打包/安装开发应用或进行界面验收，待具体需求与截图后执行。
+  本次构建有已有的未知 SF Symbol `arrow.down.doc.on.clipboard` 和静态/动态导入混用警告，不影响构建退出成功；全套测试未全绿。
+  未打包 Electron 的系统权限/通知身份仍可能与其他 Electron 开发实例共享，数据与会话按沙盒隔离；需要完整应用身份时另行核对本机签名并打开发包。
+  未验证新的 iPhone 配对，不更改原配对；没有提交、推送、合并、发布或升级任何官方服务。
+- 关联：C0002、C0003、C0006、C0086。
+
+### C0088 · 2026-11-03 · Mac 红绿灯与顶部操作按钮对齐
+
+- 原因：用户指出原生红绿灯靠左上，和自绘顶部栏的电脑、搜索、新建按钮不在同一水平线，要求修正布局。
+- 变化：Mac 聊天主窗口由默认红绿灯位置改为 `trafficLightPosition: { x: 14, y: 20 }`；
+  按原生按钮预期 14 点高度，将中心放在 27 点，对齐已有 54px 顶部栏的垂直中心，左侧留白设为 14 点。
+  保留原生关闭、最小化与全屏能力，仅在 `isMac` 条件下应用；不修改其他客户端、Host 或连接认证协议。
+  按用户最新要求，后续普通界面调整改好后交由用户测试，不继续耗时的自动界面检查。
+- 文件：`apps/desktop/src/main/index.ts`、`docs/guides/macos-ui-preview.md`、`CHANGELOG.md`。
+- 验证：`npm run typecheck`、`npm run build` 通过；环境隔离、沙盒与窗口关闭行为的 10 项现有回归检查全部通过。
+  完成正确性、完整性、重构三项只读复核，未发现确认的代码缺陷；没有为两行窗口配置增加抽象或镜像测试。
+  独立 Electron 预览复用生产代码窗口选项和现有 demo 内存 Host，实际返回按钮坐标 `{x:14,y:20}`；
+  已看到普通窗口顶部布局并成功进入原生全屏。开发依赖 Electron 44.5.1 从官方 GitHub 下载并核对官方 SHA256。
+- 限制/待办：本机缺少 Rust 工具链，开发 Host 构建尝试失败，未修改工具链或使用官方 Host 替代；预览为演示数据，不能作为真实连接验收。
+  截图时 macOS 的“窗口共享”胶囊替代显示红绿灯，尚无完整三色按钮的最终截图。
+  用户要求自行测试后停止继续检查，最小宽度、紧凑侧栏、退出全屏后的最终对齐与原生按钮逐项操作未完成验收。
+  本轮未重跑全套测试，C0087 已记录的语言目录基线失败仍未处理。预览 Electron 窗口及本地 8930 HTTP 服务留作用户查看，数据目录独立。
+  没有打包安装、提交、推送、合并或发布，官方 2.34.2 应用、Host、原有 iPhone 配对不变。
+- 关联：C0087。
+
+### C0089 · 2026-11-03 · 基于官方 2.34.2 打包并覆盖安装 Mac 定制版
+
+- 原因：用户明确改为要求“直接打包，覆盖原版”，并要求后续自行验收，避免继续耗时的自动界面测试。
+- 变化：新增本机打包脚本，以当前未修改的官方 2.34.2 为底包，读取本分支 C0088 的窗口位置配置，
+  仅修改官方 ASAR 主进程的红绿灯位置以及禁用官方应用更新，避免更新重新覆盖定制并升级 Host。
+  其余 ASAR 文件核对保持一致；重算 ASAR 完整性头并使用本机有效开发证书重新签名 Electron 部分，
+  保留官方 2.34.2 Host、语音、屏幕辅助程序与账号配置原文件，不编译或安装工作树 2.36.0 的 Host。
+  生成 DMG 后完整替换 `/Applications/Codync.app`，沿用官方身份和现有本地数据；此项按用户新指令覆盖此前并行安装约定。
+  安装前备份原版压缩包和本地数据，保留原应用目录便于回退。安装后停止旧演示窗口与本地演示 HTTP 服务。
+- 文件：`apps/desktop/tools/package-mac-local.cjs`、`AGENTS.md`、`docs/guides/macos-ui-preview.md`、`CHANGELOG.md`；
+  已有源码变化仍见 C0088。安装包为被忽略的 `build/releases/Codync-2.34.2-local-C0089.dmg`，不提交二进制或用户数据。
+- 验证：签名证书代码签名用途及 OCSP 验证通过，脚本检查修改后的主进程 JS 语法、原 ASAR 完整性与未修改条目的内容，
+  深层严格代码签名校验通过，DMG 生成成功。已完成原版应用、本地数据与 1 个 Host SQLite 数据库一致快照备份。
+  替换后应用已启动，19222 健康接口仍报告 2.34.2，Host 二进制及 launchd 服务配置的 SHA256 与安装前一致。
+- 限制/待办：本机包使用开发证书而非官方 Developer ID，未做公开分发公证；系统权限、钥匙串及屏幕辅助程序重新注册行为待用户验收。
+  最初打包识别了非代码资源为二进制签名目标，已收紧为 Mach-O/应用/框架目标后打包成功；
+  Chromium DIPS 数据库不接受普通只读 SQLite 打开，已改为 UI 停止后的整个 Chromium 数据目录复制，Host 数据库仍使用在线一致备份。
+  安装包保留 2.34.2 功能，不包含工作树中其他 2.36.0 功能；禁用的是该本地包的应用更新，没有修改独立 Host 的更新设置。
+  没有重跑全套测试或继续界面操作，未验证手机重新连接，但配对数据原样保留，未重新配对或改变认证协议。
+  原版与数据备份位于本人 Library 下的 `Codync Backups/20261103-212547-C0089/`，详细回退说明见 Mac 开发说明。
+  没有提交、推送、合并、公开发布或部署；没有修改 iOS 工作目录。
+- 关联：C0003、C0087、C0088。
+
+### C0090 · 2026-11-03 · Mac 界面与原生菜单接入 iOS 同款 Remix 图标
+
+- 原因：用户已在 iOS 使用 Remix 图标字体，希望 Mac 也统一为同一套图标，并沿用当前可用的覆盖安装方式。
+- 变化：复制 iOS 已有 Remix 4.9.1 字体、码点表和许可证，在桌面共享 `Icon` 增加仅 Mac 使用的字体分支；
+  保留原有 iOS 映射并扩充到 186 条，覆盖全部 165 个登记图标以及 10 个原生菜单操作图标。
+  保留既有颜色、标题、无障碍标签、应用文字缩放与按钮外部尺寸，图标使用 1.2 倍字号方框和字体自身字重；
+  未知名称保留 SF/Lucide 回退。原生菜单使用同一字体生成的 1×/2× 模板 PNG，菜单本身仍由 macOS 绘制。
+  GitHub 等专有品牌图、Bot 头像、应用/菜单栏品牌图和系统红绿灯保留；其他平台的图标分支不变。
+  本地打包复用同一字体 helper，精确加入原官方 2.34.2 的 renderer 与主进程，不升级到工作树 2.36.0 的完整客户端或 Host。
+  生成新 DMG，备份上一版及本地数据后完整覆盖并启动 `/Applications/Codync.app`。
+- 文件：`apps/desktop/src/renderer/components/Icon.tsx`、`remix-icons.ts`、`remix-icons.css`、`remix-symbols.json`；
+  `apps/desktop/src/renderer/assets/remix/` 的字体、码点表及许可证；`apps/desktop/src/main/tray.ts`；
+  `apps/desktop/tools/export-remix-menu.swift`、`local-mac-remix.cjs`、`package-mac-local.cjs`；
+  `apps/desktop/electron.vite.config.ts`、`electron-builder.yml`、`.gitignore`；`README.md`、
+  `docs/guides/desktop-styles.md`、`docs/guides/macos-ui-preview.md`、`CHANGELOG.md`。
+- 验证：与活跃 iOS 工作目录只读比对，字体/码点表/许可证 SHA256 与共享映射一致；全部映射目标存在，165 个登记图标和 10 个原生菜单图标均覆盖。
+  `npm run typecheck`、`npm run build` 通过，菜单字体导出成功生成 20 张 PNG；底包覆盖的主进程和 renderer JS 语法检查、其他原有 ASAR 文件哈希校验及深层严格代码签名校验通过，DMG 已生成。
+  完成正确性、完整性、重构三项只读复核，无确认代码缺陷；复核提醒的许可证名称已按实际资源记录。
+  覆盖后应用进程已运行，Host 健康且仍为 2.34.2，Host 二进制和 launchd 配置 SHA256 与安装前一致；已有数据与 1 个 Host SQLite 数据库一致快照已备份。
+- 限制/待办：实际资源许可证为 Remix Icon License v1.0（January 2026），与历史 C0075 的 Apache-2.0 描述不同，本轮完整保留实际许可证原文。
+  本轮仅 Mac 使用 Remix，未修改 iOS 工作目录；未知动态图标与专有品牌资源不强制替换。Remix 单一字重不等同于 SF Symbols 的各档笔画，个别图标比例与基线留给用户反馈微调。
+  按用户要求未运行自动界面验收或全套测试，没有发送聊天、重新配对或修改认证协议；原生菜单、深浅外观及各页面的最终观感由用户验收。
+  本地开发签名仍未公证，官方应用更新继续禁用。上一版与数据备份在 `Codync Backups/20261103-215810-C0090/`，安装包为被忽略的 `build/releases/Codync-2.34.2-local-C0090.dmg`。
+  没有提交、推送、合并或公开发布。
+- 关联：C0075、C0088、C0089。
