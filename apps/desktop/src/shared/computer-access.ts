@@ -6,6 +6,12 @@ export interface ScreenAgentState {
   registered: boolean
 }
 
+export interface ScreenHelperDetails {
+  name: string
+  bundleId: string
+  icon: string | null
+}
+
 export type ComputerPermission = 'capture' | 'input' | 'portal'
 export type ComputerAccessStep = 'host' | 'unavailable' | 'enable' | 'background' | 'helper' | ComputerPermission | 'ready'
 

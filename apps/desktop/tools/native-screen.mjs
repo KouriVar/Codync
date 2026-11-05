@@ -1,7 +1,5 @@
-// Builds Codync Screen (Remote screen capture and input) into build/native/CodyncScreen.app for the
-// Mac app to bundle, unsigned (electron-builder signs it; the cua-driver the Xcode target embeds
-// keeps its own signature). Without it the app registers a launch agent pointing at a missing
-// helper and Remote screen never starts.
+// Builds the helper for Electron. Public release builds are signed by electron-builder.
+// Personal builds use the Screen target's fixed development identity and keep that signature.
 import { execFileSync } from 'node:child_process'
 import { cpSync, mkdirSync, rmSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -15,10 +13,12 @@ const configuration = env === 'dev' ? 'DevRelease' : 'Release'
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const repo = join(root, '../..')
 const derived = join(repo, 'build/dd')
+const personal = process.argv.includes('--personal')
 execFileSync('xcodebuild', [
   'build', '-project', join(repo, 'apps/Codync.xcodeproj'), '-scheme', env === 'dev' ? 'Screen Dev' : 'Screen', '-configuration', configuration,
   '-destination', 'generic/platform=macOS', '-derivedDataPath', derived, '-quiet',
-  'CODE_SIGN_IDENTITY=-', 'CODE_SIGNING_REQUIRED=NO', 'CODE_SIGNING_ALLOWED=NO',
+  ...(personal ? ['ONLY_ACTIVE_ARCH=YES', `ARCHS=${process.arch === 'arm64' ? 'arm64' : 'x86_64'}`]
+    : ['CODE_SIGN_IDENTITY=-', 'CODE_SIGNING_REQUIRED=NO', 'CODE_SIGNING_ALLOWED=NO']),
 ], { stdio: 'inherit' })
 const out = join(root, `build/native/${name}.app`)
 mkdirSync(dirname(out), { recursive: true })

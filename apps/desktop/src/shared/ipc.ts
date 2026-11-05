@@ -1,7 +1,7 @@
 import type { SignInFailure, SignInProvider } from './analytics'
 import type { SharedFile } from './models'
 import type { SSHBridge } from './ssh'
-import type { ScreenAgentState } from './computer-access'
+import type { ScreenAgentState, ScreenHelperDetails } from './computer-access'
 import type { IslandRect, IslandScreen, IslandSummary } from './island'
 import type { VoiceKey, VoiceShortcut } from './voice-shortcut'
 import type { ErrorReport } from './error-report'
@@ -275,6 +275,9 @@ export interface CodyncBridge {
     authenticate(url: string, scheme: string): Promise<string>
     /** macOS: registers or removes the Codync Screen agent (SMAppService). */
     screenAgentState(): Promise<ScreenAgentState>
+    screenHelperDetails(): Promise<ScreenHelperDetails | null>
+    revealScreenHelper(): void
+    dragScreenHelper(): void
     setScreenAgent(on: boolean): Promise<{ needsApproval: boolean }>
     syncScreenAgent(enabled: boolean): Promise<{ needsApproval: boolean }>
   }

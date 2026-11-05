@@ -116,6 +116,9 @@ targets:
       - package: WebRTC
     settings:
       base:
+        DEVELOPMENT_TEAM: KQQ6SD2P4C
+        CODE_SIGN_STYLE: Manual
+        CODE_SIGN_IDENTITY: "Apple Development: suiyikou@gmail.com (VL79B8UXJR)"
         INFOPLIST_FILE: screen-macos/Info.plist
         PRODUCT_NAME: $(CODYNC_SCREEN_NAME)
         PRODUCT_BUNDLE_IDENTIFIER: $(CODYNC_SCREEN_BUNDLE_ID)
@@ -136,6 +139,11 @@ targets:
         script: |
           export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
           node "$SRCROOT/../packaging/cua-driver/fetch.mjs" darwin "$TARGET_BUILD_DIR/$CONTENTS_FOLDER_PATH/Helpers" "$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH"
+      - name: Export permission card icon
+        inputFiles: ["$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/AppIcon.icns"]
+        outputFiles: ["$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/PermissionIcon.png"]
+        script: |
+          /usr/bin/sips -s format png -z 64 64 "$SCRIPT_INPUT_FILE_0" --out "$SCRIPT_OUTPUT_FILE_0" >/dev/null
   iOS:
     type: application
     platform: iOS

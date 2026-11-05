@@ -922,3 +922,21 @@ iOS 定制分支：`ui/ios-customization`；当前 Mac 工作分支：`ui/macos-
   - 本分支我方基线仍为 Clerk 登录（早于 Google ID token 改动），本次按「保留我方」未改动；如需同步 Google 登录需另行移植。
   - 未做真机/功能验证；未 push。
 - 关联：C0122（同批上游同步）。
+
+### C0092 · 2026-11-05 · 稳定 Mac 屏幕权限的签名身份并加入拖拽授权
+
+- **原因** 当前安装包的 Codync 和 Codync Screen 使用 ad hoc 签名。重新打包改变代码哈希时，macOS 可能无法把已保存的授权关联到新包。
+- **变化** Screen target 使用团队 `KQQ6SD2P4C` 的固定 Apple Development 证书。本机主版与开发版打包使用同一签名身份，并校验整包及包内 Screen。LaunchAgent 继续负责启动 Screen，现有 Bundle ID 沿用。
+  录屏前由实际采集进程检查当前权限，并将状态交给 Mac 和手机共用。新进程探测到授权时，由 launchd 重启采集进程并重新上报状态。
+  Mac「屏幕录制」和「控制应用」增加真实 helper 图标、原生文件拖拽和「在访达中显示」。保留权限请求、系统设置入口和刷新，并在页面底部显示按当前版本生成的可复制重置命令。
+- **文件** `apps/project.yml` 与 XcodeGen 生成的 `apps/Codync.xcodeproj/project.pbxproj`、`apps/screen-macos/{Permissions,ScreenHelper}.swift`、
+  `apps/desktop/{package.json,tools/{native-host.mjs,native-screen.mjs,package-mac-personal.cjs}}`、
+  `apps/desktop/src/{main/{screen,updates}.ts,preload/index.ts,shared/{computer-access,ipc}.ts}`、
+  `apps/desktop/src/renderer/{demo/bridge.ts,lib/{computer-access-phrases,l10n}.ts,store/computer-access.ts,views/computer-access/}`、
+  `docs/{architecture/desktop-app.md,guides/macos-ui-preview.md}`、`web/content/docs/computer-use.mdx`。
+- **验证** Electron `npm run typecheck` 和 `npm run build` 通过。Xcode `Screen Dev` 的 `DevDebug` 编译及严格签名校验通过。
+  连续两次完成本机主版打包，严格签名校验通过，主程序和 helper 的 Team ID 及各自的 designated requirement 在两次构建间一致。
+- **限制与待办** 验证范围为编译、打包和签名。安装、系统授权、拖拽、手机连线及权限跨安装保留由用户验收。
+  本机主版包随附 Host 2.39.1，首次打开时现有启动逻辑会切换到该 Host。替换前需备份旧应用及 Host 数据。
+  新增界面文案提供简体与繁体中文，其余语言回退至英文。
+- **关联** C0089、C0090、C0091。

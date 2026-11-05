@@ -151,38 +151,25 @@ UI checks: `CODYNC_SHOW_INACTIVE=1` opens the window without taking focus,
 Each packaging script names its environment:
 
 ```sh
-npm run dist:mac:dev      # dev cloud, Clerk development
+npm run dist:mac:dev      # local Codync Dev package
+npm run dist:mac:local    # local package with the Codync main identity
 npm run dist:mac:main     # main: what the release workflow ships
 npm run dist:linux:dev    # / dist:linux:main
 npm run dist:win:dev      # / dist:win:main, on Windows (builds the bundled host with rustup)
 ```
 
-They write `resources/account-config.json` for that environment, and the Mac ones build the
-bundled host (`tools/native-host.mjs`, universal, through rustup's pinned toolchain) for the same
-one, so app and host always match, plus the Codync Screen helper (`tools/native-screen.mjs`).
-`dist:mac:dev` builds only what this Mac runs: the app folder for its architecture
-(`dist/mac-arm64/Codync Dev.app` on Apple silicon), the host for that architecture in the faster
-`dev-app` profile, and signatures without Apple's timestamp server (only notarized builds need it;
-asking it for every file adds about 5 minutes). `CODYNC_HOST_PROFILE` (`dev-app` or `release`)
-overrides the host's profile: the release workflow's Windows dry runs on PRs into `dev` build
-`dev-app`, since nothing they make ships (its macOS job keeps `release`, the profile its cache holds).
-Extra electron-builder flags go after `--`. The speech
-helper at the top of `electron-builder.yml` doesn't depend on the environment; place it first
-(the release workflow, `.github/workflows/release-desktop.yml`, shows how).
-`dist:mac:dev` signs with the team 7FUM8A8H72 development certificate (`CSC_NAME` in
-`package.json`): the Screen launch agent only runs code from that team, and the keychain holds
-another team's certificate electron-builder would otherwise pick. Update the name when it is
-renewed.
-Codync and Codync Dev can run side by side: separate app identities, host services, ports, data and login callbacks. See [Dev app isolation](../guides/dev-app.md) for the resource map and external signing/account setup.
+The Mac scripts build the bundled Host and Codync Screen for the same environment as the app.
+`dist:mac:local` and `dist:mac:dev` also build the speech helper, target this Mac's architecture,
+and produce `Codync.app` or `Codync Dev.app` under the repository's `build/dd/desktop-personal`.
+The personal packager uses the Apple Development identity configured on the Screen target in
+`apps/project.yml` to sign the Electron app and verifies the embedded Screen uses the same identity.
+See [local Mac packaging and permissions](../guides/macos-ui-preview.md#本机签名与电脑访问c0092).
 
-For a local signed Mac build, explicitly select a development identity from the project's
-team with `-c.mac.identity="Apple Development: …"`; use `--dir --arm64` and
-`-c.mac.notarize=false` only for local development. Automatic identity discovery can select
-an old certificate from another team. `security find-identity` alone does not establish that
-a certificate is still trusted: verify its exported public certificate with
-`security verify-cert -c certificate.pem -p codeSign -R ocsp -R require` before signing.
-If Gatekeeper reports `CSSMERR_TP_CERT_REVOKED`, fix the signing identity rather than
-disabling security checks. Distributed builds still require Developer ID signing and notarization.
+`dist:mac:main` is the universal release build. Prepare the speech helper first as shown in
+`.github/workflows/release-desktop.yml`. Extra electron-builder flags for the release command go
+after `--`. `CODYNC_HOST_PROFILE` (`dev-app` or `release`) can override the Host build profile.
+Codync and Codync Dev can run side by side: separate app identities, host services, ports, data and login callbacks. See [Dev app isolation](../guides/dev-app.md) for the resource map and external signing/account setup.
+Distributed builds require Developer ID signing and notarization.
 
 ## Composer checks
 

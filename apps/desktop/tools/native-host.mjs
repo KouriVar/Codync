@@ -1,7 +1,8 @@
 // Builds the host the app bundles for the same environment as the app: node tools/native-host.mjs
 // dev|main compiles it in as CODYNC_ENV. Built on every package so a host made for another
 // environment is never shipped. macOS: build/native/codync-host (universal; Codync Dev: this Mac's
-// architecture only, since it never leaves the Mac that built it). Windows:
+// architecture only, since it never leaves the Mac that built it). The personal macOS
+// packager also passes --native. Windows:
 // build/native/codync-host.exe and codync-hostw.exe (runs it at sign-in), plus the computer-use
 // driver the host starts from beside itself. Linux apps use the installed host, so there's
 // nothing to do there.
@@ -36,7 +37,7 @@ if (process.platform === 'win32') {
   run(process.execPath, [join(root, '../../packaging/cua-driver/fetch.mjs'), 'windows-x86_64', out])
 } else {
   const native = process.arch === 'arm64' ? 'aarch64-apple-darwin' : 'x86_64-apple-darwin'
-  const targets = env === 'dev' ? [native] : ['aarch64-apple-darwin', 'x86_64-apple-darwin']
+  const targets = env === 'dev' || process.argv.includes('--native') ? [native] : ['aarch64-apple-darwin', 'x86_64-apple-darwin']
   for (const target of targets) build(target)
   run('lipo', ['-create', '-output', join(out, 'codync-host'), ...targets.map((t) => built(t, 'codync-host'))])
 }

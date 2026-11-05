@@ -1,4 +1,4 @@
-import { computerAccessStep, computerPermissionSettings, type ComputerPermission, type ScreenAgentState } from '@shared/computer-access'
+import { computerAccessStep, computerPermissionSettings, type ComputerPermission, type ScreenAgentState, type ScreenHelperDetails } from '@shared/computer-access'
 import { normalizeScreen, type ScreenState } from '@shared/models'
 import { Observable } from '../lib/observable'
 import type { AppModel } from './app-model'
@@ -7,6 +7,7 @@ import type { AppModel } from './app-model'
 export class ComputerAccess extends Observable {
   screen: ScreenState | null = null
   agent: ScreenAgentState | null = null
+  helper: ScreenHelperDetails | null = null
   busy: ComputerPermission | 'enable' | null = null
   private checkError: string | null = null
   private actionError: string | null = null
@@ -21,9 +22,20 @@ export class ComputerAccess extends Observable {
     return computerAccessStep(window.codync.platform, this.app.local?.connection.kind === 'online', this.screen, this.agent)
   }
 
-  get helperName() { return this.screen?.permissionApp || 'Codync Screen' }
+  get helperReady() {
+    return this.screen?.enabled === true && this.screen.connected &&
+      (window.codync.platform !== 'darwin' || (this.agent?.available === true && this.agent.registered))
+  }
+
+  get helperName() { return this.helper?.name || this.screen?.permissionApp || 'Codync Screen' }
   get computerName() { return this.app.local?.hostName || window.codync.computerName || 'Your computer' }
   get error() { return this.checkError ?? this.actionError }
+
+  async loadHelperDetails() {
+    if (window.codync.platform !== 'darwin') return
+    this.helper = await window.codync.app.screenHelperDetails().catch(() => null)
+    this.changed()
+  }
 
   async refresh() {
     if (this.refreshing) return

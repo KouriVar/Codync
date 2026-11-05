@@ -26,7 +26,6 @@ final class ScreenHelper {
     }
 
     func start() {
-        let captureAtLaunch = CGPreflightScreenCaptureAccess()
         link.start()
         NotificationCenter.default.addObserver(forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.sendStatus() }
@@ -35,14 +34,7 @@ final class ScreenHelper {
         Task { [weak self] in
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(3))
-                self?.sendStatus()
-                // A process keeps the screen-recording answer it saw at launch, so a grant made
-                // while we run never shows up here. Ask a fresh process; once it's granted, quit
-                // and let launchd (KeepAlive) start us again with capture working.
-                if !captureAtLaunch, await Self.captureGrantedNow() {
-                    self?.closeAll()
-                    exit(0)
-                }
+                await self?.refreshPermissions()
             }
         }
     }
@@ -56,6 +48,10 @@ final class ScreenHelper {
             return [String: Any]()
         case "answer":
             guard let id = p["session"] as? String, let sdp = p["sdp"] as? String else { throw HelperError("session and sdp are required") }
+            guard ScreenPermissions.captureGranted else {
+                sendStatus()
+                throw HelperError("Allow screen recording for \(ScreenPermissions.appName) in System Settings.")
+            }
             if let s = sessions[id] { return ["sdp": try await s.answer(offer: sdp)] }
             let iceServers = (p["iceServers"] as? [[String: Any]] ?? []).compactMap { value -> RTCIceServer? in
                 guard let urls = value["urls"] as? [String], !urls.isEmpty else { return nil }
@@ -92,7 +88,7 @@ final class ScreenHelper {
         case "focusedField":
             return try AXTree.focusedField(pid: (p["pid"] as? NSNumber).map { pid_t($0.int32Value) })
         case "driver":
-            guard CGPreflightScreenCaptureAccess(), AXIsProcessTrusted() else {
+            guard ScreenPermissions.captureGranted, ScreenPermissions.inputGranted else {
                 throw HelperError("Set up Computer access in Codync → Settings on this computer first.")
             }
             return ["socket": try await driver.socket()]
@@ -127,16 +123,14 @@ final class ScreenHelper {
         badge.update(viewers: 0)
     }
 
-    /// Runs this binary with `--probe-capture`: a new process reads the current grant.
-    private static func captureGrantedNow() async -> Bool {
-        guard let exe = Bundle.main.executableURL else { return false }
-        let p = Process()
-        p.executableURL = exe
-        p.arguments = ["--probe-capture"]
-        return await withCheckedContinuation { c in
-            p.terminationHandler = { c.resume(returning: $0.terminationStatus == 0) }
-            do { try p.run() } catch { c.resume(returning: false) }
-        }
+    private func refreshPermissions() async {
+        sendStatus()
+        // The running process can keep its pre-grant answer. The probe can trigger a restart,
+        // but only the process that actually captures the screen can report it as ready.
+        guard !ScreenPermissions.captureGranted, await ScreenPermissions.probeCaptureGrant(),
+              !ScreenPermissions.captureGranted else { return }
+        link.stop()
+        exit(0) // KeepAlive starts the capture process again with the current grant.
     }
 
     private func display(_ v: Any?) -> CGDirectDisplayID {
@@ -157,11 +151,11 @@ final class ScreenHelper {
         }
         let status: [String: AnyHashable] = [
             "platform": "macos",
-            "permissionApp": Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String ?? "Codync Screen",
+            "permissionApp": ScreenPermissions.appName,
             "displays": displays,
-            "capture": CGPreflightScreenCaptureAccess(),
+            "capture": ScreenPermissions.captureGranted,
             "trickle": true,
-            "input": AXIsProcessTrusted(),
+            "input": ScreenPermissions.inputGranted,
         ]
         guard status != lastStatus, link.isConnected else { return }
         lastStatus = status
@@ -175,7 +169,7 @@ enum ScreenHelperMain {
 
     @MainActor
     static func main() {
-        if CommandLine.arguments.contains("--probe-capture") { exit(CGPreflightScreenCaptureAccess() ? 0 : 1) }
+        if CommandLine.arguments.contains("--probe-capture") { exit(ScreenPermissions.captureGranted ? 0 : 1) }
         let app = NSApplication.shared
         app.setActivationPolicy(.accessory)
         let helper = ScreenHelper()

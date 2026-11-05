@@ -13,12 +13,13 @@ import { prefs, type HostController } from './host-controller'
 const { autoUpdater } = electronUpdater
 
 /**
- * The app's own updates (electron-updater, GitHub releases; packaged `main` builds only, so a
- * local `dev` build never replaces itself with a release). Codync
+ * The app's own updates (electron-updater, GitHub releases). On macOS, only packaged
+ * `main` builds with an update feed can update themselves. Codync
  * coordinates its background services before the installer replaces the app: the host is
  * stopped first, and a restart marker makes the next launch reinstall it from the new bundle.
  */
 const enabled = app.isPackaged && isMainEnvironment()
+  && (process.platform !== 'darwin' || existsSync(join(process.resourcesPath, 'app-update.yml')))
 const shipIt = `${identity.appId}.ShipIt`
 
 const bundlePath = () => join(app.getPath('exe'), '../../..')

@@ -1,6 +1,8 @@
+import { execFile } from 'node:child_process'
 import { existsSync, statSync } from 'node:fs'
 import { join } from 'node:path'
-import { app, ipcMain } from 'electron'
+import { promisify } from 'node:util'
+import { app, ipcMain, nativeImage, shell, type NativeImage } from 'electron'
 import { prefs } from './host-controller'
 import { identity } from './environment'
 import { shouldSyncScreenAgent } from '../shared/computer-access'
@@ -11,14 +13,31 @@ import { shouldSyncScreenAgent } from '../shared/computer-access'
 
 const serviceName = `${identity.screenLabel}.plist`
 const isMac = process.platform === 'darwin'
+const screenBundlePath = join(process.resourcesPath, '..', 'Library/LoginItems', `${identity.screenName}.app`)
+const screenExecutablePath = join(screenBundlePath, 'Contents/MacOS', identity.screenName)
+let helperIcon: NativeImage | undefined
 
-/** Identifies the helper binary inside this app: its path and modification date. */
+function hasBundledHelper() {
+  return isMac && app.isPackaged && existsSync(screenExecutablePath)
+}
+
+async function helperDetails() {
+  if (!hasBundledHelper()) return null
+  const name = await promisify(execFile)('/usr/bin/plutil', ['-extract', 'CFBundleDisplayName', 'raw', join(screenBundlePath, 'Contents/Info.plist')])
+    .then(({ stdout }) => stdout.trim()).catch(() => `${identity.name} Screen`)
+  // Xcode exports this from the helper's compiled AppIcon.icns before signing it.
+  const icon = nativeImage.createFromPath(join(screenBundlePath, 'Contents/Resources/PermissionIcon.png'))
+  helperIcon = icon.isEmpty() ? undefined : icon.resize({ width: 32, height: 32 })
+  return { name, bundleId: identity.screenLabel, icon: helperIcon ? icon.toDataURL() : null }
+}
+
+/** Identifies the helper binary even if an app replacement preserves its modification date. */
 function helperStamp() {
-  const path = join(process.resourcesPath, '..', `Library/LoginItems/${identity.screenName}.app/Contents/MacOS/${identity.screenName}`)
   try {
-    return `${path}@${statSync(path).mtimeMs}`
+    const { dev, ino, mtimeMs } = statSync(screenExecutablePath)
+    return `${screenExecutablePath}@${dev}:${ino}:${mtimeMs}`
   } catch {
-    return `${path}@0`
+    return `${screenExecutablePath}@0`
   }
 }
 
@@ -62,11 +81,21 @@ export function unregisterScreenAgent() {
 }
 
 export function registerScreenIPC() {
-  ipcMain.handle('screen:state', () => ({
-    available: !isMac || (app.isPackaged && existsSync(join(process.resourcesPath, '..', `Library/LoginItems/${identity.screenName}.app/Contents/MacOS/${identity.screenName}`))),
-    needsApproval: status() === 'requires-approval',
-    registered: status() === 'enabled',
-  }))
+  ipcMain.handle('screen:state', () => {
+    const agentStatus = status()
+    return {
+      available: !isMac || hasBundledHelper(),
+      needsApproval: agentStatus === 'requires-approval',
+      registered: agentStatus === 'enabled',
+    }
+  })
+  ipcMain.handle('screen:helperDetails', helperDetails)
+  ipcMain.on('screen:revealHelper', () => {
+    if (hasBundledHelper()) shell.showItemInFolder(screenBundlePath)
+  })
+  ipcMain.on('screen:dragHelper', ({ sender }) => {
+    if (hasBundledHelper() && helperIcon) sender.startDrag({ file: screenBundlePath, icon: helperIcon })
+  })
   ipcMain.handle('screen:setAgent', (_e, on: boolean) => setScreenAgent(on))
   ipcMain.handle('screen:syncAgent', (_e, enabled: boolean) => syncScreenAgent(enabled))
 }

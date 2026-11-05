@@ -56,7 +56,7 @@ CODYNC_CLERK_SECRET_KEY= npm run dev -- --name macos-ui --cdp
 未打包运行仍使用 Electron 本身的 macOS 身份，可能与其他未打包 Electron 开发实例共享系统权限或通知；
 会话与数据按沙盒分开。若修改涉及系统权限或完整安装包，再使用独立的 `com.pokai.Codync.dev` 开发包，
 先核对本机签名配置，仅安装到本任务的开发位置，不覆盖 `/Applications/Codync.app`。
-仓库 `dist:mac:dev` 带有上游作者的签名设置，不能未经核对直接作为本机安装命令。
+仓库的 `npm run dist:mac:dev` 生成固定开发证书签名的本机开发包，见下方 C0092。
 
 ## 官方应用与 iPhone 配对
 
@@ -64,6 +64,33 @@ CODYNC_CLERK_SECRET_KEY= npm run dev -- --name macos-ui --cdp
 上述为 C0087 初始化状态。C0089 按用户最新授权覆盖应用本体，Host、launchd 服务及 `~/.codync` 继续保留。
 iPhone 继续使用原本地配对；不将现有手机重新配对到开发沙盒，不升级官方 Host，不更改连接或认证协议。
 沙盒是另一台逻辑电脑，不会自动出现官方实例的 Bot、聊天和配对设备。
+
+### 本机签名与电脑访问（C0092）
+
+在 `apps/desktop` 下运行 `npm run dist:mac:local`，生成
+`build/dd/desktop-personal/Codync.app`，使用现有主版应用身份和数据目录。
+`npm run dist:mac:dev` 生成同目录下的 `Codync Dev.app`，使用独立数据和配对。
+命令需要 Xcode、项目指定的 Rust 工具链和本机 Apple Development 签名身份。两种本机包都使用
+`KQQ6SD2P4C`，主程序和包内 Screen 签名校验通过后才输出。安装由用户在 Finder 完成。
+
+首次启动主版本机包时，现有启动逻辑会安装并重启随包的 Host 2.39.1。覆盖前请备份旧应用和
+`~/.codync` 数据。主版配对是否仍可使用属于验收项，Host 2.39.1 要求手机端 Codync 至少为 2.36.0。
+
+首次从旧签名迁移时，先关闭菜单栏的「远程屏幕」，退出 Codync，在终端重置 helper 的两项权限。
+正式身份使用以下命令：
+
+```sh
+tccutil reset ScreenCapture com.pokai.Codync.screen
+tccutil reset Accessibility com.pokai.Codync.screen
+```
+
+开发身份使用 `com.pokai.Codync.dev.screen`。在 Finder 备份旧包后，将新包放到原安装路径，再打开 Codync。
+在「设置 → 电脑访问」启用 Codync Screen。分别打开系统设置的「屏幕与系统音频录制」和「辅助功能」，
+把对应栏的 Codync Screen 卡片拖进列表并打开开关。系统未接收拖拽时，可用「在访达中显示」定位 helper，
+通过系统设置的「+」选中同一个 `.app`，也可以点 Codync 的授权按钮唤起系统提示。
+
+返回 Codync 确认三项就绪，再从手机上已配对电脑的「屏幕」入口打开画面。重复打包并替换同一个安装路径，
+这次直接确认三项就绪、手机能看到画面。首次授权和重复打包之间应保留系统权限记录。
 
 ## 验证与记账
 

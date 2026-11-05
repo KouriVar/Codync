@@ -6,6 +6,7 @@ import { useApp } from '../../store/context'
 export function useComputerAccess() {
   const access = useModel(useApp().computerAccess)
   useEffect(() => {
+    void access.loadHelperDetails()
     const refresh = () => void access.refresh()
     refresh()
     const timer = window.setInterval(refresh, 2_000)
