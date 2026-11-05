@@ -18,7 +18,9 @@ import { BotRoster } from './BotRoster'
 import { ExtensionsMovedTip } from './ExtensionsMovedTip'
 import { RailAccountNotice, SidebarFooter } from './SidebarFooter'
 import { UpdateBadge } from './UpdateButton'
-import { ComputerFilterHeader, computerSelection } from './ComputerFilterHeader'
+import { ComputerFilterHeader, computerSelection, useComputerFilterChoices } from './ComputerFilterHeader'
+import { MainMenuActionsContext, type MainMenuActions } from './MainBotMenu'
+import { isMac } from './settings/parts'
 import { ThreadView } from './thread/ThreadView'
 import { queueVoiceKey } from './thread/voice-shortcut-keys'
 import { NewBotView, NewGroupView } from './bots/NewBotView'
@@ -130,7 +132,7 @@ export function ChatWindow() {
         accessSetup === null ? (
           <AccessOnboarding onContinue={(ready) => finishAccess(ready, true)} />
         ) : showsChat ? (
-          <ChatSplitView />
+          <ChatSplitView onComputerAccess={() => setShowAccess(true)} />
         ) : (
           <HostStateView />
         )
@@ -192,7 +194,13 @@ interface CreateTarget {
   computerId: string
 }
 
-function ChatSplitView() {
+/**
+ * The window with no sidebar (C0096): the conversation fills it, and the main bot's menu reaches
+ * everything the sidebar used to hold. That menu needs this window's own state, so it is built here
+ * and handed to `ThreadView` through `MainMenuActionsContext`; `onComputerAccess` reaches the sheet
+ * the window (not this view) owns.
+ */
+function ChatSplitView({ onComputerAccess }: { onComputerAccess: () => void }) {
   const tr = useTr()
   const app = useApp()
   const ssh = useSSH()
@@ -213,6 +221,8 @@ function ChatSplitView() {
   const [settings, setSettings] = useState<SettingsPage | null>(null)
   const openVoiceSettings = useCallback(() => setSettings('voice'), [])
   const [showAccount, setShowAccount] = useState(false)
+  /** C0096: with the sidebar gone on the Mac, its list opens from the main bot's menu instead. */
+  const [botsList, setBotsList] = useState(false)
   const [windowSize, setWindowSize] = useState({ width: window.innerWidth, height: window.innerHeight })
   const newButton = useRef<HTMLButtonElement>(null)
   const railNewButton = useRef<HTMLButtonElement>(null)
@@ -237,6 +247,17 @@ function ChatSplitView() {
   const localOnline = !!app.local && onlineStores.includes(app.local)
   const roster = useComputerRoster(app, shown)
   const visibleRoster = roster.items
+  /** Settings → Computers, where a computer out of the account is added (the sidebar's footer + header used it). */
+  const manage = useCallback(() => setSettings('computers'), [])
+  // The same summary and choices the sidebar's header showed; the main bot's menu opens them (C0096).
+  const connection = useComputerFilterChoices(hidden, setHidden, manage)
+
+  // C0096: the app opens straight on the main bot's conversation — the lead bot, else the first one.
+  useEffect(() => {
+    if (!isMac || app.selection || !roster.items.length) return
+    const target = voiceTarget(roster)
+    if (target) app.select(target.ref)
+  }, [app, roster.items])
 
   const create = (kind: CreateTarget['kind']) => {
     // The selected bot's computer if it's online, else this computer, else any online one.
@@ -253,7 +274,8 @@ function ChatSplitView() {
         if (c.kind === 'newBot' && onlineStores.length) create('bot')
         if (c.kind === 'search') setSearching(true)
         if (c.kind === 'networkSettings') setSettings('network')
-        if (c.kind === 'toggleSidebar') setCompact(!prefs.sidebarCompact.get())
+        // With no sidebar on the Mac, the menu bar's Toggle Sidebar opens the bot list instead (C0096).
+        if (c.kind === 'toggleSidebar') isMac ? setBotsList((o) => !o) : setCompact(!prefs.sidebarCompact.get())
         if (c.kind === 'voiceKey') {
           if (c.key === 'double' && !app.selection) app.select(voiceTarget(roster)?.ref ?? null)
           queueVoiceKey(c.key)
@@ -296,6 +318,20 @@ function ChatSplitView() {
   ]
 
   const openMarketplace = () => setMarketplace((selectedStore ?? app.local ?? onlineStores[0])?.computer.id ?? null)
+
+  // C0096: every entry the sidebar held, as the main bot's menu reaches it. Same handlers, new door.
+  const menuActions: MainMenuActions = {
+    openBots: () => setBotsList(true),
+    openSearch: () => setSearching(true),
+    openNewBot: () => create('bot'),
+    openNewGroup: () => create('group'),
+    openImport: () => setImporting(true),
+    openExtensions: openMarketplace,
+    openSettings: (page) => setSettings(page),
+    openAccount: () => setShowAccount(true),
+    openAccess: onComputerAccess,
+    connection,
+  }
 
   // One plain list. The lead stays in sight: no hide.
   const botActions = (bot: Bot, store: BotStore): ActionItem[] => [
@@ -368,67 +404,89 @@ function ChatSplitView() {
   }
 
   const width = compact ? 76 : sidebarWidth
+  /** The roster's scrolling body, the sidebar's and the Mac sheet's alike. */
+  const rosterBlock = (listCompact: boolean, inSheet: boolean) => (
+    <div className="roster" ref={listRef} tabIndex={0} onKeyDown={onListKey}>
+      {roster.grouped && !listCompact ? <ExtensionsMovedTip /> : null}
+      <BotRoster roster={roster} compact={listCompact}
+        onContext={(bot, store, x, y) => setContext({ items: botActions(bot, store), x, y })}
+        onSectionContext={(section, store, x, y) => {
+          const items = sectionHeaderItems(section, store, setNaming, (to) => roster.renameSection(store, section, to))
+          if (items.length) setContext({ items, x, y })
+        }}
+        openExtensions={(id) => {
+          // Found it: the tip about where Extensions went has done its job.
+          prefs.extensionsMovedTipSeen.set(true)
+          if (inSheet) setBotsList(false)
+          setMarketplace(id)
+        }} />
+      {visibleRoster.length === 0 && !roster.grouped && !listCompact && mismatchStores.length === 0 ? (
+        <div className="roster-empty">
+          <Text as="div" size="body" weight="medium">{onlineStores.length ? tr(`No bots yet`) : tr(`Waiting for a computer`)}</Text>
+          {onlineStores.length ? <Text as="div" size="callout" tone="secondary">{tr(`Use + to create a bot.`)}</Text> : null}
+        </div>
+      ) : null}
+    </div>
+  )
+  /** A row that opens another surface closes the sheet first, so only one modal stands at a time. */
+  const afterSheet = (inSheet: boolean, fn: () => void) => () => {
+    if (inSheet) setBotsList(false)
+    fn()
+  }
+  /** The account, Extensions and computer rows under the roster (the rail's while compact). */
+  const footerBlock = (listCompact: boolean, inSheet: boolean) => listCompact ? (
+    <div className="rail-actions">
+      <IconButton title="Search" icon="magnifyingglass" onClick={() => setSearching(true)} />
+      <IconButton title="New" icon="plus" size={36} buttonRef={railNewButton} menuOpen={railNewMenu} disabled={!onlineStores.length} onClick={() => setRailNewMenu((o) => !o)} />
+      <AnchoredMenu open={railNewMenu} onClose={() => setRailNewMenu(false)} anchor={railNewButton} items={newItems} />
+      <IconButton title="Extensions" icon="square.grid.2x2" size={36} onClick={openMarketplace} />
+      <UpdateBadge size={32} />
+      <RailAccountNotice onComputers={() => setSettings('computers')} />
+      <button className={`rail-profile ${showAccount ? 'open' : ''}`} aria-label="Open account menu for Account" title="Account" onClick={() => setShowAccount((s) => !s)}>
+        <ProfileAvatar />
+      </button>
+    </div>
+  ) : (
+    // With several computers each heading opens its own Extensions instead.
+    <SidebarFooter accountOpen={showAccount}
+      onAccount={afterSheet(inSheet, () => setShowAccount((s) => !s))}
+      onExtensions={roster.grouped ? undefined : afterSheet(inSheet, openMarketplace)}
+      onComputers={afterSheet(inSheet, manage)} />
+  )
   return (
     <div className={`split ${showAccount || context ? 'covered' : ''}`}>
-      <aside className={`sidebar ${compact ? 'compact' : ''} ${resizing ? 'resizing' : ''}`} style={{ width }}>
-        <div className="sidebar-header drag" inert={compact}>
-          <Spacer />
-          <HStack gap={6} className="no-drag">
-            <ComputerFilterHeader hidden={hidden} setHidden={setHidden} manage={() => setSettings('computers')} compact />
-            <IconButton title="Search" icon="magnifyingglass" size={32} className="sidebar-header-action" onClick={() => setSearching(true)} />
-            <IconButton title="New" icon="plus" size={32} className="sidebar-header-action" buttonRef={newButton} menuOpen={newMenu} onClick={() => setNewMenu((o) => !o)} disabled={!onlineStores.length} />
-          </HStack>
-          <AnchoredMenu open={newMenu} onClose={() => setNewMenu(false)} anchor={newButton} items={newItems} />
-        </div>
-        {compact ? (
-          <div className="rail-header drag">
-            <HStack align="stretch" justify="center" className="no-drag">
-              <ComputerFilterHeader hidden={hidden} setHidden={setHidden} manage={() => setSettings('computers')} compact />
-            </HStack>
-          </div>
-        ) : null}
-        <div className="roster" ref={listRef} tabIndex={0} onKeyDown={onListKey}>
-          {roster.grouped && !compact ? <ExtensionsMovedTip /> : null}
-          <BotRoster roster={roster} compact={compact}
-            onContext={(bot, store, x, y) => setContext({ items: botActions(bot, store), x, y })}
-            onSectionContext={(section, store, x, y) => {
-              const items = sectionHeaderItems(section, store, setNaming, (to) => roster.renameSection(store, section, to))
-              if (items.length) setContext({ items, x, y })
-            }}
-            openExtensions={(id) => {
-              // Found it: the tip about where Extensions went has done its job.
-              prefs.extensionsMovedTipSeen.set(true)
-              setMarketplace(id)
-            }} />
-          {visibleRoster.length === 0 && !roster.grouped && !compact && mismatchStores.length === 0 ? (
-            <div className="roster-empty">
-              <Text as="div" size="body" weight="medium">{onlineStores.length ? tr(`No bots yet`) : tr(`Waiting for a computer`)}</Text>
-              {onlineStores.length ? <Text as="div" size="callout" tone="secondary">{tr(`Use + to create a bot.`)}</Text> : null}
+      {/* C0096: no left sidebar on the Mac — the main bot's menu opens the list below instead. */}
+      {isMac ? null : (
+        <>
+          <aside className={`sidebar ${compact ? 'compact' : ''} ${resizing ? 'resizing' : ''}`} style={{ width }}>
+            <div className="sidebar-header drag" inert={compact}>
+              <Spacer />
+              <HStack gap={6} className="no-drag">
+                <ComputerFilterHeader hidden={hidden} setHidden={setHidden} manage={manage} compact />
+                <IconButton title="Search" icon="magnifyingglass" size={32} className="sidebar-header-action" onClick={() => setSearching(true)} />
+                <IconButton title="New" icon="plus" size={32} className="sidebar-header-action" buttonRef={newButton} menuOpen={newMenu} onClick={() => setNewMenu((o) => !o)} disabled={!onlineStores.length} />
+              </HStack>
+              <AnchoredMenu open={newMenu} onClose={() => setNewMenu(false)} anchor={newButton} items={newItems} />
             </div>
-          ) : null}
-        </div>
-        {compact ? (
-          <div className="rail-actions">
-            <IconButton title="Search" icon="magnifyingglass" onClick={() => setSearching(true)} />
-            <IconButton title="New" icon="plus" size={36} buttonRef={railNewButton} menuOpen={railNewMenu} disabled={!onlineStores.length} onClick={() => setRailNewMenu((o) => !o)} />
-            <AnchoredMenu open={railNewMenu} onClose={() => setRailNewMenu(false)} anchor={railNewButton} items={newItems} />
-            <IconButton title="Extensions" icon="square.grid.2x2" size={36} onClick={openMarketplace} />
-            <UpdateBadge size={32} />
-            <RailAccountNotice onComputers={() => setSettings('computers')} />
-            <button className={`rail-profile ${showAccount ? 'open' : ''}`} aria-label="Open account menu for Account" title="Account" onClick={() => setShowAccount((s) => !s)}>
-              <ProfileAvatar />
-            </button>
-          </div>
-        ) : (
-          // With several computers each heading opens its own Extensions instead.
-          <SidebarFooter accountOpen={showAccount} onAccount={() => setShowAccount((s) => !s)} onExtensions={roster.grouped ? undefined : openMarketplace} onComputers={() => setSettings('computers')} />
-        )}
-      </aside>
-      <ResizeHandle label={tr('Resize sidebar')} width={width} min={76} max={sidebarMax} edge="trailing" onResize={resizeSidebar} onDragging={setResizing} />
-      <main className="detail">
-        {/* The call bar's settings open this window's Settings at Voice chat. */}
-        <OpenVoiceSettings.Provider value={openVoiceSettings}>{detail}</OpenVoiceSettings.Provider>
-      </main>
+            {compact ? (
+              <div className="rail-header drag">
+                <HStack align="stretch" justify="center" className="no-drag">
+                  <ComputerFilterHeader hidden={hidden} setHidden={setHidden} manage={manage} compact />
+                </HStack>
+              </div>
+            ) : null}
+            {rosterBlock(compact, false)}
+            {footerBlock(compact, false)}
+          </aside>
+          <ResizeHandle label={tr('Resize sidebar')} width={width} min={76} max={sidebarMax} edge="trailing" onResize={resizeSidebar} onDragging={setResizing} />
+        </>
+      )}
+      <MainMenuActionsContext.Provider value={menuActions}>
+        <main className="detail">
+          {/* The call bar's settings open this window's Settings at Voice chat. */}
+          <OpenVoiceSettings.Provider value={openVoiceSettings}>{detail}</OpenVoiceSettings.Provider>
+        </main>
+      </MainMenuActionsContext.Provider>
 
       {showAccount ? (
         <AccountPanelLayer
@@ -491,6 +549,21 @@ function ChatSplitView() {
         onClose={() => setConfirmDelete(null)}
       />
       <SectionNameDialog naming={naming} onClose={() => setNaming(null)} />
+      {/* C0096: the sidebar's list on the Mac, opened from the main bot's menu (or Toggle Sidebar). */}
+      {isMac ? (
+        <Sheet open={botsList} onClose={() => setBotsList(false)} width={Math.min(360, windowSize.width - 48)} height={sheetHeight} dismissOnDim>
+          <aside className="sidebar roster-sheet" style={{ width: '100%' }}>
+            <div className="sidebar-header roster-sheet-header">
+              <Spacer />
+              <HStack gap={6}>
+                <ComputerFilterHeader hidden={hidden} setHidden={setHidden} manage={afterSheet(true, manage)} />
+              </HStack>
+            </div>
+            {rosterBlock(false, true)}
+            {footerBlock(false, true)}
+          </aside>
+        </Sheet>
+      ) : null}
       <Dialog open={errorMessage !== null} title={tr('Something went wrong')} message={errorMessage} actions={[]} cancel="OK" onClose={() => app.clearErrors()} />
       <SignInCodeDialog />
     </div>

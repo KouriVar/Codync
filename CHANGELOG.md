@@ -986,3 +986,58 @@ iOS 定制分支：`ui/ios-customization`；当前 Mac 工作分支：`ui/macos-
   - 标签栏数据取自当前已加载的会话记录；还没翻到的更早历史里的派活对象要等加载后才会出现。
   - 未加单元测试。
 - **关联** C0094。
+
+### C0096 · 2026-11-05 · Mac 主界面改版（基础版）：去掉左侧栏，左侧栏功能搬进主 bot 三组菜单
+
+- **原因** 用户要求 Mac 端主界面改版（基础版）：去左侧栏、主 bot 菜单、bot 标签栏、右侧对话栏；打开 App 直接进主 bot 会话，左侧栏里的功能一项不删、不改逻辑，只换入口。
+- **变化** Mac 上不再渲染左侧栏列（`ChatSplitView` 在 `isMac` 时跳过 `<aside className="sidebar">` 及其宽度拖拽条），会话区占满窗口；Linux/Windows 保持原样（`isMac` 取自 `window.codync.platform`，平台判断沿用既有做法）。
+  左侧栏原有入口全部改到「主 bot 菜单」：点顶部居中的主 bot 名字按钮（`title-pill`）弹出，用分隔线分三组。
+  组 a（主 bot 自己的）：例行任务、完整对话（历史）、对话详情。
+  组 b（其他 bot）：Bot 列表（在 Sheet 里打开原左侧栏整套列表 —— 分组、右键菜单、拖拽排序、每台电脑的扩展入口、底部账户/扩展/更新，组件与行为不变）、新建 bot、搜索。
+  组 c（App 本身）：连接状态（用与侧栏头部同一份 `useComputerFilterChoices` 的选项：切换电脑、重新连接、安装 Host、管理电脑等）、电脑访问（Codync Screen）、设置、账户。
+  菜单共 15 项，超过十项，不常用的 5 项收进「更多」：新建群聊、导入 Bot…、扩展、网络、检查更新。
+  启动行为：没有选中时自动选主 bot（lead bot，否则列表第一个）进入其会话。
+  macOS 菜单栏「View → Toggle Sidebar」在 Mac 上改为开关这个 Bot 列表 Sheet（其他平台仍切换窄栏）。
+  拿不准归组的「搜索」按语义放进了 b 组（它搜的是 bot 列表）；其余归属见上。
+- **文件** `apps/desktop/src/renderer/views/{ChatWindow.tsx,MainBotMenu.tsx,ComputerFilterHeader.tsx,chat-window.css}`、`apps/desktop/src/renderer/lib/{main-layout-phrases.ts,l10n.ts}`。
+- **验证** `apps/desktop` 下 `npm run typecheck` 与 `npm run build`（electron-vite build）通过。按用户要求只编译、不做功能自测：未启动应用、未实际点菜单、未点 Bot 列表。
+- **限制与待办** 改动位于三平台共用的 renderer，Mac 侧用 `isMac` / `html[data-platform="darwin"]` 条件隔离，Linux/Windows 的视觉与交互未改。未加单元测试。
+  「新会话 / 历史会话」在现有代码里没有独立功能（主 bot 会话是无尽的，旧消息在流内「加载更早」或「完整对话」里看），故未凭空新增，只把已有的「完整对话」「例行任务」「对话详情」放进 a 组。
+- **关联** 编号接 C0095。
+
+### C0097 · 2026-11-05 · Mac 主会话把派活卡片移出消息流
+
+- **原因** C0094 的派活卡片显示在消息流里；新版把同类信息放到 bot 标签栏与右侧对话栏，消息流不再需要这张卡。
+- **变化** Mac 上 `ThreadView` 的 `Row` 对 `exchanges` 项不再渲染（返回 null），消息流里不再出现 C0094 的卡片。`BotPair`、`delegateStatus`、`delegate-card.ts` 等判断逻辑保留，供标签栏与右侧栏复用。Linux/Windows 仍显示原卡片。`chat-items`/`buildChat` 的分组与分页逻辑未改（只是不画）。
+- **文件** `apps/desktop/src/renderer/views/thread/ThreadView.tsx`、`apps/desktop/src/renderer/views/thread/delegate-card.ts`（新增四色状态映射 `DELEGATE_STATUS_DOTS`，供标签栏用）。
+- **验证** 同 C0096（typecheck 与 build 通过；未做功能自测）。
+- **限制与待办** 空的 exchanges 容器 `div` 仍保留在 rows 里（无高度、无视觉影响）。未加单元测试。
+- **关联** C0094、C0096。
+
+### C0098 · 2026-11-05 · Mac 主会话 bot 标签栏：头像状态点四色、正在执行状态条、N 条消息往来
+
+- **原因** 标签栏要能一眼看出每个 bot 的状态、谁正在执行，并作为右侧对话栏的入口。
+- **变化** 每个标签改为「头像 + 昵称」，状态点挪到头像右下角，四种颜色：红 = 出问题（failed）、橙 = 执行中（working）、蓝 = 等你反馈或选择（needs-decision）、绿 = 已回复或空闲（replied）。判断沿用原 `delegateStatus`，颜色用新增的 `DELEGATE_STATUS_DOTS`。
+  标签栏上方新增一排「某某 正在……」状态条：取本会话里 `isWorking` 的 bot，动作文本取 `bot.activity`（没有则 `Working…`），一个 bot 一条，横排、放不下横向滚动，样式同标签。
+  每个标签上方加「N 条消息往来」小卡片，点击打开右侧对话栏。
+  点标签插入 @名字的行为不变（发送仍走原 `store.send`，@ 仍是正文前缀）。
+- **文件** `apps/desktop/src/renderer/views/thread/{BotChipBar.tsx,bot-chips.css,delegate-card.ts}`、`apps/desktop/src/renderer/lib/main-layout-phrases.ts`。
+- **验证** 同 C0096（typecheck 与 build 通过；未做功能自测，未点标签、未开卡片）。
+- **限制与待办** 「正在……」里的动作文本来自 Host（英文），未本地化；状态仍是 C0094 的近似判断（对方 bot 全局 `needsInput`），不是会话级判据。未加单元测试。
+- **关联** C0095、C0096。
+
+### C0099 · 2026-11-05 · Mac 右侧对话栏：并排 + 竖分割线、BotPair 标题、自己的输入框、尺寸规则
+
+- **原因** 需要一个和主会话并排的右侧对话栏，并按用户指定的尺寸（会话区/输入框最大 888 最小 560、气泡最大 560、右栏最小 320，先压右栏再压主区）实现，全部弹性、不写死窗口尺寸。
+- **变化** 点「N 条消息往来」在 Mac 打开右侧对话栏（其他平台仍是原来的 Sheet）：主会话区与右侧栏左右并排，中间一条竖分割线（右侧栏只加 `border-left`，不做成两张卡）。
+  标题用 `BotPair`（主 bot ⇆ 对方 bot）；右上角关闭按钮，再放一个「更多」按钮（先留空、不做功能）。
+  栏内消息统一左对齐（含用户发出的），复用原 Sheet 的行 `BotConversationScroll`。底部自己的输入框，占位「给 某某 发消息」，发送走现有 `store.send(text, peerId)`（对方是本机 bot 时真实送达，落在对方自己的会话）；对方在另一台电脑时不显示输入框、显示提示。
+  尺寸：`html[data-platform="darwin"]` 下会话列 `--column` 最大 888、`.conversation` 最小 560、消息气泡最大 560；右侧栏最小 320；宽度按「先压右栏到 320、再压主区到 560」计算（`ThreadView` 内 `chatPanelWidth = max(320, min(420, viewWidth - 560))`）。不写死窗口尺寸。
+- **文件** 新增 `apps/desktop/src/renderer/views/thread/{BotChatPanel.tsx,bot-chat-panel.css}`；修改 `apps/desktop/src/renderer/views/thread/{ThreadView.tsx,BotConversation.tsx,thread.css}`、`apps/desktop/src/renderer/lib/main-layout-phrases.ts`。
+- **验证** 同 C0096（typecheck 与 build 通过；未做功能自测，未实际打开右栏、未发送）。
+- **限制与待办**
+  - 窗口宽度小于约 881px（主区 560 + 右栏 320 + 分割线）时两者都到下限，右侧栏会压到主区边缘/裁切；本轮未改窗口最小宽（用户要求不写死窗口尺寸），要彻底不裁切需另定窗口 `minWidth`。
+  - 右侧栏只回显你发给对方的内容（取自对方 bot 自己会话里的用户消息），对方 bot 的回复在该 bot 自己的会话里看；未把对方回复合并进栏内。
+  - 右侧栏与「对话详情」侧栏同时在右侧，同时打开会重叠（详情面板是绝对定位覆盖）。
+  - 按要求先不做拉成全屏。未加单元测试。
+- **关联** C0094、C0095、C0096。

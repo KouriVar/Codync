@@ -23,6 +23,19 @@ export const DELEGATE_STATUS_TONES: Record<DelegateStatus, Tone> = {
   failed: 'danger',
 }
 
+/**
+ * The tag bar's four status dots (C0096): red when it broke, orange while it runs, blue while it
+ * waits on you to pick, green once it answered (or has nothing to do). Same states as the card.
+ */
+export type DelegateDot = 'problem' | 'working' | 'asking' | 'idle'
+
+export const DELEGATE_STATUS_DOTS: Record<DelegateStatus, DelegateDot> = {
+  failed: 'problem',
+  working: 'working',
+  'needs-decision': 'asking',
+  replied: 'idle',
+}
+
 /** The peer has said something in this exchange: it replied to ours, or its message started it. */
 const answered = (x: BotExchange) => (isOutgoing(x) ? Boolean(x.message.reply) : true)
 

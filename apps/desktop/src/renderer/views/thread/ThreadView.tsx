@@ -3,7 +3,7 @@ import { draftOf, isGroup, isWorking, isWorkingIn, type Bot, type BotDraft, type
 import { BotAvatar, GroupAvatar } from '../../components/Avatar'
 import { Spinner } from '../../components/Controls'
 import { Icon } from '../../components/Icon'
-import { Sheet, usePresence } from '../../components/Overlay'
+import { Sheet, usePresence, AnchoredMenu } from '../../components/Overlay'
 import { HStack, IconSlot, Spacer } from '../../components/Stack'
 import { Text } from '../../components/Text'
 import { prefs, usePref } from '../../lib/prefs'
@@ -14,6 +14,9 @@ import { useStore } from '../../store/context'
 import { UpdateNeededCard } from '../UpdateNeededCard'
 import { buildChat, rowIn, useArrivals, type ChatItem } from './chat-items'
 import { BotConversationView, BotMessageRow } from './BotConversation'
+import { BotChatPanel } from './BotChatPanel'
+import { useMainBotMenu } from '../MainBotMenu'
+import { isMac } from '../settings/parts'
 import { CallConversationView, CallLineRow } from '../call/CallRows'
 import { hidingCalls } from '@shared/calls'
 import { ChatRow, TimeSeparator } from './ChatRows'
@@ -56,7 +59,8 @@ export const ThreadView = memo(function ThreadView({ botId }: { botId: string })
   const cancelReply = useCallback(() => setReplyTo(null), [])
   /** The bot the message box addresses with a chip below the transcript. */
   const [mention, setMention] = useState<Mention | null>(null)
-  const [botChat, setBotChat] = useState<string | null>(null)
+  /** The peer whose conversation is open: a sheet on other platforms, the docked panel on the Mac. */
+  const [botChat, setBotChat] = useState<{ id: string; name: string } | null>(null)
   /** The voice call whose conversation is open (its line's entry id). */
   const [callLine, setCallLine] = useState<string | null>(null)
   const [editingGroup, setEditingGroup] = useState(false)
@@ -80,6 +84,8 @@ export const ThreadView = memo(function ThreadView({ botId }: { botId: string })
   const width = useRef(800)
   const [wide, setWide] = useState(true)
   const [, setSqueezed] = useState(0)
+  /** The measured width, in state: the docked panel beside the chat sizes itself to it (C0096). */
+  const [viewWidth, setViewWidth] = useState(800)
   const squeezeBelow = useRef(0)
   const [detailsWidth, setDetailsWidth] = usePref(prefs.detailsPanelWidth)
   useReading(store, botId)
@@ -92,6 +98,7 @@ export const ThreadView = memo(function ThreadView({ botId }: { botId: string })
     const observer = new ResizeObserver(([e]) => {
       const w = e!.contentRect.width
       width.current = w
+      setViewWidth(w)
       setWide(w >= WIDE)
       setSqueezed(w - 380 < squeezeBelow.current ? w : 0)
     })
@@ -144,6 +151,13 @@ export const ThreadView = memo(function ThreadView({ botId }: { botId: string })
   const presentAgent = useCallback((id: string) => (id === botId ? presentRoutine(null) : setEditingMember(id)), [botId, presentRoutine])
   const member = editingMember ? store.bots.get(editingMember) : undefined
 
+  // C0096: the bot's name button opens the menu the left sidebar used to be — its own conversation's
+  // entries, the other bots, and the app's.
+  const mainMenu = useMainBotMenu({ onRoutines: () => presentRoutine(null), onFullConversation: openTrace, onDetails: toggleDetails })
+  // The docked conversation (Mac): the chat keeps 560 at least, the panel 320 at least.
+  const chatOpen = isMac && botChat !== null
+  const chatPanelWidth = chatOpen ? Math.max(320, Math.min(420, viewWidth - 560)) : 0
+
   const details = (
     <DetailsPanel
       key={routineRequest}
@@ -176,20 +190,32 @@ export const ThreadView = memo(function ThreadView({ botId }: { botId: string })
             ) : null}
           </div>
           {/* The call bar takes the pill's place; its frosted glass would show the name blurred. */}
-          <button className={`title-pill ${calling ? 'hidden-by-call' : ''}`} inert={calling} onClick={toggleDetails} aria-label={tr('{name}, view details').replaceAll('{name}', () => bot?.name ?? tr('Conversation'))} title="View conversation details">
+          <button
+            ref={isMac ? mainMenu.anchor : undefined}
+            className={`title-pill ${calling ? 'hidden-by-call' : ''}`}
+            inert={calling}
+            onClick={isMac ? mainMenu.toggle : toggleDetails}
+            aria-haspopup={isMac ? 'menu' : undefined}
+            aria-expanded={isMac ? mainMenu.open : undefined}
+            aria-label={isMac
+              ? tr('{name}, open menu').replaceAll('{name}', () => bot?.name ?? tr('Conversation'))
+              : tr('{name}, view details').replaceAll('{name}', () => bot?.name ?? tr('Conversation'))}
+            title={isMac ? tr('Open menu') : 'View conversation details'}
+          >
             <HStack as="span" gap={7}>
               {bot ? isGroup(bot) ? <GroupAvatar members={store.members(bot)} size={22} /> : <BotAvatar bot={bot} size={22} /> : null}
               <Text size="body" weight="medium" tone="text" truncate>{bot?.name ?? ''}</Text>
               {/* Grok Bot's hint on hover: the pill opens the details. */}
               <span className="title-pill-chevron">
-                <Icon name="chevron.right" size={10} weight="semibold" color="var(--secondary)" />
+                <Icon name={isMac ? 'chevron.down' : 'chevron.right'} size={10} weight="semibold" color="var(--secondary)" />
               </span>
             </HStack>
             {store.shownConnection.kind !== 'online' || store.mismatch ? <ConnectionSubtitle /> : null}
           </button>
+          {isMac ? <AnchoredMenu open={mainMenu.open} onClose={mainMenu.close} anchor={mainMenu.anchor} items={mainMenu.items} /> : null}
         </div>
         {/* An update card takes the composer's place, so there's nothing to reply with. */}
-        <Transcript botId={botId} openTrace={openTrace} onReply={store.mismatch ? undefined : setReplyTo} openRoutine={presentRoutine} openAgent={presentAgent} openBotChat={setBotChat} openArtifact={openArtifact} openCall={setCallLine} />
+        <Transcript botId={botId} openTrace={openTrace} onReply={store.mismatch ? undefined : setReplyTo} openRoutine={presentRoutine} openAgent={presentAgent} openBotChat={(peerId) => setBotChat({ id: peerId, name: store.authorName(peerId) })} openArtifact={openArtifact} openCall={setCallLine} />
         <div className="composer-dock" ref={dock}>
           <div className="composer-fade" />
           {store.mismatch ? (
@@ -201,7 +227,7 @@ export const ThreadView = memo(function ThreadView({ botId }: { botId: string })
             <>
               <QueuedMessages botId={botId} />
               {/* A main chat's chips over its box; a group addresses its members with @ in the text. */}
-              {bot && !isGroup(bot) ? <BotChipBar botId={botId} mention={mention} pick={setMention} /> : null}
+              {bot && !isGroup(bot) ? <BotChipBar botId={botId} mention={mention} pick={setMention} openChat={(id, name) => setBotChat({ id, name })} /> : null}
               <Composer
                 botId={botId}
                 reply={replyTo}
@@ -221,6 +247,12 @@ export const ThreadView = memo(function ThreadView({ botId }: { botId: string })
         ) : null}
         {artifactId ? <ArtifactView botId={botId} artifactId={artifactId} close={() => setArtifactId(null)} /> : null}
       </div>
+      {/* C0096: the peer's conversation docked beside the chat on the Mac — one window, split by a hairline. */}
+      {chatOpen && botChat ? (
+        <div className="bot-chat-dock" style={{ width: chatPanelWidth }}>
+          <BotChatPanel botId={botId} peerId={botChat.id} peerName={botChat.name} onClose={() => setBotChat(null)} />
+        </div>
+      ) : null}
       <ChatSidePanel
         open={panelOpen}
         width={panelWidth(detailsWidth)}
@@ -234,9 +266,12 @@ export const ThreadView = memo(function ThreadView({ botId }: { botId: string })
       <Sheet open={compactDetails} onClose={() => setCompactDetails(false)} width={400} height={600}>
         {details}
       </Sheet>
-      <Sheet open={botChat !== null} onClose={() => setBotChat(null)} width={620} height={560}>
-        {botChat ? <BotConversationView botId={botId} peerId={botChat} /> : null}
-      </Sheet>
+      {/* The Mac docks the conversation beside the chat; elsewhere it stays a sheet (C0096). */}
+      {isMac ? null : (
+        <Sheet open={botChat !== null} onClose={() => setBotChat(null)} width={620} height={560}>
+          {botChat ? <BotConversationView botId={botId} peerId={botChat.id} /> : null}
+        </Sheet>
+      )}
       <Sheet open={callLine !== null} onClose={() => setCallLine(null)} width={620} height={560}>
         {callLine ? <CallConversationView botId={botId} lineId={callLine} /> : null}
       </Sheet>
@@ -431,7 +466,11 @@ function Row({ item, chat, openTrace, onReply, openRoutine, openAgent, openBotCh
   if (item.kind === 'separator') {
     return <TimeSeparator date={item.date} />
   }
-  if (item.kind === 'exchanges') return <BotMessageRow exchanges={item.exchanges} open={openBotChat} />
+  if (item.kind === 'exchanges') {
+    // C0096: the delegation card no longer sits in the message flow on the Mac — the tag bar and the
+    // docked panel carry it. Other platforms keep the card they had.
+    return isMac ? null : <BotMessageRow exchanges={item.exchanges} open={openBotChat} />
+  }
   const e = item.entry
   if (e.kind === 'notice' && e.data.routineId) return <RoutineNotice entry={e} open={() => openRoutine(e.data.routineId!)} />
   if (e.kind === 'notice' && e.data.call) return <div className="chat-row notice"><CallLineRow entry={e} open={() => openCall(e.id)} /></div>

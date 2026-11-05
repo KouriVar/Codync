@@ -13,37 +13,59 @@ import { useFetched } from '../../lib/use-fetched'
 import { useTr } from '../../lib/use-language'
 
 
-/** A run of bot-to-bot messages with one peer: the delegation card in the message flow. Opens the conversation. */
+/**
+ * A run of bot-to-bot messages with one peer, as a card in the message flow (C0094). The transcript
+ * no longer shows it (C0096); the pair and the state it draws stay for the tag bar and the panel.
+ */
 export function BotMessageRow({ exchanges, open }: { exchanges: BotExchange[]; open: (peerId: string) => void }) {
   return <DelegateCard exchanges={exchanges} open={open} />
 }
 
-/** Read-only history between a bot and one peer: the live chat merged with what the host returns. */
-export function BotConversationView({ botId, peerId }: { botId: string; peerId: string }) {
-  const tr = useTr()
+/**
+ * The history between a bot and one peer — the live chat merged with what the host returns — as the
+ * rows to draw and the peer they are with. The plain sheet and the Mac's docked panel both read it.
+ */
+export function useBotConversation(botId: string, peerId: string) {
   const store = useStore()
   // null while the host's history loads.
   const { fetched, error } = useFetched(() => store.botConversation(botId, peerId), [store, botId, peerId])
-  const scroller = useRef<HTMLDivElement>(null)
   const exchanges = botConversation(fetched ?? [], store.allEntries(botId), peerId)
   const rows = buildBotConversation(exchanges)
-  const peer = { id: peerId, name: peerNameIn(exchanges) }
+  const peer: Peer = { id: peerId, name: peerNameIn(exchanges) }
+  return { rows, error, fetched, peer }
+}
 
+/** The conversation's rows, scrolled to the newest; a note while it loads or is empty. */
+export function BotConversationScroll({ rows, peer, error, fetched }: {
+  rows: BotConversationRow[]
+  peer: Peer
+  error: string | null
+  fetched: unknown
+}) {
+  const tr = useTr()
+  const scroller = useRef<HTMLDivElement>(null)
   useEffect(() => {
     const el = scroller.current
     if (el) el.scrollTop = el.scrollHeight
   }, [rows.length, rows[rows.length - 1]?.id])
+  return (
+    <div className="bot-conversation-scroll" ref={scroller}>
+      <div className="bot-conversation-rows">
+        {error ? <Text as="div" size="footnote" tone="danger" className="bot-conversation-note">{error}</Text> : null}
+        {!error && fetched && rows.length === 0 ? <Text as="div" size="footnote" tone="tertiary" className="bot-conversation-note">{tr(`No messages yet.`)}</Text> : null}
+        {rows.map((row) => <ConversationRow key={row.id} row={row} peer={peer} />)}
+      </div>
+    </div>
+  )
+}
 
+/** Read-only history between a bot and one peer: the live chat merged with what the host returns. */
+export function BotConversationView({ botId, peerId }: { botId: string; peerId: string }) {
+  const { rows, error, fetched, peer } = useBotConversation(botId, peerId)
   return (
     <div className="bot-conversation">
       <ModalHeader title={<BotPair botId={botId} peer={peer} />} />
-      <div className="bot-conversation-scroll" ref={scroller}>
-        <div className="bot-conversation-rows">
-          {error ? <Text as="div" size="footnote" tone="danger" className="bot-conversation-note">{error}</Text> : null}
-          {!error && fetched && rows.length === 0 ? <Text as="div" size="footnote" tone="tertiary" className="bot-conversation-note">{tr(`No messages yet.`)}</Text> : null}
-          {rows.map((row) => <ConversationRow key={row.id} row={row} peer={peer} />)}
-        </div>
-      </div>
+      <BotConversationScroll rows={rows} peer={peer} error={error} fetched={fetched} />
     </div>
   )
 }

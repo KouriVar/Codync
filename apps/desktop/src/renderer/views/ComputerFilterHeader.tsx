@@ -39,8 +39,11 @@ function summary(connections: Connection[]) {
   return `${connections.length} offline`
 }
 
-/** The roster's connection summary, with details and filters on demand. */
-export function ComputerFilterHeader({ hidden, setHidden, manage, compact = false }: { hidden: string; setHidden: (v: string) => void; manage: () => void; compact?: boolean }) {
+/**
+ * The roster's connection summary and its choices, in one place: the sidebar header shows them, and
+ * the main bot's menu (C0096) opens the same list. Same items, same actions — only the entry differs.
+ */
+export function useComputerFilterChoices(hidden: string, setHidden: (v: string) => void, manage: () => void) {
   const tr = useTr()
   const app = useApp()
   const ssh = useSSH()
@@ -69,6 +72,13 @@ export function ComputerFilterHeader({ hidden, setHidden, manage, compact = fals
     list.push({ title: 'Manage computers', icon: 'desktopcomputer', action: manage })
     return list
   }
+  return { text, items }
+}
+
+/** The roster's connection summary, with details and filters on demand. */
+export function ComputerFilterHeader({ hidden, setHidden, manage, compact = false }: { hidden: string; setHidden: (v: string) => void; manage: () => void; compact?: boolean }) {
+  const tr = useTr()
+  const { text, items } = useComputerFilterChoices(hidden, setHidden, manage)
   return (
     <DropdownMenu items={items} title={text} className={`computer-filter ${compact ? 'computer-filter-action' : ''}`}>
       {compact ? <Icon name="desktopcomputer" size={12} weight="medium" /> : <Text truncate aria-label={tr('Computers, {filter}. Filter conversations').replaceAll('{filter}', () => text)}>{text}</Text>}

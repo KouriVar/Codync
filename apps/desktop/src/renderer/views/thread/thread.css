@@ -447,3 +447,24 @@
     animation: fade-in 0.12s both;
   }
 }
+
+/* C0096 — the Mac main layout's sizes. The chat column and its box top out at 888 and never squeeze
+   under 560; a bubble tops out at 560. The docked peer conversation keeps 320 at least, and gives way
+   first: the panel shrinks to 320 before the chat shrinks to 560 (both set in `ThreadView`). */
+html[data-platform="darwin"] .conversation {
+  min-width: 560px;
+}
+html[data-platform="darwin"] .conversation {
+  --column: min(888px, 100%);
+}
+html[data-platform="darwin"] {
+  --agent-bubble-max: min(560px, max(80px, (100cqw + 32px) * 0.8 - 32px), 100cqw - 88px);
+}
+/* The docked peer conversation hangs off the chat's right edge, split from it by the panel's own
+   hairline. It is a layout child, not an overlay: the chat reflows beside it (C0096). */
+.bot-chat-dock {
+  flex: none;
+  min-width: 0;
+  height: 100%;
+  display: flex;
+}

@@ -1,18 +1,84 @@
-/* The bots a chat has worked with, over its message box (C0095): one row, scrolled sideways, flush
-   with the box's column and left edge. */
-.bot-chip-bar {
+/* The bots a chat has worked with, over its message box (C0095), and the Mac's revamp (C0096):
+   a column per bot — a count card over its tag — plus a row of whoever is running right now. One
+   row each, scrolled sideways, flush with the box's column. */
+.bot-chip-bar-wrap {
+  /* The four status dots: red broke · orange running · blue awaiting you · green done. */
+  --status-problem: #d92d20;
+  --status-working: #e8890c;
+  --status-asking: #2f6fed;
+  --status-idle: #1f9d55;
+  max-width: var(--column);
+  margin: 0 auto;
+  padding: 2px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+@media (prefers-color-scheme: dark) {
+  .bot-chip-bar-wrap {
+    --status-problem: #f0736a;
+    --status-working: #f0a030;
+    --status-asking: #6ea8ff;
+    --status-idle: #4fc17f;
+  }
+}
+/* The row of running bots, above the tags: one strip each, scrolled sideways when they don't fit. */
+.bot-chip-running {
   display: flex;
   flex-wrap: nowrap;
   align-items: center;
   gap: 6px;
-  max-width: var(--column);
-  margin: 0 auto;
-  padding: 2px 14px 2px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding-bottom: 2px;
+}
+.bot-chip-running::-webkit-scrollbar {
+  display: none;
+}
+.bot-chip-running-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex: none;
+  max-width: 220px;
+  padding: 4px 9px;
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+}
+.bot-chip-bar {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: flex-end;
+  gap: 8px;
   overflow-x: auto;
   scrollbar-width: none;
 }
 .bot-chip-bar::-webkit-scrollbar {
   display: none;
+}
+/* The card over a tag and the tag itself, as one column: the card lines up over its bot. */
+.bot-chip-col {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 3px;
+  flex: none;
+  max-width: 200px;
+}
+.bot-chip-count {
+  padding: 1px 6px;
+  text-align: center;
+  font-size: var(--text-caption);
+  color: var(--secondary);
+  border-radius: var(--radius-xs);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.bot-chip-count:hover {
+  background: var(--surface);
+  color: var(--text);
 }
 .bot-chip {
   display: flex;
@@ -20,31 +86,39 @@
   gap: 6px;
   flex: none;
   max-width: 200px;
-  padding: 5px 9px;
+  padding: 4px 9px 4px 5px;
   border-radius: var(--radius-pill);
   background: var(--surface);
 }
 .bot-chip.chosen {
   background: color-mix(in srgb, var(--text) 12%, var(--surface));
 }
-/* A dot per state: grey while it works, a ring once it answered, amber when it waits on the user,
-   red when it failed. */
-.bot-chip-status {
-  width: 6px;
-  height: 6px;
+/* The avatar with its status dot on its bottom-right corner. */
+.bot-chip-avatar {
+  position: relative;
+  display: inline-flex;
   flex: none;
+}
+.bot-chip-status {
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
   box-sizing: border-box;
+  /* A ring of the chip's own fill, so the dot reads on the avatar's edge. */
+  box-shadow: 0 0 0 1.5px var(--surface);
+}
+.bot-chip-status.problem {
+  background: var(--status-problem);
 }
 .bot-chip-status.working {
-  background: var(--secondary);
+  background: var(--status-working);
 }
-.bot-chip-status.replied {
-  border: 1px solid var(--tertiary);
+.bot-chip-status.asking {
+  background: var(--status-asking);
 }
-.bot-chip-status.needs-decision {
-  background: var(--attention);
-}
-.bot-chip-status.failed {
-  background: var(--danger);
+.bot-chip-status.idle {
+  background: var(--status-idle);
 }

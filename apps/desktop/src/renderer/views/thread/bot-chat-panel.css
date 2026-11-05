@@ -1,0 +1,92 @@
+/* The conversation with one peer, docked beside the main chat (C0096). A hairline splits the two —
+   one window, not two cards — so the panel carries no background or border of its own. */
+.bot-chat-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-width: 320px;
+  min-height: 0;
+  border-left: 0.5px solid var(--border);
+  background: var(--background);
+}
+.bot-chat-panel-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+  padding: 10px 10px 10px 14px;
+  /* Clears the traffic lights on the Mac's top band like the chat's own chrome. */
+  min-height: 48px;
+}
+.bot-chat-panel-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  container-type: inline-size;
+}
+.bot-chat-panel-scroll .bot-conversation-scroll {
+  /* The panel scrolls as one; the rows body must not scroll on its own. */
+  overflow: visible;
+}
+.bot-chat-panel-mine {
+  padding: 6px 16px 12px;
+  border-top: 0.5px solid var(--border);
+}
+.bot-chat-panel-mine-title {
+  padding: 6px 0;
+}
+/* Every row is the exchange's: left-aligned, whichever side wrote it. */
+.bot-chat-panel .message.agent .message-body,
+.bot-chat-panel .message .message-body {
+  align-items: flex-start;
+  margin-left: 0;
+  margin-right: 0;
+  max-width: 100%;
+}
+.bot-chat-panel .bubble {
+  max-width: min(100%, 560px);
+}
+.bot-chat-panel-composer {
+  flex: none;
+  padding: 10px 12px 12px;
+  border-top: 0.5px solid var(--border);
+}
+.bot-chat-panel-box {
+  align-items: flex-end;
+  padding: 6px 6px 6px 12px;
+  border-radius: var(--radius-l);
+  background: var(--surface);
+}
+.bot-chat-panel-box textarea {
+  flex: 1;
+  min-width: 0;
+  min-height: calc(20px * var(--scale));
+  max-height: calc(120px * var(--scale));
+  padding: 4px 0;
+  border: 0;
+  resize: none;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: var(--text-callout);
+  line-height: 1.4;
+}
+.bot-chat-panel-box textarea::placeholder {
+  color: var(--tertiary);
+}
+.bot-chat-panel-send {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--accent-fill);
+  color: var(--on-accent);
+}
+.bot-chat-panel-send:disabled {
+  opacity: 0.4;
+}
+.bot-chat-panel-hint {
+  padding: 4px 2px;
+}

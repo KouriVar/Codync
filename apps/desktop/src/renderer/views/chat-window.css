@@ -412,3 +412,37 @@ html[data-platform="darwin"] .sidebar-header {
   right: 0;
   height: 40px;
 }
+
+/* C0096: the Mac has no sidebar column; its list opens in a sheet from the main bot's menu. The
+   sheet hands the same `.sidebar` markup a flex slot, and its header keeps the window's traffic
+   lights out of the way (there are none inside a modal). */
+.sidebar.roster-sheet {
+  flex: 1;
+  min-height: 0;
+  height: auto;
+  background: var(--sheet);
+}
+.roster-sheet-header {
+  padding-left: 18px;
+}
+.roster-sheet .roster {
+  /* No footer height to reserve: the footer is a sibling, so the scroll box is the rest. */
+  padding-bottom: 4px;
+}
+
+/* The conversation fills the window on the Mac: the chat area never squeezes under 560 (C0096).
+   The joined right-hand panel keeps its own 320 floor; both are set in the thread's own sheet. */
+html[data-platform="darwin"] .detail {
+  min-width: 560px;
+}
+
+/* C0096: with no sidebar the account menu has no footer to rise from; on the Mac it drops from the
+   top centre, under the main bot's name button. `margin-left` (not translate) keeps the panel-in
+   scale animation intact. */
+html[data-platform="darwin"] .account-panel {
+  left: 50%;
+  margin-left: -130px;
+  bottom: auto;
+  top: 60px;
+  transform-origin: top center;
+}
