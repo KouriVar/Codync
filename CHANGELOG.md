@@ -3815,3 +3815,21 @@
 - 验证：`xcodebuild build ... -configuration DevDebug`（`generic/platform=iOS`）**BUILD SUCCEEDED，0 error**，
   构建号 **235**；已装到 iPhone 16 Pro（2.36.0 / 235）。不跑测试、不截图。
 - 关联：C0223g、C0218（图片通用层思路）、协议 `/tmp/codync-audit/c0223-protocol.md` #23/#15。
+
+### C0223fix1 · 2026-11-05 · 修 A（命令/技能不显示）+ C（上下文/统计汉化排序）
+
+- **A 命令/技能不显示**：根因是 `onAppear` 同时发起 `commands`/`goal`/`tasks` 三个「发请求→等回复」，共用一个
+  等待槽，互相把对方的帧吃掉（网关回复按 kind 匹配、无 requestId）。改：
+  - `DSHGateway.requestFrame` 改为**串行**（一次一个请求，`acquireRequestSlot`/`releaseRequestSlot` 排队），加
+    15s 超时兜底（超时以 error 收尾，避免卡死后续请求）；`commandAwaiter` 带自增 id，超时只解自己的。
+  - `DSHComposer`：把加载集中到 `loadSessionPanels()`；在 `onAppear`、`gateway.phase` 变为 `.ready` 时、以及
+    **打开加号 sheet 时**（若命令为空）都会补拉；加号 sheet 若 `commands` 能力在但列表还空，显示「命令加载中…」。
+- **C 上下文/Token 汉化 + 排序**：`DSHContextUsageSheet`/`DSHStatsSheet` 改用 `DSHMetrics`：
+  - 已知 key 映射中文（总量/输入/输出/缓存读取/缓存写入/缓存命中/推理/未缓存输入/系统提示词/工具/对话消息/窗口上限/
+    已用占比…），未知 key 回落原字段名（不编造）。
+  - 主指标（已用占比/总量/输入/输出/缓存/推理）排最前；百分比按 `xx%`、token 计数加千分位 + ` tok`。
+  - 分组：上下文面板「Token 用量 / 上下文压力」；统计面板「执行统计 / Token 用量 / 上下文」。
+- 边界：不改输入框设计、串流、Coe 共享组件。
+- 验证：`xcodebuild build ... -configuration DevDebug`（`generic/platform=iOS`）**BUILD SUCCEEDED，0 error**，
+  构建号 **236**；已装 iPhone 16 Pro（2.36.0 / 236）。不跑测试、不截图。
+- 说明：`tokenUsage` 的确切字段名网关未文档化，若个别 key 未命中映射仍会显示英文原名；把实际 key 给我可精修。

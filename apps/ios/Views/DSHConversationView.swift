@@ -374,10 +374,14 @@ struct DSHComposer: View {
             status: status,
             focused: focused
         )
-        .onAppear {
-            if gateway.supportsCommands, gateway.commandGroups.isEmpty { Task { await gateway.loadCommands() } }
-            if gateway.supportsGoals { Task { await gateway.loadGoal() } }
-            if gateway.supportsTasks { Task { await gateway.loadTasks() } }
+        .onAppear { loadSessionPanels() }
+        .onChange(of: gateway.phase) { _, phase in
+            if case .ready = phase { loadSessionPanels() }
+        }
+        .onChange(of: showAddSheet) { _, open in
+            if open, gateway.supportsCommands, gateway.commandGroups.isEmpty {
+                Task { await gateway.loadCommands() }
+            }
         }
         .alert("编辑目标", isPresented: $editingGoal) {
             TextField("目标", text: $goalObjective)
@@ -410,6 +414,7 @@ struct DSHComposer: View {
                 canPhoto: gateway.capabilities.contains("images"),
                 canFile: gateway.supportsFileUpload,
                 groups: gateway.supportsCommands ? gateway.commandGroups : [],
+                commandPending: gateway.supportsCommands && gateway.commandGroups.isEmpty,
                 onPhotos: { pickingPhotos = true },
                 onCamera: { capturePhoto { image in add(captured: image) } },
                 onFiles: { pickingFiles = true },
@@ -707,6 +712,14 @@ struct DSHComposer: View {
         }
     }
 
+    /// Loads commands, goal and tasks once the transport is ready (requests are serialised in the
+    /// gateway, so firing them together is safe; a not-yet-ready phase just returns empty and is retried).
+    private func loadSessionPanels() {
+        if gateway.supportsCommands { Task { await gateway.loadCommands() } }
+        if gateway.supportsGoals { Task { await gateway.loadGoal() } }
+        if gateway.supportsTasks { Task { await gateway.loadTasks() } }
+    }
+
     /// Photos come in as data, are made gateway-safe by the shared processor, then join the strip.
     private func addPhotos(_ items: [PhotosPickerItem]) async {
         preparingImages = true
@@ -824,6 +837,7 @@ private struct DSHAddSheet: View {
     let canPhoto: Bool
     let canFile: Bool
     let groups: [DSHCommandGroup]
+    let commandPending: Bool
     let onPhotos: () -> Void
     let onCamera: () -> Void
     let onFiles: () -> Void
@@ -842,6 +856,9 @@ private struct DSHAddSheet: View {
                     if !canPhoto && !canFile {
                         Text("这个网关不支持发附件")
                             .font(.footnote).foregroundStyle(Palette.secondary)
+                    }
+                    if commandPending {
+                        Text("命令加载中…").font(.footnote).foregroundStyle(Palette.secondary)
                     }
                     ForEach(groups) { group in
                         VStack(alignment: .leading, spacing: 6) {
@@ -1110,13 +1127,12 @@ private struct DSHModelSheet: View {
     }
 }
 
-/// Context usage: the gateway's `context-usage` reply rendered as key/value rows, plus a button that
-/// runs the `/compact` command. The exact `tokenUsage` keys are not documented, so every entry is
-/// shown as-is (marked in the report as 未确认 structure).
+/// Context usage: `context-usage` rendered in Chinese, main metrics first, plus a 立即压缩 button.
 private struct DSHContextUsageSheet: View {
     @ObservedObject var gateway: DSHGateway
     @Environment(\.dismissModal) private var dismiss
-    @State private var rows: [(String, String)] = []
+    @State private var tokenRows: [(String, String)] = []
+    @State private var pressureRows: [(String, String)] = []
     @State private var loaded = false
 
     var body: some View {
@@ -1124,13 +1140,11 @@ private struct DSHContextUsageSheet: View {
             List {
                 if !loaded {
                     Text("加载中…").foregroundStyle(Palette.secondary)
-                } else if rows.isEmpty {
+                } else if tokenRows.isEmpty && pressureRows.isEmpty {
                     Text("没有上下文用量数据").foregroundStyle(Palette.secondary)
                 } else {
-                    ForEach(rows, id: \.0) { row in
-                        HStack { Text(row.0).foregroundStyle(Palette.secondary); Spacer()
-                            Text(row.1).foregroundStyle(Palette.text) }
-                    }
+                    if !tokenRows.isEmpty { Section("Token 用量") { ForEach(tokenRows, id: \.0) { row in kv(row) } } }
+                    if !pressureRows.isEmpty { Section("上下文压力") { ForEach(pressureRows, id: \.0) { row in kv(row) } } }
                 }
                 Section {
                     Button {
@@ -1144,52 +1158,39 @@ private struct DSHContextUsageSheet: View {
             .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("关闭") { dismiss() } } }
             .task {
                 if let json = await gateway.loadContextUsage() {
-                    var out: [(String, String)] = []
-                    out += Self.kvRows(json["tokenUsage"])
-                    out += Self.kvRows(json["contextPressure"])
-                    rows = out
+                    tokenRows = DSHMetrics.rows(json["tokenUsage"])
+                    pressureRows = DSHMetrics.rows(json["contextPressure"])
                 }
                 loaded = true
             }
         }
     }
 
-    /// Flattens one nested dict into readable rows (numbers and strings; nested dicts one level deep).
-    static func kvRows(_ value: Any?) -> [(String, String)] {
-        guard let dict = value as? [String: Any] else { return [] }
-        var rows: [(String, String)] = []
-        for key in dict.keys.sorted() {
-            let v = dict[key]
-            if let n = v as? NSNumber { rows.append((key, DSHNumberFormat.string(n))) }
-            else if let s = v as? String { rows.append((key, s)) }
-            else if let nested = v as? [String: Any] {
-                for inner in nested.keys.sorted() {
-                    if let n = nested[inner] as? NSNumber { rows.append((key + "." + inner, DSHNumberFormat.string(n))) }
-                    else if let s = nested[inner] as? String { rows.append((key + "." + inner, s)) }
-                }
-            }
-        }
-        return rows
+    private func kv(_ row: (String, String)) -> some View {
+        HStack { Text(row.0).foregroundStyle(Palette.secondary); Spacer()
+            Text(row.1).foregroundStyle(Palette.text) }
     }
 }
 
-/// Token usage and execution stats from `session-stats`, as key/value rows.
+/// Token usage and execution stats from `session-stats`, in Chinese with main metrics first.
 private struct DSHStatsSheet: View {
     @ObservedObject var gateway: DSHGateway
     @Environment(\.dismissModal) private var dismiss
-    @State private var rows: [(String, String)] = []
+    @State private var statRows: [(String, String)] = []
+    @State private var tokenRows: [(String, String)] = []
+    @State private var pressureRows: [(String, String)] = []
     @State private var loaded = false
 
     var body: some View {
         NavigationStack {
             List {
                 if !loaded { Text("加载中…").foregroundStyle(Palette.secondary) }
-                else if rows.isEmpty { Text("没有统计数据").foregroundStyle(Palette.secondary) }
-                else {
-                    ForEach(rows, id: \.0) { row in
-                        HStack { Text(row.0).foregroundStyle(Palette.secondary); Spacer()
-                            Text(row.1).foregroundStyle(Palette.text) }
-                    }
+                else if statRows.isEmpty && tokenRows.isEmpty && pressureRows.isEmpty {
+                    Text("没有统计数据").foregroundStyle(Palette.secondary)
+                } else {
+                    if !statRows.isEmpty { Section("执行统计") { ForEach(statRows, id: \.0) { row in kv(row) } } }
+                    if !tokenRows.isEmpty { Section("Token 用量") { ForEach(tokenRows, id: \.0) { row in kv(row) } } }
+                    if !pressureRows.isEmpty { Section("上下文") { ForEach(pressureRows, id: \.0) { row in kv(row) } } }
                 }
             }
             .navigationTitle("Token 统计")
@@ -1197,24 +1198,106 @@ private struct DSHStatsSheet: View {
             .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("关闭") { dismiss() } } }
             .task {
                 if let json = await gateway.loadSessionStats() {
-                    var out: [(String, String)] = []
-                    out += DSHContextUsageSheet.kvRows(json["sessionStats"])
-                    out += DSHContextUsageSheet.kvRows(json["tokenUsage"])
-                    out += DSHContextUsageSheet.kvRows(json["contextPressure"])
-                    rows = out
+                    statRows = DSHMetrics.rows(json["sessionStats"])
+                    tokenRows = DSHMetrics.rows(json["tokenUsage"])
+                    pressureRows = DSHMetrics.rows(json["contextPressure"])
                 }
                 loaded = true
             }
         }
     }
+
+    private func kv(_ row: (String, String)) -> some View {
+        HStack { Text(row.0).foregroundStyle(Palette.secondary); Spacer()
+            Text(row.1).foregroundStyle(Palette.text) }
+    }
 }
 
-/// Formats a gateway number: integers stay integers, fractional values keep a little precision.
-private enum DSHNumberFormat {
-    static func string(_ n: NSNumber) -> String {
+/// Turns a gateway usage/stats dict into ordered, Chinese-labelled, formatted rows. The exact wire keys
+/// are undocumented, so unknown keys fall back to the raw name; known keys get a Chinese label and the
+/// main metrics (已用占比/总量/输入/输出/缓存/推理) sort first.
+private enum DSHMetrics {
+    static let labels: [String: String] = [
+        "usedpercent": "已用占比", "percent": "已用占比", "utilization": "已用占比", "usage": "已用占比",
+        "total": "总量", "totaltokens": "总量", "tokenusage": "总量", "totalusage": "总量", "totaltokenusage": "总量",
+        "input": "输入", "inputtokens": "输入", "prompttokens": "输入",
+        "uncachedinput": "未缓存输入", "uncachedinputtokens": "未缓存输入",
+        "output": "输出", "outputtokens": "输出", "completiontokens": "输出",
+        "cacheread": "缓存读取", "cachereadtokens": "缓存读取", "cachedread": "缓存读取",
+        "cachewrite": "缓存写入", "cachewritetokens": "缓存写入", "cachedwrite": "缓存写入",
+        "reasoning": "推理", "reasoningtokens": "推理",
+        "cachehitrate": "缓存命中", "cachehit": "缓存命中", "hitrate": "缓存命中", "cachedpercent": "缓存命中",
+        "systemprompt": "系统提示词", "systemprompttokens": "系统提示词",
+        "tool": "工具", "tooltokens": "工具", "tools": "工具",
+        "conversation": "对话消息", "conversationtokens": "对话消息", "message": "对话消息", "messagetokens": "对话消息",
+        "used": "已用", "usedtokens": "已用",
+        "limit": "窗口上限", "limittokens": "窗口上限", "window": "窗口上限", "contextwindow": "窗口上限",
+        "remaining": "剩余", "remainingtokens": "剩余",
+        "estimated": "预计", "estimate": "预计", "estimatedtokens": "预计",
+        "turns": "轮次", "steps": "步骤", "llmms": "LLM 耗时(ms)", "toolms": "工具耗时(ms)",
+        "ttftms": "首字耗时(ms)", "ttftsteps": "首字步数", "decodems": "解码耗时(ms)",
+        "decodetokens": "解码 tokens", "lastturn": "最近轮次", "openstep": "进行中步骤", "pendingcalls": "待处理调用",
+    ]
+    static let order: [String] = [
+        "usedpercent", "percent", "utilization", "usage", "total", "totaltokens", "tokenusage",
+        "input", "inputtokens", "prompttokens", "uncachedinput", "uncachedinputtokens",
+        "output", "outputtokens", "completiontokens",
+        "cacheread", "cachereadtokens", "cachewrite", "cachewritetokens", "cachehitrate", "cachehit", "hitrate",
+        "reasoning", "reasoningtokens", "systemprompt", "tool", "conversation", "message",
+        "limit", "window", "remaining", "estimated",
+        "turns", "steps", "llmms", "toolms", "ttftms", "ttftsteps", "decodems", "decodetokens",
+    ]
+
+    static func normalize(_ key: String) -> String { key.lowercased().filter { $0.isLetter || $0.isNumber } }
+
+    static func rows(_ value: Any?) -> [(String, String)] {
+        guard let dict = value as? [String: Any] else { return [] }
+        var items: [(order: Int, label: String, value: String)] = []
+        for (key, raw) in dict {
+            if let n = raw as? NSNumber {
+                items.append((orderIndex(key), label(key), format(key, n)))
+            } else if let str = raw as? String {
+                items.append((orderIndex(key), label(key), str))
+            } else if let nested = raw as? [String: Any] {
+                for (inner, v) in nested {
+                    let composite = key + "." + inner
+                    if let n = v as? NSNumber { items.append((orderIndex(composite), label(composite), format(composite, n))) }
+                    else if let str = v as? String { items.append((orderIndex(composite), label(composite), str)) }
+                }
+            }
+        }
+        return items.sorted { $0.order == $1.order ? $0.label < $1.label : $0.order < $1.order }
+            .map { ($0.label, $0.value) }
+    }
+
+    private static func orderIndex(_ key: String) -> Int {
+        let nk = normalize(key).split(separator: ".").last.map(String.init) ?? normalize(key)
+        if let index = order.firstIndex(of: nk) { return index }
+        return order.count + 1
+    }
+    private static func label(_ key: String) -> String {
+        let nk = normalize(key).split(separator: ".").last.map(String.init) ?? normalize(key)
+        return labels[nk] ?? key
+    }
+    private static func format(_ key: String, _ n: NSNumber) -> String {
+        let nk = normalize(key)
         let d = n.doubleValue
-        if d == d.rounded() { return String(Int64(d)) }
-        return String(format: "%.1f", d)
+        if nk.contains("percent") || nk.contains("rate") || nk.contains("utilization") || nk.contains("ratio") {
+            let pct = d <= 1.0 ? d * 100 : d
+            return trimmed(pct) + "%"
+        }
+        if nk.contains("token") || nk.contains("input") || nk.contains("output") || nk.contains("cache")
+            || nk.contains("reasoning") || nk.contains("total") || abs(d) >= 1000 {
+            return grouped(Int64(d.rounded())) + " tok"
+        }
+        return trimmed(d)
+    }
+    private static func trimmed(_ d: Double) -> String {
+        d == d.rounded() ? String(Int64(d)) : String(format: "%.1f", d)
+    }
+    private static func grouped(_ v: Int64) -> String {
+        let f = NumberFormatter(); f.numberStyle = .decimal; f.groupingSeparator = ","
+        return f.string(from: NSNumber(value: v)) ?? "\(v)"
     }
 }
 

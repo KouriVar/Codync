@@ -74,7 +74,12 @@ public final class DSHGateway: ObservableObject {
     @Published public private(set) var pendingQuestion: DSHQuestionRequest?
 
     /// The single outstanding request/reply (commands, options, …). The UI serialises them.
-    private var commandAwaiter: CheckedContinuation<DSHFrame, Never>?
+    private var commandAwaiter: (id: Int, cont: CheckedContinuation<DSHFrame, Never>)?
+    private var requestSeq = 0
+    /// One request in flight at a time: the gateway's replies are matched by kind, not a request id, so
+    /// concurrent commands/goal/tasks requests would otherwise steal each other's frames.
+    private var requestBusy = false
+    private var requestQueue: [CheckedContinuation<Void, Never>] = []
     private static let requestKinds: Set<String> = [
         "commands", "command-executed", "command-options", "command-selected",
         "file-upload-opened", "file-upload-chunk-accepted", "file-upload-completed", "file-upload-cancelled",
@@ -788,14 +793,40 @@ public final class DSHGateway: ObservableObject {
     }
 
     private func requestFrame(_ payload: [String: Any], expecting kind: String) async -> DSHFrame? {
+        await acquireRequestSlot()
+        defer { releaseRequestSlot() }
         guard send(payload) else { return nil }
-        let frame = await withCheckedContinuation { commandAwaiter = $0 }
+        requestSeq += 1
+        let id = requestSeq
+        let timeout = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 15_000_000_000)
+            guard let self, !Task.isCancelled else { return }
+            if let waiter = self.commandAwaiter, waiter.id == id {
+                self.commandAwaiter = nil
+                waiter.cont.resume(returning: DSHFrame(kind: "error", json: ["code": "timeout"]))
+            }
+        }
+        defer { timeout.cancel() }
+        let frame = await withCheckedContinuation { (cont: CheckedContinuation<DSHFrame, Never>) in
+            commandAwaiter = (id, cont)
+        }
         return (frame.kind == kind || frame.kind == "error") ? frame : nil
     }
 
+    private func acquireRequestSlot() async {
+        if !requestBusy { requestBusy = true; return }
+        await withCheckedContinuation { requestQueue.append($0) }
+    }
+
+    private func releaseRequestSlot() {
+        if requestQueue.isEmpty { requestBusy = false }
+        else { requestQueue.removeFirst().resume() }
+    }
+
     private func resolveCommandAwaiter(_ frame: DSHFrame) {
-        commandAwaiter?.resume(returning: frame)
+        guard let waiter = commandAwaiter else { return }
         commandAwaiter = nil
+        waiter.cont.resume(returning: frame)
     }
 
     static func decodeCommandGroups(_ frame: DSHFrame) -> [DSHCommandGroup] {
@@ -1494,8 +1525,7 @@ public final class DSHGateway: ObservableObject {
         // and may ask again once the connection is back. That is a read retry, never a resend.
         for (_, waiters) in imageWaiters { for waiter in waiters { waiter.resume(returning: nil) } }
         imageWaiters = [:]; imageInFlight = []; imageQueue = []
-        commandAwaiter?.resume(returning: DSHFrame(kind: "error", json: ["code": "disconnected"]))
-        commandAwaiter = nil
+        resolveCommandAwaiter(DSHFrame(kind: "error", json: ["code": "disconnected"]))
         commandGroups = []
         for timeout in operationTimeouts.values { timeout.cancel() }
         operationTimeouts = [:]
