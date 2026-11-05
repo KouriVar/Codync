@@ -99,15 +99,16 @@ public struct ConversationComposer: View {
     private var isExpanded: Bool { mode == .expanded }
 }
 
-/// The frame's numbers, in one place. Every size comes from the app's control metrics so the frame
-/// stays the home bar's height and the buttons stay the compact circle.
+/// The frame's numbers, in one place. The side margin and the height come from
+/// `ConversationBottomMetrics`, which the transcript's jump arrow and status line also read, so the
+/// whole bottom area lines up from one set of values.
 private enum Layout {
     /// The screen's side margin, the same as the home bar.
-    static let side: CGFloat = 16
-    /// The frame's minimum height: the home bar's bar token.
-    static let minHeight: CGFloat = ControlMetrics.Size.bar.hitTarget
+    static let side: CGFloat = ConversationBottomMetrics.sideMargin
+    /// The frame's minimum height.
+    static let minHeight: CGFloat = ConversationBottomMetrics.inputHeight
     /// The expanded button row: the same height as the capsule.
-    static let buttonRowHeight: CGFloat = ControlMetrics.Size.bar.hitTarget
+    static let buttonRowHeight: CGFloat = ConversationBottomMetrics.inputHeight
     /// The frame's corner. One row reads as a capsule; several rows read as a 24pt rounded box.
     static let cornerRadius: CGFloat = 24
     /// How far the buttons sit from the frame's edge.

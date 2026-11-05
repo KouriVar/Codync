@@ -3323,3 +3323,60 @@
   `devicectl device install app` 即可。按穗要求不跑测试、不截图、不自测。
 - 关联：根因由 C0219（`a432069b`）引入；备份 tag `backup/before-composer-hang-c0220`（`7ffd963b`，含
   C0219）。回滚可 revert 本次提交，回到 C0219 的两分支结构（会重新出现卡死），不建议。
+
+### C0221 · 2026-11-05 · bot 页和 chat 页底部统一成一套组件
+
+- 原因：穗定了两个会话页共用一套底部组件，chat 页只在这套组件上扩展。但现在两个页面还是各写一套：输入框
+  各自包一层、键盘/底部间距各写一份、状态行的上下内边距在两个文件里各写一遍、回到底部箭头的间距是个散落的
+  字面量。尤其两边的「输入框下面的底部间距」不一致（bot 页 28、chat 页 12），bot 页还对输入框用了
+  `.ignoresSafeArea(.bottom)`，导致 bot 页的回到底部箭头顶得比 chat 页高，两页看起来不一样。
+- 改动前两页底部各用了什么（文件:行号，均为改动前 HEAD `8ff39487`）：
+  - **bot 页（Coe）**
+    - 输入框：`Composer.swift:122-129` 包 `ConversationComposer(... mode:.capsule, bottomPadding: keyboardUp ? 12 : 28)`；
+      键盘状态 `Composer.swift:34`、监听 `:132-137`；`Composer.swift:155` `.ignoresSafeArea(.container, edges: keyboardUp ? [] : .bottom)`。
+    - 回到底部箭头：`ConversationList.swift:405-420` 的 `JumpToLatest`，`.padding(.bottom, 30)`（`:409`）。
+    - 状态行：`ThreadView.swift:356-358` `ConversationStatusLine(bot:title:)` + `.padding(.top,12).padding(.bottom,10)`。
+    - 列表：`ThreadView.swift:326-364` `ChatTranscriptList`→`ConversationList`。
+  - **chat 页（DSH）**
+    - 输入框：`DSHConversationView.swift:230-236` 包 `ConversationComposer(... mode: focused ? .expanded : .capsule,
+      bottomPadding: keyboardUp ? 8 : 12)`；键盘状态 `:215`、监听 `:237-242`；**没有** `ignoresSafeArea`。
+    - 回到底部箭头：同 `ConversationList.swift:409` 的 `JumpToLatest`（两页本来就用同一个箭头组件、同一个 30）。
+    - 状态行：`ChatTranscript.swift:148-155` `ConversationStatusLine(title:){SourceAvatar}` + `.padding(.top,12).padding(.bottom,10)`。
+    - 列表：`ChatTranscript.swift:57-61` `ChatTranscriptList`→`ConversationList`。
+  - **两边共用的**：`ConversationComposer`（C0219/C0220）的 `Layout.side=16`、`minHeight=48`、`cornerRadius=24`；
+    `ConversationList` 里的 `JumpToLatest`；`ConversationStatusLine`。
+- 哪些重复 / 数值不一致：① 底部间距 28 vs 12、键盘间距 12 vs 8、`ignoresSafeArea` 只有 bot 页有 → 箭头到输入框
+  顶的距离两页不一样（bot 更高）；② 状态行的 `.padding(.top,12).padding(.bottom,10)` 在 `ThreadView` 和
+  `ChatTranscript` 各写一份；③ 箭头的 `30`、输入框的 16/48 都是散落字面量，没有一组共享常量。
+- 变化：
+  - 新增 `apps/ios/Kit/Sources/CodyncUI/Thread/ConversationBottomBar.swift`：
+    - `ConversationBottomMetrics`：一整套共有常量——`sideMargin 16`、`inputHeight 48`、`composerTopPadding 6`、
+      `restingBottomPadding 12`、`keyboardBottomPadding 8`、`jumpGap 36`（+ 派生 `jumpPadding = 36−6 = 30`）、
+      `statusTopPadding 12`、`statusInputGap 24`（+ 派生 `statusBottomPadding = 24−6 = 18`）。
+    - `ConversationBottomBar`：**共用的底部组件**。它包住 `ConversationComposer`，统一负责底部间距策略与键盘观察
+      （弹起 8 / 收起 12），两页只通过参数传自己的 `mode`、`leading`/`field`/`trailing` 和一个可选 `accessory`。
+  - `Composer.swift`（bot 页）：改用 `ConversationBottomBar(mode:.capsule, accessory:…, leading:…, field:…, trailing:…)`；
+    删掉自己的 `keyboardUp`、键盘监听、`bottomPadding` 和 `.ignoresSafeArea` 那行。加号菜单、引用、附件、发送/停止、
+    草稿、IME 等全部原样。
+  - `DSHConversationView.swift`（chat 页的 `DSHComposer`）：改用 `ConversationBottomBar(mode: focused ? .expanded : .capsule,
+    …)`；删掉自己的键盘状态与监听。两态切换、按钮可用性、停止/未连接、两个占位 sheet 全部原样；模型按钮仍只出现在
+    展开态的 `trailing` 里（扩展点），bot 页不传。
+  - `ConversationComposer.swift`：`Layout.side/minHeight/buttonRowHeight` 改为读 `ConversationBottomMetrics`（同一组常量的
+    源头）；C0220 的「单一 TextField、不在布局里改状态」写法一行未动。
+  - `ConversationList.swift`：箭头的 `.padding(.bottom, 30)` 改成 `ConversationBottomMetrics.jumpPadding`。
+  - `ThreadView.swift` / `ChatTranscript.swift`：状态行的上下内边距改用 `ConversationBottomMetrics.statusTopPadding` /
+    `statusBottomPadding`（两页同一处常量）。
+- 与设计的差异 / 可见变化（都是按「统一 + 已定数值」的结果，请确认观感）：
+  - bot 页输入框下方的底部间距从 28 改成 12、并去掉了 `.ignoresSafeArea(.bottom)`，与 chat 页一致 → bot 页
+    回到底部箭头从原来的「偏高」降到与 chat 页相同的 **离输入框顶 36**。
+  - 状态行到输入框顶从原来的 16 统一到 **24**（穗在 C0219 已定为 24）：两页状态行都会比原来高约 8pt。
+  - 底部仍然透明（输入框无底色、只有玻璃），消息照旧从后面透出；输入框高 48、左右边距 16 不变。
+  - chat 页展开仍是「上打字、下左加号右模型+发送」，收起回胶囊；bot 页只有加号+发送，没有模型/语音。
+- 边界：只做统一，没加新功能；加号/模型 sheet 内容仍是占位、未改；不改消息气泡、顶部栏、加号行为；不加依赖、
+  测试 target；不改 Package.swift/project.yml/pbxproj（新文件在 SPM 的 `Kit/` 下自动纳入）。
+- 验证：`xcodebuild build -project apps/Codync.xcodeproj -scheme 'iOS Dev' -configuration DevDebug`（`generic/platform=iOS`
+  与真机 destination）均 **BUILD SUCCEEDED，0 error**，构建号 215；`xcrun devicectl device install app` 装到
+  iPhone 16 Pro（`00008140-000A31311AE3001C`，`com.suiyikou.codync.uipreview`，2.36.0 / 215）成功。按穗要求
+  **不跑测试、不截图、不自测**，观感留穗验收。
+- 关联：组件源头 C0219（`a432069b`）、C0220（`8ff39487`）；备份 tag `backup/before-unified-bottom-c0221`（`e7d10fec`，
+  含 C0219/C0220）。回滚可 revert 本次提交，两页恢复各自一套底部间距（箭头高度会再次不一致）。

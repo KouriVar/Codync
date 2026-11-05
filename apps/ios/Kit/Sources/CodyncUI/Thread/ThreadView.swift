@@ -351,11 +351,11 @@ extension ThreadView {
         if let bot, working {
             rows.append(ConversationRow("working", revision: workingRevision) {
                 // One line, no steps and nothing to open: the bot's name and what kind of work is
-                // under way, swept. 12 above it; 24 below it to the composer's field, which the
-                // list's 8pt section inset and the composer's own 6pt top leave 10 here.
+                // under way, swept. The gaps to the message above and the input below are the shared
+                // bottom-area numbers, the same ones the chat page uses.
                 ConversationStatusLine(bot: bot, title: workingTitle)
-                    .padding(.top, 12)
-                    .padding(.bottom, 10)
+                    .padding(.top, ConversationBottomMetrics.statusTopPadding)
+                    .padding(.bottom, ConversationBottomMetrics.statusBottomPadding)
                     .transition(.opacity)
             })
         }

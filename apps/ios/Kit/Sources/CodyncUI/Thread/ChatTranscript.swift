@@ -149,10 +149,9 @@ public struct ChatTranscriptView: View {
                     // A DSH gateway has no bot: the source's own face, dot and all.
                     SourceAvatar(.dsh, size: 24)
                 }
-                // The same 12 above and 24 below as Coe's page: the list's 8pt section inset and the
-                // composer's 6pt top leave 10 of the 24 here.
-                .padding(.top, 12)
-                .padding(.bottom, 10)
+                // The shared bottom-area numbers, the same ones Coe's page uses.
+                .padding(.top, ConversationBottomMetrics.statusTopPadding)
+                .padding(.bottom, ConversationBottomMetrics.statusBottomPadding)
                 .transition(.opacity)
             })
         }

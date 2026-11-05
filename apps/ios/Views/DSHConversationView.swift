@@ -211,8 +211,6 @@ struct DSHComposer: View {
     @Binding var draft: String
 
     @FocusState private var focused: Bool
-    /// Keyboard up: sit closer to it; down: keep the resting gap.
-    @State private var keyboardUp = false
     @State private var showAddSheet = false
     @State private var showModelSheet = false
 
@@ -227,19 +225,14 @@ struct DSHComposer: View {
     private var canSend: Bool { connected && gateway.openSessionId != nil && !isEmpty }
 
     var body: some View {
-        ConversationComposer(
+        // The same bottom bar the bot page uses; the chat page only adds its own controls through the
+        // frame's slots (the model button in `trailing`) and its two-state mode.
+        ConversationBottomBar(
+            mode: focused ? .expanded : .capsule,
             leading: AnyView(addButton),
             field: AnyView(field),
-            trailing: AnyView(trailing),
-            mode: focused ? .expanded : .capsule,
-            bottomPadding: keyboardUp ? 8 : 12
+            trailing: AnyView(trailing)
         )
-        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
-            keyboardUp = true
-        }
-        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
-            keyboardUp = false
-        }
         .sheet(isPresented: $showAddSheet) {
             PlaceholderSheet(title: "添加")
                 .presentationDetents([.medium, .large])

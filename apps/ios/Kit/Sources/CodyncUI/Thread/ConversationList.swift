@@ -405,8 +405,8 @@ struct JumpToLatest: View {
             if visible {
                 jumpButton
                     .help(L10n.tr("Jump to latest"))
-                    // 36 from the composer's field: the composer adds 6 of its own above it.
-                    .padding(.bottom, 30)
+                    // The shared gap to the input's top; the composer adds the rest of it above.
+                    .padding(.bottom, ConversationBottomMetrics.jumpPadding)
                     .transition(.scale(scale: 0.8).combined(with: .opacity))
             }
         }

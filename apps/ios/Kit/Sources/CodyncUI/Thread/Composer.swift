@@ -30,8 +30,6 @@ struct Composer: View {
     @State private var pickingFiles = false
     @State private var pickingPhotos = false
     @State private var photoItems: [PhotosPickerItem] = []
-    /// Keyboard up: sit just above it; down: keep the same 28pt gap as the home bar.
-    @State private var keyboardUp = false
     @Environment(\.capturePhoto) private var capturePhoto
     @FocusState private var focused: Bool
 
@@ -117,25 +115,20 @@ struct Composer: View {
     private var sendGlyph: CGFloat { 20 }
 
     /// The bar, in the page's one composer shape: the quote and the attachments sit above the row,
-    /// the "+" opens the attachments menu on the left, send/stop/interrupt on the right.
+    /// the "+" opens the attachments menu on the left, send/stop/interrupt on the right. The frame's
+    /// spacing and keyboard policy come from the shared `ConversationBottomBar`, the same one the
+    /// chat page uses.
     private var field: some View {
-        ConversationComposer(
+        ConversationBottomBar(
+            mode: .capsule,
             accessory: accessoryBar,
             leading: canAttach ? AnyView(addButton) : AnyView(EmptyView()),
             field: AnyView(box),
-            trailing: AnyView(trailingButton),
-            mode: .capsule,
-            bottomPadding: keyboardUp ? 12 : 28
+            trailing: AnyView(trailingButton)
         )
         // Lines, not the text: an animated transaction on every keystroke breaks IME composition.
         .animation(Motion.layout, value: draft.count(where: \.isNewline))
         .animation(Motion.layout, value: files.map(\.id))
-        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
-            keyboardUp = true
-        }
-        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
-            keyboardUp = false
-        }
         .animation(Motion.reduced(Motion.layout, reduceMotion), value: replyingTo?.id)
         .dropDestination(for: PickedFile.self) { picked, _ in
             guard canAttach else { return false }
@@ -152,7 +145,6 @@ struct Composer: View {
                 photoItems = []
                 Task { await addPhotos(items) }
             }
-        .ignoresSafeArea(.container, edges: keyboardUp ? [] : .bottom)
     }
 
     /// What sits above the bar: the quoted message and the attachments going out with it.
