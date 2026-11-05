@@ -330,6 +330,11 @@ struct DSHComposer: View {
     @State private var photoItems: [PhotosPickerItem] = []
     @State private var preparingImages = false
     @State private var attachError: String?
+    /// A media picker to open right after the add sheet dismisses (presenting from behind a sheet is
+    /// deferred by iOS otherwise — that was why tapping 照片/文件/拍照 seemed to do nothing).
+    @State private var pendingAttach: PendingAttach?
+
+    private enum PendingAttach { case photos, files, camera }
     @Environment(\.capturePhoto) private var capturePhoto
 
     // Commands: a `select` command opens a small options list.
@@ -409,15 +414,15 @@ struct DSHComposer: View {
             }
             Button("取消", role: .cancel) { confirmRemoveQueue = nil }
         }
-        .sheet(isPresented: $showAddSheet) {
+        .sheet(isPresented: $showAddSheet, onDismiss: { performPendingAttach() }) {
             DSHAddSheet(
                 canPhoto: gateway.capabilities.contains("images"),
                 canFile: gateway.supportsFileUpload,
                 groups: gateway.supportsCommands ? gateway.commandGroups : [],
                 commandPending: gateway.supportsCommands && gateway.commandGroups.isEmpty,
-                onPhotos: { pickingPhotos = true },
-                onCamera: { capturePhoto { image in add(captured: image) } },
-                onFiles: { pickingFiles = true },
+                onPhotos: { pendingAttach = .photos },
+                onCamera: { pendingAttach = .camera },
+                onFiles: { pendingAttach = .files },
                 onCommand: runCommand
             )
             .presentationDetents([.medium, .large])
@@ -712,6 +717,21 @@ struct DSHComposer: View {
         }
     }
 
+    /// Opens the media picker the reader chose, after the add sheet has fully dismissed. Presenting a
+    /// sheet from behind another sheet is deferred by iOS, so we wait for onDismiss and then present.
+    private func performPendingAttach() {
+        guard let action = pendingAttach else { return }
+        pendingAttach = nil
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 120_000_000)
+            switch action {
+            case .photos: pickingPhotos = true
+            case .files: pickingFiles = true
+            case .camera: capturePhoto { image in add(captured: image) }
+            }
+        }
+    }
+
     /// Loads commands, goal and tasks once the transport is ready (requests are serialised in the
     /// gateway, so firing them together is safe; a not-yet-ready phase just returns empty and is retried).
     private func loadSessionPanels() {
@@ -902,7 +922,7 @@ private struct DSHAddSheet: View {
     }
 
     private func tile(_ title: String, icon: String, enabled: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
+        Button { action(); dismiss() } label: {
             VStack(spacing: 8) {
                 RemixIcon(icon, size: 28).foregroundStyle(enabled ? Palette.text : Palette.tertiary)
                 Text(title).font(.footnote).foregroundStyle(enabled ? Palette.text : Palette.tertiary)

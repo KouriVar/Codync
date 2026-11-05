@@ -3847,3 +3847,13 @@
 - 验证：`xcodebuild build ... -configuration DevDebug`（`generic/platform=iOS`）**BUILD SUCCEEDED，0 error**，
   构建号 **237**；已装 iPhone 16 Pro（2.36.0 / 237）。不跑测试、不截图。
 - 若仍偏大/偏小：告诉我，我按你量到的实际像素再调（也可把 12 做成统一常量）。
+
+### C0223fix3 · 2026-11-05 · 修加号 sheet 里点“照片/拍照/文件”没反应
+
+- 现象：加号 sheet 打开时点「照片/拍照/文件」看似没反应，必须先把 sheet 关掉，全屏选择器才出来；文件夹还打不开。
+- 根因：这三个 picker（`.photosPicker`/`.fileImporter`，以及从 `RootView` 弹的相机 `.sheet`）挂在**加号 sheet 后面的父视图/根视图**上。iOS 同一宿主同一时刻只能展示一个 sheet，所以新 picker 被排队，直到加号 sheet 关闭；文件选择器在父层被挡就表现为“打不开”。
+- 修法：点这三项时**先自动关闭加号 sheet，再在 onDismiss 里立即弹对应 picker**（相机是根视图弹的，只能这样；照片/文件同法最稳）。
+  - `DSHComposer` 新增 `pendingAttach`（photos/files/camera）+ `performPendingAttach()`：`DSHAddSheet` 的 `tile` 点按后先 `dismiss()`，sheet 的 `onDismiss` 里延时 120ms 再 `pickingPhotos/pickingFiles/capturePhoto`，避免同一帧二次展示冲突。
+- 边界：不改输入框结构/宽度/箭头/状态行/串流。
+- 验证：`xcodebuild build ... -configuration DevDebug`（`generic/platform=iOS`）**BUILD SUCCEEDED，0 error**，构建号 **238**；已装 iPhone 16 Pro（2.36.0 / 238）。不跑测试、不截图。
+- 说明：体验上是“加号收起→选择器弹出”，不是两个 sheet 叠一起（相机根弹无法叠加）；若你更想要“选择器直接盖在加号上”，照片/文件可改成 sheet 内再弹，相机仍需先关。
