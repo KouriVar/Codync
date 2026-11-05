@@ -33,6 +33,12 @@ public final class DSHGateway: ObservableObject {
     @Published public private(set) var currentActivity: DSHActivityDetail?
     /// Whether the open conversation has a turn under way.
     @Published public private(set) var isRunning = false
+    /// What the gateway said it can do in its `hello`. Replaced on every hello and cleared when the
+    /// connection retires, so a picture is never sent to a gateway that never offered `images`.
+    @Published public private(set) var capabilities: [String] = []
+
+    /// A gateway that did not announce `images` must not be sent one.
+    public var supportsImages: Bool { capabilities.contains("images") }
 
     public private(set) var profile: DSHGatewayProfile?
 
@@ -72,6 +78,21 @@ public final class DSHGateway: ObservableObject {
 
     private var pendingPairing: CheckedContinuation<DSHGatewayProfile, Error>?
     private var pairingTimeoutTask: Task<Void, Never>?
+
+    /// Pictures by (gatewayId, sessionId, attachmentId), in memory only: a picture is never written to
+    /// disk, and reopening a conversation fetches it again. Bounded so a long scroll cannot grow it
+    /// without end.
+    private var imageCache: [DSHAttachmentKey: Data] = [:]
+    private var imageCacheOrder: [DSHAttachmentKey] = []
+    private var imageCacheBytes = 0
+    /// Callers waiting for one picture, resumed once its frame arrives or the wait times out.
+    private var imageWaiters: [DSHAttachmentKey: [CheckedContinuation<Data?, Never>]] = [:]
+    /// Requests on the wire. Only a few run at once; the rest wait here.
+    private var imageInFlight: Set<DSHAttachmentKey> = []
+    private var imageQueue: [DSHAttachmentKey] = []
+    private static let imageConcurrency = 3
+    private static let imageCacheLimit = 32 * 1024 * 1024
+    private static let imageCacheCount = 24
 
     /// One connection shared by the home list and Settings, so pairing (or disconnect) in one place
     /// drives the other. The home owns whether it connects; Settings only shows its state.
@@ -296,6 +317,8 @@ public final class DSHGateway: ObservableObject {
         case "sent":
             if let id = frame.string("requestId") { updateDelivery(id, status: .accepted, detail: "已接收") }
             reconnectAttempt = 0
+        case "attachment":
+            handleAttachment(frame)
         case "session-created":
             if let request = frame.string("requestId"), creationRequests.removeValue(forKey: request) == selectionGeneration,
                let id = frame.string("sessionId") { open(sessionId: id) }
@@ -334,6 +357,8 @@ public final class DSHGateway: ObservableObject {
         }
         validatedGatewayId = gatewayId
         if let name = frame.string("gatewayName"), !name.isEmpty { gatewayName = name }
+        // The gateway's own claim about what it accepts; a picture is gated on it, never assumed.
+        capabilities = (frame.json["capabilities"] as? [String]) ?? []
         reconnectAttempt = 0
         if pendingPairing == nil { phase = .ready }
         send(["type": "sessions"])
@@ -595,15 +620,27 @@ public final class DSHGateway: ObservableObject {
         requestSubscription()
     }
 
-    /// Returns whether the local intent was saved; only then may the caller clear its draft.
-    @discardableResult public func send(text: String) -> Bool {
+    /// Returns whether the local intent was saved; only then may the caller clear its draft. Pictures
+    /// may go alone, with no text. A gateway that never offered `images` is refused, and a message over
+    /// the local frame budget is refused rather than split.
+    @discardableResult public func send(text: String, images: [DSHOutgoingImage] = []) -> Bool {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty, openSessionId != nil, conversation != nil else { return false }
+        guard !trimmed.isEmpty || !images.isEmpty, openSessionId != nil, conversation != nil else { return false }
+        guard images.isEmpty || supportsImages else { return false }
+        guard imageSendProblem(text: trimmed, images: images) == nil else { return false }
         let available = phase == .ready && task != nil && networkAvailable && validatedGatewayId != nil
-        guard let id = conversation?.submit(text: trimmed, connection: connectionGeneration, available: available) else { return false }
+        guard let id = conversation?.submit(text: trimmed, images: images,
+                                            connection: connectionGeneration,
+                                            available: available) else { return false }
         publishConversation()
         guard available else { return true }
-        let payload: [String: Any] = ["type": "message", "sessionId": openSessionId!, "text": trimmed, "requestId": id]
+        var payload: [String: Any] = ["type": "message", "sessionId": openSessionId!, "requestId": id]
+        if !trimmed.isEmpty { payload["text"] = trimmed }
+        if !images.isEmpty {
+            payload["images"] = images.map {
+                ["mediaType": $0.mediaType, "name": $0.name, "data": $0.data.base64EncodedString()]
+            }
+        }
         if !send(payload, completion: { [weak self] error in
             if let error { self?.updateDelivery(id, status: .unknown, detail: "送达待核对：" + error.localizedDescription) }
         }) {
@@ -616,15 +653,123 @@ public final class DSHGateway: ObservableObject {
         return true
     }
 
+    /// Why these pictures cannot go, or nil when they can. The composer shows this before sending; the
+    /// gateway refuses the send either way, so nothing oversized ever reaches the wire.
+    public func imageSendProblem(text: String, images: [DSHOutgoingImage]) -> DSHImageError? {
+        guard !images.isEmpty else { return nil }
+        guard supportsImages else { return .unsupportedByGateway }
+        let bytes = DSHImageProcessor.messageByteCount(text: text, images: images)
+        return bytes > DSHImageProcessor.maxMessageBytes ? .messageTooLarge(bytes) : nil
+    }
+
+    // MARK: - Pictures (attachment fetch)
+
+    /// The bytes of one picture, fetched once and then read from the in-memory cache. Returns nil when
+    /// it cannot be fetched; the row keeps its placeholder and may ask again after a reconnect.
+    public func imageData(for ref: DSHImageRef) async -> Data? {
+        await imageData(attachmentId: ref.attachmentId)
+    }
+
+    /// The same fetch by bare attachment id, which is what a picture row holds.
+    public func imageData(attachmentId: String) async -> Data? {
+        guard let gatewayId = validatedGatewayId, let sessionId = openSessionId else { return nil }
+        let key = DSHAttachmentKey(gatewayId: gatewayId, sessionId: sessionId, attachmentId: attachmentId)
+        if let data = imageCache[key] { return data }
+        return await withCheckedContinuation { continuation in
+            imageWaiters[key, default: []].append(continuation)
+            enqueueImage(key)
+        }
+    }
+
+    private func enqueueImage(_ key: DSHAttachmentKey) {
+        guard !imageInFlight.contains(key), !imageQueue.contains(key) else { return }
+        imageQueue.append(key)
+        pumpImages()
+    }
+
+    /// Starts as many attachment requests as the concurrency limit allows. The rest wait their turn.
+    private func pumpImages() {
+        while imageInFlight.count < Self.imageConcurrency, !imageQueue.isEmpty {
+            let key = imageQueue.removeFirst()
+            guard imageInFlight.insert(key).inserted else { continue }
+            guard phase == .ready, task != nil, networkAvailable else { finishImage(key, data: nil); continue }
+            // The gateway does not echo a requestId for attachments: the reply is matched by
+            // sessionId + attachmentId against this connection's own bookkeeping.
+            let sent = send(["type": "attachment", "sessionId": key.sessionId,
+                             "attachmentId": key.attachmentId])
+            if !sent { finishImage(key, data: nil); continue }
+            scheduleTimeout(Self.attachmentTimeoutId(key), seconds: 20) { [weak self] in
+                self?.finishImage(key, data: nil)
+            }
+        }
+    }
+
+    private func finishImage(_ key: DSHAttachmentKey, data: Data?) {
+        imageInFlight.remove(key)
+        operationTimeouts.removeValue(forKey: Self.attachmentTimeoutId(key))?.cancel()
+        if let data { storeImage(key, data) }
+        for waiter in imageWaiters.removeValue(forKey: key) ?? [] { waiter.resume(returning: data) }
+        pumpImages()
+    }
+
+    private func storeImage(_ key: DSHAttachmentKey, _ data: Data) {
+        if let old = imageCache[key] {
+            imageCacheBytes -= old.count
+        } else {
+            imageCacheOrder.append(key)
+        }
+        imageCache[key] = data
+        imageCacheBytes += data.count
+        while imageCacheBytes > Self.imageCacheLimit || imageCacheOrder.count > Self.imageCacheCount {
+            guard let oldest = imageCacheOrder.first else { break }
+            imageCacheOrder.removeFirst()
+            if let removed = imageCache.removeValue(forKey: oldest) { imageCacheBytes -= removed.count }
+        }
+    }
+
+    private func handleAttachment(_ frame: DSHFrame) {
+        guard let gatewayId = validatedGatewayId,
+              let sessionId = frame.string("sessionId"),
+              let attachment = frame.dict("attachment"),
+              let attachmentId = attachment["attachmentId"] as? String,
+              let encoded = frame.string("data") else { return }
+        let key = DSHAttachmentKey(gatewayId: gatewayId, sessionId: sessionId, attachmentId: attachmentId)
+        // Only a picture this connection actually asked for, and only while it is still waiting: an
+        // unrequested or already-finished reply must not pollute the cache.
+        guard imageInFlight.contains(key), imageWaiters[key] != nil else { return }
+        let expected = (attachment["bytes"] as? NSNumber)?.intValue
+        Task { [weak self] in
+            // A few megabytes of Base64 must not be decoded on the main actor.
+            let data = await Task.detached(priority: .userInitiated) { () -> Data? in
+                guard let decoded = Data(base64Encoded: encoded) else { return nil }
+                // The decoded length has to agree with what the gateway said it holds; a mismatch
+                // leaves the placeholder rather than showing the wrong bytes.
+                if let expected, expected != decoded.count { return nil }
+                return decoded
+            }.value
+            guard let self, self.imageInFlight.contains(key) else { return }
+            self.finishImage(key, data: data)
+        }
+    }
+
+    private static func attachmentTimeoutId(_ key: DSHAttachmentKey) -> String {
+        "attachment:\(key.sessionId):\(key.attachmentId)"
+    }
+
     public func retrySubmission(_ id: String) {
         guard let submission = conversation?.submissions.first(where: { $0.id == id }), submission.status == .failed else { return }
-        if send(text: submission.text) { conversation?.dismissSubmission(id); publishConversation() }
+        // The frozen pictures are re-sent exactly as they were: never re-compressed into a new payload.
+        if send(text: submission.text, images: submission.images) {
+            conversation?.dismissSubmission(id); publishConversation()
+        }
     }
 
     public func resendUnknownSubmission(_ id: String) {
         guard let submission = conversation?.submissions.first(where: { $0.id == id }),
               submission.status == .unknown, submission.historyChecked else { return }
-        if send(text: submission.text) { conversation?.dismissSubmission(id); publishConversation() }
+        if send(text: submission.text, images: submission.images) {
+            conversation?.dismissSubmission(id); publishConversation()
+        }
     }
 
     public func dismissSubmission(_ id: String) {
@@ -742,6 +887,11 @@ public final class DSHGateway: ObservableObject {
         connectionGeneration &+= 1
         validatedGatewayId = nil; inFlightSubscription = nil; creationRequests = [:]
         gatewayQueues = [:]; hasQueueBaseline = false
+        capabilities = []
+        // A dropped connection ends the pictures that were in flight: their rows keep the placeholder
+        // and may ask again once the connection is back. That is a read retry, never a resend.
+        for (_, waiters) in imageWaiters { for waiter in waiters { waiter.resume(returning: nil) } }
+        imageWaiters = [:]; imageInFlight = []; imageQueue = []
         for timeout in operationTimeouts.values { timeout.cancel() }
         operationTimeouts = [:]
         for scope in Array(conversations.keys) {
@@ -952,4 +1102,12 @@ public final class DSHGateway: ObservableObject {
 /// The name an unnamed, unstarted session gets.
 private enum L10nSessionFallback {
     static let title = "未命名会话"
+}
+
+/// One picture's cache address. Never keyed by file name or a bare attachment id: two gateways can
+/// use the same attachment id for different pictures.
+struct DSHAttachmentKey: Hashable, Sendable {
+    let gatewayId: String
+    let sessionId: String
+    let attachmentId: String
 }

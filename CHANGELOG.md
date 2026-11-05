@@ -3156,3 +3156,81 @@
   `/tmp/codync-audit/ws-mobile-protocol.md`）；备份 tag `backup/before-dsh-events-c0217`（`c1f0c529`，
   含 C0212–C0216）。回滚可 revert 本次提交，只撤事件类型投影与 notice 适配，保留第二步的消息 store 和
   C0212 状态行；无协议或数据 schema 迁移，原 JSON 事实可保留。
+
+### C0218 · 2026-11-05 · DSH 图片：后台部分（不含输入框界面）
+
+- 原因：DSH 会话里既发不了图片，也看不到别人发的图片。要先把「图片怎么处理、怎么发、怎么按需取回」
+  做成不依赖界面的后台能力，等新输入框做好后直接接上，不必再动这一层。
+- 变化：
+  - 新增 `apps/ios/DSHKit/Sources/DSHKit/DSHImageProcessor.swift`：纯逻辑图片处理器，不依赖界面、
+    不依赖网关。用 ImageIO 读**真实格式**（不看扩展名）；合规的 JPEG/PNG/GIF/WebP 原样发；HEIC/TIFF/BMP、
+    EXIF 不正向、或超限的图转成**方向正确**的 JPEG（透明底转白，缩略图 API 不放大小图）；JPEG 质量
+    0.9→0.3 递减，仍超则长边 ×0.8 重新从 0.9 试，最多 12 轮，压不下来就报错而不是发超限图；批内最多
+    2 张并行解码；整条消息超 16 MiB 直接报错，不自动拆条。
+  - `apps/ios/DSHKit/Sources/DSHKit/DSHModels.swift`：新增 `DSHImageRef`（attachmentId/mediaType/
+    bytes/width/height/name，不含字节）、`DSHOutgoingImage`（待发图片的 mediaType/name/data）；
+    `DSHMessage` 与 `DSHTranscriptItem` 增加 `images`。保留 C0212–C0217 全部类型。
+  - `apps/ios/DSHKit/Sources/DSHKit/DSHWireEvent.swift`：`images` 同时解析 live 的 `event.images` 与
+    history 的 `data.content[].attachment`，按 attachmentId 去重。
+  - `apps/ios/DSHKit/Sources/DSHKit/DSHConversationState.swift`：纯图片（text 为空、images 非空）也生成
+    一行（user 气泡 / assistant / context notice 不变）；`DSHSubmission.images` 与文字一起冻结，重试/重发
+    用同一份字节，不重新压缩成另一份 payload。
+  - `apps/ios/DSHKit/Sources/DSHKit/DSHGateway.swift`：保存 hello 的 `capabilities` 并发布，断线清空；
+    `send(text:images:)` 支持只发图不带字，未宣告 `images` 的网关拒绝发图，超 16 MiB 在发送前拦下并给出
+    `imageSendProblem`；新增按需取图 `imageData(attachmentId:)`——缓存键 (gatewayId, sessionId,
+    attachmentId)、只放内存、有界（32MiB / 24 张，超出按最早淘汰）、同时最多 3 个请求、去重排队，并按
+    sessionId+attachmentId 匹配 `attachment` 回包（网关不回显 requestId）；断线把所有在途取图请求以 nil
+    收尾（这是读取重试，不是重发消息）。
+  - `apps/ios/Kit/Sources/CodyncUI/Thread/Attachments.swift`：把 Coe 的图片视图抽出「谁来加载」的通用层
+    `LoadedImage`/`LoadedImageViewer`/`TranscriptImageList` 与中性类型 `TranscriptImageRef`；
+    `AttachmentImage` 改为薄包装，公开 API 与行为不变（Coe 的 LibraryView / FileDownloadCard /
+    AttachmentList 照旧）。DSH 不伪造 botId 走 Coe 下载地址。
+  - `apps/ios/Kit/Sources/CodyncUI/Thread/ChatTranscript.swift`：`TranscriptItem` 可带图片，
+    `ChatTranscriptView` 新增 `loadImage`/`imageReloadKey`（都有默认值，Coe 调用点不改）；用户/助手行在
+    文字上方显示图片，纯图不画空气泡；notice 行的图片（上下文图）显示在中性行上方；行 revision 把图片 id
+    计入，图片晚到只重画该行。
+  - `apps/ios/Views/DSHConversationView.swift`：去掉「纯图消息丢弃」的判断，映射图片并接网关 loader。
+- **图片处理器对外接口（新输入框直接接它）**：
+  ```swift
+  // 输入一张或一批「原始字节 + 名字」，返回处理好的图片或抛错；批量顺序保持、最多 2 张并行。
+  public static func DSHImageProcessor.prepare(_ input: DSHImageInput) async throws -> DSHPreparedImage
+  public static func DSHImageProcessor.prepare(_ inputs: [DSHImageInput]) async throws -> [DSHPreparedImage]
+  // 发送前算整帧字节（Base64 膨胀 + 16 MiB 判定都走这里）。
+  public static func DSHImageProcessor.messageByteCount(text: String, images: [DSHPreparedImage]) -> Int
+  public static func DSHImageProcessor.messageByteCount(text: String, images: [DSHOutgoingImage]) -> Int
+  ```
+  `DSHImageInput(data:name:)`；`DSHPreparedImage(mediaType:name:data:pixelWidth:pixelHeight:)`，可直接
+  `DSHOutgoingImage(prepared)` 交给 `gateway.send(text:images:)`。错误类型 `DSHImageError`
+  （notAnImage/tooManyImages/cannotCompress/messageTooLarge/unsupportedByGateway），都有中文
+  `errorDescription`，输入框可以直接显示。发送前还可用 `gateway.imageSendProblem(text:images:)` 预检
+  能力与体积。
+- **实际压缩参数**：长边上限 2000px；像素积 40,000,000；单张字节上限 3,670,016；整帧 16 MiB；一批最多
+  20 张、2 张并行；JPEG 质量从 0.9 每轮 −0.1 到 0.3，再长边 ×0.8 从 0.9 重来，最多 12 轮，最小长边 256，
+  达不到上限报 `cannotCompress`；透明图铺白底。
+- 与设计的差异（实现取舍）：
+  - 设计把「加号/附件条/相机/共享 Composer 控件」也列在本轮文件计划里；穗明确本轮**只做后台**，输入框
+    另做，所以 `ComposerAttachments.swift`、`Composer.swift`、`ConversationComposer.swift` 一律未改，
+    DSH 页没有加号或菜单。附件选择的界面接线留到新输入框那一步。
+  - 取图缓存的「请求状态」放在 `DSHGateway`（它本来就负责 I/O、且按 gateway+session 天然隔离），没有放进
+    `DSHConversationState`（设计写了 State/WireEvent 二选一）。
+  - 取图请求**加了 20 秒超时**（设计未写）。没有它，一次丢包会让该图永远停在占位；超时后按 nil 收尾，行
+    保留占位，重连可再取。
+  - 缓存上限取 32 MiB / 24 张（设计只说「有界内存」，未给数值）。
+  - 新增 `gateway.imageSendProblem(text:images:)` 让输入框在发送前拿到明确错误（设计只要求「超限提示减少
+    图片数量」，没用它的接口形态）。
+  - `context` 来源的图片仍按第三步的中性说明行显示（图片放在说明行上方），不是用户气泡；这与设计的
+    「context 图片沿中性来源显示」一致。
+- 边界：不改网关、不改 Coe Host、不改协议；不做视频/普通文件；不加测试 target、不加依赖、不改
+  `Package.swift`/`project.yml`/pbxproj；C0212–C0217 的状态行/正文身份/事件投影未改动；CodyncUI 未
+  import DSHKit。手机上暂无发图入口，符合本轮范围。
+- 验证：`xcodebuild build -project apps/Codync.xcodeproj -scheme 'iOS Dev' -configuration DevDebug`
+  （真机 destination、ui-preview 覆盖、构建号 212）编译通过，0 error；仅未改文件 `BotShortcuts.swift`、
+  `QuickCapture.swift` 的既有警告。`xcrun devicectl device install app` 装到 iPhone 16 Pro
+  （`00008140-000A31311AE3001C`，`com.suiyikou.codync.uipreview`，2.36.0 / 212）成功。按穗要求**只编译
+  不自测**，四项真机场景留给穗操作。构建与安装记录在 `/tmp/codync-audit/c0218-build-final.log`、
+  `c0218-install.json`。另做了一轮独立只读复核，修掉三处：JPEG 2000 曾被误当基线 JPEG 原样透传（已改
+  为转码）、取图 base64 解码从主线程挪到后台、`attachment` 回包只接受本连接仍在等的请求且 bytes 不符时
+  立即释放（不再空等 20 秒超时）。
+- 关联：设计 `/tmp/codync-audit/attachment-images.md`；备份 tag `backup/before-dsh-images-c0218`
+  （`2fb2c54a`，含 C0217）。回滚可 revert 本次提交，回到「纯图消息不显示、DSH 无图片能力」的状态，
+  不改协议、无数据迁移，DSH 原消息与历史不受影响。

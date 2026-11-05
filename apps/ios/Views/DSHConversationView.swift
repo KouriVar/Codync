@@ -20,7 +20,9 @@ struct DSHConversationView: View {
                            hasMore: gateway.hasMore, loadingEarlier: gateway.loadingEarlier,
                            historyError: gateway.historyError,
                            accessory: gateway.submissions.isEmpty ? nil : AnyView(sendingStatus),
-                           sendingRevision: gateway.submissions.hashValue &+ gateway.queueHints.hashValue &+ (gateway.queueIsKnown ? 1 : 0))
+                           sendingRevision: gateway.submissions.hashValue &+ gateway.queueHints.hashValue &+ (gateway.queueIsKnown ? 1 : 0),
+                           imageReloadKey: gateway.phase == .ready ? "ready" : "waiting",
+                           loadImage: { id in await gateway.imageData(attachmentId: id) })
         .background(Palette.background)
         // The input bar is an inset rather than a stacked row: the transcript runs under it and
         // comes up with the keyboard. It has no backing of its own — only the field's glass — so the
@@ -63,7 +65,17 @@ struct DSHConversationView: View {
     private var items: [TranscriptItem] {
         DSHConversationAdapter.transcript(from: gateway.messages).compactMap { row in
             guard let entry = Self.entry(for: row) else { return nil }
-            return TranscriptItem(entry: entry, displayRowId: row.displayRowId, scrollToWhenAdded: false)
+            return TranscriptItem(entry: entry, displayRowId: row.displayRowId, scrollToWhenAdded: false,
+                                  images: Self.images(for: row))
+        }
+    }
+
+    /// One DSH row's pictures as the transcript's refs. The id is what the gateway caches a picture
+    /// by, so it stays stable across re-renders and the row does not jump when bytes arrive.
+    private static func images(for row: DSHTranscriptItem) -> [TranscriptImageRef] {
+        row.images.map { ref in
+            TranscriptImageRef(id: ref.attachmentId, name: ref.name,
+                               pixelWidth: ref.width, pixelHeight: ref.height)
         }
     }
 
@@ -72,7 +84,8 @@ struct DSHConversationView: View {
     /// line's heading rides in the text; its controlled source name and style travel in `EntryData`
     /// so the transcript's row revision changes when they do.
     private static func entry(for row: DSHTranscriptItem) -> Entry? {
-        guard !row.text.isEmpty else { return nil }
+        // Pictures may come with no text at all: a photo the reader sent is still a row.
+        guard !row.text.isEmpty || !row.images.isEmpty else { return nil }
         var data = EntryData(text: row.text)
         let kind: String
         switch row.kind {

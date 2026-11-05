@@ -28,17 +28,22 @@ public struct TranscriptItem: Identifiable, Sendable {
     public let id: String
     public let content: Content
     public let isUserMessage: Bool
+    /// Pictures this row shows, loaded by whoever owns the transcript.
+    public let images: [TranscriptImageRef]
 
-    public init(entry: Entry, displayRowId: String? = nil, scrollToWhenAdded: Bool? = nil) {
+    public init(entry: Entry, displayRowId: String? = nil, scrollToWhenAdded: Bool? = nil,
+                images: [TranscriptImageRef] = []) {
         id = displayRowId ?? entry.id
         content = .entry(entry)
         isUserMessage = scrollToWhenAdded ?? (entry.kind == "user")
+        self.images = images
     }
 
     public init(summary: TranscriptSummary) {
         id = summary.id
         content = .summary(summary)
         isUserMessage = false
+        images = []
     }
 }
 
@@ -72,13 +77,18 @@ public struct ChatTranscriptView: View {
     let historyError: String?
     let accessory: AnyView?
     let sendingRevision: Int
+    /// Changes when pictures should be asked for again; empty for a transcript without pictures.
+    let imageReloadKey: String
+    /// Loads one picture by its `TranscriptImageRef.id`; nil draws no pictures at all.
+    let loadImage: (@MainActor (String) async -> Data?)?
 
     public init(items: [TranscriptItem], following: Binding<Bool>, working: Bool = false,
                 workingTitle: String = WorkingPhrase.processing,
                 nearTop: (() -> Void)? = nil, refresh: (() async -> Void)? = nil,
                 hasMore: Bool = false, loadingEarlier: Bool = false, historyError: String? = nil,
                 accessory: AnyView? = nil, sendingRevision: Int = 0,
-                onOpenSummary: @escaping (TranscriptSummary) -> Void = { _ in }) {
+                onOpenSummary: @escaping (TranscriptSummary) -> Void = { _ in },
+                imageReloadKey: String = "", loadImage: (@MainActor (String) async -> Data?)? = nil) {
         self.items = items
         _following = following
         self.working = working
@@ -88,6 +98,8 @@ public struct ChatTranscriptView: View {
         self.hasMore = hasMore; self.loadingEarlier = loadingEarlier
         self.historyError = historyError; self.accessory = accessory
         self.sendingRevision = sendingRevision
+        self.imageReloadKey = imageReloadKey
+        self.loadImage = loadImage
     }
 
     public var body: some View {
@@ -121,8 +133,9 @@ public struct ChatTranscriptView: View {
                 }
                 lastDate = date
                 out.append(ConversationRow(item.id, isUserMessage: item.isUserMessage,
-                                           revision: Self.revision(of: entry)) {
-                    ChatEntryRow(entry: entry)
+                                           revision: Self.revision(of: item)) {
+                    ChatEntryRow(entry: entry, images: item.images, reloadKey: imageReloadKey,
+                                 loadImage: loadImage)
                 })
             case .summary:
                 // A folded "thinking for 12s · ran 3 commands" line is a step, not the bot talking:
@@ -152,15 +165,19 @@ public struct ChatTranscriptView: View {
     private var accessoryRevision: Int { items.count &+ sendingRevision }
 
     /// What counts as "this row changed": the entry's own revision plus everything the row draws —
-    /// its text, and for a notice its heading/source and style — so a growing streaming reply, or a
-    /// notice whose source or style changed, re-renders alone while the rest of the transcript stays
-    /// put. This is an in-memory row version, never persisted, so `Hasher` is fine here.
-    private static func revision(of entry: Entry) -> Int {
+    /// its text, and for a notice its heading/source and style — plus the pictures it shows, so a
+    /// growing streaming reply, a notice whose source or style changed, or a picture that arrived
+    /// late re-renders alone while the rest of the transcript stays put. This is an in-memory row
+    /// version, never persisted, so `Hasher` is fine here.
+    private static func revision(of item: TranscriptItem) -> Int {
         var hasher = Hasher()
-        hasher.combine(entry.data.text ?? "")
-        hasher.combine(entry.data.title ?? "")
-        hasher.combine(entry.data.style ?? "")
-        hasher.combine(entry.rev)
+        if case .entry(let entry) = item.content {
+            hasher.combine(entry.data.text ?? "")
+            hasher.combine(entry.data.title ?? "")
+            hasher.combine(entry.data.style ?? "")
+            hasher.combine(entry.rev)
+        }
+        hasher.combine(item.images.map(\.id).joined(separator: "\u{1F}"))
         return hasher.finalize()
     }
 
@@ -179,33 +196,59 @@ public struct ChatTranscriptView: View {
 /// A user/assistant/notice row drawn like the Coe chat's, minus the BotStore-only actions.
 private struct ChatEntryRow: View {
     let entry: Entry
+    let images: [TranscriptImageRef]
+    let reloadKey: String
+    let loadImage: (@MainActor (String) async -> Data?)?
 
     var body: some View {
         switch entry.kind {
         case "user":
             HStack(spacing: 0) {
                 Spacer(minLength: 40)
-                Text(entry.data.text ?? "")
-                    .font(.body)
-                    .textSelection(.enabled)
-                    .foregroundStyle(Palette.text)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
-                    .background(Palette.bubbleUser, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                VStack(alignment: .trailing, spacing: 4) {
+                    pictureList
+                    // A message that is only pictures has no text to put in a bubble.
+                    if let text = entry.data.text, !text.isEmpty {
+                        Text(text)
+                            .font(.body)
+                            .textSelection(.enabled)
+                            .foregroundStyle(Palette.text)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 10)
+                            .background(Palette.bubbleUser, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    }
+                }
             }
             .padding(.top, 12)
         case "agent":
             HStack(spacing: 0) {
-                MarkdownText(entry.data.text ?? "").equatable()
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
-                    .background(Palette.bubbleAgent, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                VStack(alignment: .leading, spacing: 4) {
+                    pictureList
+                    if let text = entry.data.text, !text.isEmpty {
+                        MarkdownText(text).equatable()
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 10)
+                            .background(Palette.bubbleAgent, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    }
+                }
                 Spacer(minLength: 40)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.top, 12)
         default:
-            NoticeRow(entry: entry).padding(.top, 10)
+            // A notice is a neutral line; a picture riding on one (a context photo) still shows, above it.
+            VStack(alignment: .leading, spacing: 4) {
+                pictureList
+                NoticeRow(entry: entry)
+            }
+            .padding(.top, 10)
+        }
+    }
+
+    /// The row's pictures, when the transcript knows how to load them.
+    @ViewBuilder private var pictureList: some View {
+        if let loadImage, !images.isEmpty {
+            TranscriptImageList(images: images, reloadKey: reloadKey, load: loadImage)
         }
     }
 }

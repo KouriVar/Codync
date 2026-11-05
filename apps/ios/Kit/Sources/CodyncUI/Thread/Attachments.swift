@@ -175,7 +175,6 @@ struct AttachmentImage: View {
     var contentMode: ContentMode = .fit
     let load: @MainActor (BotStore) async -> Data?
     @Environment(BotStore.self) private var model
-    @State private var image: CGImage?
 
     init(file: Attachment, botId: String, maxPixels: Int, contentMode: ContentMode = .fit) {
         id = file.id
@@ -191,6 +190,47 @@ struct AttachmentImage: View {
     }
 
     var body: some View {
+        // Asked again when the computer comes online: a chat shown from the cache before it connects
+        // gets its pictures once it does.
+        LoadedImage(id: id, maxPixels: maxPixels, contentMode: contentMode,
+                    reloadKey: model.connection == .online ? "online" : "waiting") {
+            await load(model)
+        }
+    }
+}
+
+// MARK: - Pictures whose bytes come from the caller
+
+/// One picture in a row: what it is called and how big it claims to be, never the bytes.
+///
+/// A transcript that keeps its own picture cache (DSH) only hands out stable ids and a loader;
+/// the drawing is the same as Coe's. `id` is that cache's key, and also what `ForEach` and the
+/// full-size sheet identify a picture by.
+public struct TranscriptImageRef: Identifiable, Hashable, Sendable {
+    public let id: String
+    public let name: String?
+    public let pixelWidth: Int?
+    public let pixelHeight: Int?
+
+    public init(id: String, name: String? = nil, pixelWidth: Int? = nil, pixelHeight: Int? = nil) {
+        self.id = id
+        self.name = name
+        self.pixelWidth = pixelWidth
+        self.pixelHeight = pixelHeight
+    }
+}
+
+/// A picture fetched by a closure: nothing here knows about bots, entries or a cache.
+struct LoadedImage: View {
+    let id: String
+    let maxPixels: Int
+    var contentMode: ContentMode = .fit
+    /// Changing it asks for another attempt (say, a connection went from down to up).
+    let reloadKey: String
+    let load: @MainActor () async -> Data?
+    @State private var image: CGImage?
+
+    var body: some View {
         Group {
             if let image {
                 Image(decorative: image, scale: 1).resizable().aspectRatio(contentMode: contentMode)
@@ -201,12 +241,61 @@ struct AttachmentImage: View {
                     .overlay { RemixIcon("image-line").foregroundStyle(Palette.tertiary) }
             }
         }
-        // Asked again when the computer comes online: a chat shown from the cache before it connects
-        // gets its pictures once it does. A loaded picture is never fetched again.
-        .task(id: [id, model.connection == .online ? "online" : "waiting"]) {
-            guard image == nil, let data = await load(model) else { return }
+        // Asked again when the caller says so; a loaded picture is never fetched again.
+        .task(id: [id, reloadKey]) {
+            guard image == nil, let data = await load() else { return }
             let size = maxPixels
             image = await Task.detached { ImageData.thumbnail(data, maxPixels: size) }.value
+        }
+    }
+}
+
+/// A caller-loaded picture full size, laid out like `AttachmentViewer`.
+struct LoadedImageViewer: View {
+    let name: String
+    let imageId: String
+    let reloadKey: String
+    let load: @MainActor () async -> Data?
+    @Environment(\.dismissModal) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            LoadedImage(id: imageId, maxPixels: 4096, reloadKey: reloadKey, load: load)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .padding(12)
+                .navigationTitle(name)
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) { Button(L10n.tr("Close")) { dismiss() } }
+                }
+        }
+        .tint(.primary)
+    }
+}
+
+/// The pictures of one row, tap one for full size: `AttachmentList`'s picture branch, with the
+/// loading left to the caller.
+struct TranscriptImageList: View {
+    let images: [TranscriptImageRef]
+    let reloadKey: String
+    let load: @MainActor (String) async -> Data?
+    @State private var viewing: TranscriptImageRef?
+
+    var body: some View {
+        VStack(alignment: .trailing, spacing: 4) {
+            ForEach(images) { ref in
+                LoadedImage(id: ref.id, maxPixels: 720, reloadKey: reloadKey, load: { await load(ref.id) })
+                    .frame(maxWidth: 220, maxHeight: 280)
+                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .contentShape(Rectangle())
+                    .onTapGesture { viewing = ref }
+                    .accessibilityLabel(ref.name ?? "")
+                    .accessibilityAddTraits(.isButton)
+            }
+        }
+        .codyncSheet(item: $viewing) { ref in
+            LoadedImageViewer(name: ref.name ?? "", imageId: ref.id, reloadKey: reloadKey,
+                              load: { await load(ref.id) })
         }
     }
 }

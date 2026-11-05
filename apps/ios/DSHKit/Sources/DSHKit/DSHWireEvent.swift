@@ -464,6 +464,37 @@ struct DSHWireEvent: Equatable, Sendable {
     /// structured `tool/call` events instead.
     var tools: [DSHTool] { [] }
 
+    // MARK: Pictures
+
+    /// The pictures this event refers to. Only references live here — the bytes come from an
+    /// `attachment` request when the row is on screen. A message may carry pictures and no text.
+    var images: [DSHImageRef] { Self.images(in: payload) }
+    static func images(in payload: DSHJSON) -> [DSHImageRef] {
+        var refs: [DSHImageRef] = []
+        var seen = Set<String>()
+        func append(_ ref: DSHImageRef?) {
+            guard let ref, seen.insert(ref.attachmentId).inserted else { return }
+            refs.append(ref)
+        }
+        // A live event lists them at the top level; a history one keeps them as content blocks, whose
+        // attachment object holds the reference.
+        for value in payload["images"].array { append(imageRef(value)) }
+        let blocks = payload["message"]["content"] != .null ? payload["message"]["content"] : payload["content"]
+        for block in blocks.array where block["type"].string == "image" {
+            append(imageRef(block["attachment"] != .null ? block["attachment"] : block))
+        }
+        return refs
+    }
+    private static func imageRef(_ value: DSHJSON) -> DSHImageRef? {
+        guard let id = value["attachmentId"].string, !id.isEmpty else { return nil }
+        return DSHImageRef(attachmentId: id,
+                           mediaType: value["mediaType"].string ?? "image/jpeg",
+                           bytes: value["bytes"].integer.map(Int.init),
+                           width: value["width"].integer.map(Int.init),
+                           height: value["height"].integer.map(Int.init),
+                           name: value["name"].string)
+    }
+
     /// Compare facts, not the different live/history envelope shapes.
     func contradicts(_ other: DSHWireEvent) -> Bool {
         if type != other.type { return true }

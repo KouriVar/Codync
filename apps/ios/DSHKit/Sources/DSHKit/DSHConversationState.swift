@@ -4,6 +4,9 @@ public struct DSHSubmission: Identifiable, Hashable, Sendable {
     public enum Status: String, Hashable, Sendable { case writing, accepted, failed, unknown }
     public let id: String
     public let text: String
+    /// The pictures frozen with this send. A retry re-sends exactly these bytes: a picture is never
+    /// re-compressed into a different payload, and pictures picked later never join this one.
+    public let images: [DSHOutgoingImage]
     public private(set) var status: Status
     public private(set) var detail: String
     public private(set) var historyChecked = false
@@ -11,8 +14,8 @@ public struct DSHSubmission: Identifiable, Hashable, Sendable {
     mutating func retire() { isRetired = true }
     var connection: UInt64
 
-    init(text: String, connection: UInt64, available: Bool) {
-        id = UUID().uuidString; self.text = text; self.connection = connection
+    init(text: String, images: [DSHOutgoingImage], connection: UInt64, available: Bool) {
+        id = UUID().uuidString; self.text = text; self.images = images; self.connection = connection
         status = available ? .writing : .failed
         detail = available ? "发送中" : "没有发出去，请连接后手动重试"
     }
@@ -214,8 +217,10 @@ struct DSHConversationState: Sendable {
         pageError = message
     }
 
-    mutating func submit(text: String, connection: UInt64, available: Bool) -> String {
-        let submission = DSHSubmission(text: text, connection: connection, available: available)
+    mutating func submit(text: String, images: [DSHOutgoingImage], connection: UInt64,
+                         available: Bool) -> String {
+        let submission = DSHSubmission(text: text, images: images, connection: connection,
+                                       available: available)
         submissions.append(submission)
         return submission.id
     }
@@ -288,11 +293,12 @@ struct DSHConversationState: Sendable {
             return projectUser(event)
         case "assistant/message":
             let text = event.text
-            guard !text.isEmpty else { return nil }
+            let images = event.images
+            guard !text.isEmpty || !images.isEmpty else { return nil }
             // No tool rows are attached: the transcript draws none, and the running status line reads
             // structured `tool/call` events instead of a per-turn array copied onto every message.
             return DSHMessage(id: scope.identity([.seq(event.seq)]), role: .assistant, text: text,
-                              reasoning: event.reasoning, turn: event.turn,
+                              reasoning: event.reasoning, images: images, turn: event.turn,
                               createdAt: event.time, seq: event.seq, step: event.step,
                               revision: event.revision)
         case "turn/end":
@@ -307,28 +313,31 @@ struct DSHConversationState: Sendable {
     private func projectUser(_ event: DSHWireEvent) -> DSHMessage? {
         guard let origin = event.origin else { return nil }
         let text = event.text
-        guard !text.isEmpty else { return nil }
+        let images = event.images
+        // Pictures without text are still a row: a photo the reader sent says something on its own.
+        guard !text.isEmpty || !images.isEmpty else { return nil }
         switch origin.kind {
         case .user:
             // Confirmed by the source: the old "Time sampled…" prefix rule no longer deletes it.
             return DSHMessage(id: scope.identity([.seq(event.seq)]), role: .user, text: text,
-                              turn: event.turn, createdAt: event.time, seq: event.seq,
+                              images: images, turn: event.turn, createdAt: event.time, seq: event.seq,
                               step: event.step, revision: event.revision)
         case .context:
             let source = origin.sourceName
             let notice = DSHNotice(style: .context, source: source,
                                    title: source.map { "上下文 · \($0)" } ?? "上下文")
             // The row's identity comes from the event's own address plus a fixed `context` suffix.
+            // A context picture stays a neutral line: it is never drawn as the reader's own photo.
             return DSHMessage(id: scope.identity([.seq(event.seq), .text("context")]),
-                              role: .notice, text: text, notice: notice, turn: event.turn,
-                              createdAt: event.time, seq: event.seq, step: event.step,
-                              revision: event.revision)
+                              role: .notice, text: text, images: images, notice: notice,
+                              turn: event.turn, createdAt: event.time, seq: event.seq,
+                              step: event.step, revision: event.revision)
         case .legacy:
             // No source field at all: not claimed to be the reader's own input. The old prefix rule
             // stays here only, so it can never delete a message the source confirmed as the user's.
             guard !DSHSystemMessageFilter.isInjected(text) else { return nil }
             return DSHMessage(id: scope.identity([.seq(event.seq)]), role: .user, text: text,
-                              turn: event.turn, createdAt: event.time, seq: event.seq,
+                              images: images, turn: event.turn, createdAt: event.time, seq: event.seq,
                               step: event.step, revision: event.revision)
         }
     }

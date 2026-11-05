@@ -90,6 +90,47 @@ public struct DSHTool: Identifiable, Hashable, Sendable {
     }
 }
 
+/// One picture a message refers to. The bytes are never kept here: they are fetched with an
+/// `attachment` request when the row becomes visible, and cached in memory by
+/// `(gatewayId, sessionId, attachmentId)`.
+public struct DSHImageRef: Identifiable, Hashable, Sendable {
+    public let attachmentId: String
+    public let mediaType: String
+    public let bytes: Int?
+    public let width: Int?
+    public let height: Int?
+    public let name: String?
+
+    public var id: String { attachmentId }
+
+    public init(attachmentId: String, mediaType: String, bytes: Int? = nil,
+                width: Int? = nil, height: Int? = nil, name: String? = nil) {
+        self.attachmentId = attachmentId
+        self.mediaType = mediaType
+        self.bytes = bytes
+        self.width = width
+        self.height = height
+        self.name = name
+    }
+}
+
+/// A picture the reader is sending, already prepared by `DSHImageProcessor`.
+public struct DSHOutgoingImage: Hashable, Sendable {
+    public let mediaType: String
+    public let name: String
+    public let data: Data
+
+    public init(mediaType: String, name: String, data: Data) {
+        self.mediaType = mediaType
+        self.name = name
+        self.data = data
+    }
+
+    public init(_ prepared: DSHPreparedImage) {
+        self.init(mediaType: prepared.mediaType, name: prepared.name, data: prepared.data)
+    }
+}
+
 /// A neutral line in the conversation that is neither the reader nor the model: injected context, or
 /// how a turn ended.
 public struct DSHNotice: Hashable, Sendable {
@@ -134,6 +175,9 @@ public struct DSHMessage: Identifiable, Hashable, Sendable {
     public var reasoning: String
     /// Tools called in this step, in order.
     public var tools: [DSHTool]
+    /// Pictures this message carries. A message may hold pictures and no text at all, and it is still
+    /// a row: the bytes are fetched separately, so the references are all that live here.
+    public var images: [DSHImageRef]
     /// What a `.notice` row is: its style, and the controlled source name when it is a context line.
     public var notice: DSHNotice?
     /// The turn this message belongs to.
@@ -144,7 +188,8 @@ public struct DSHMessage: Identifiable, Hashable, Sendable {
     public var createdAt: Int64
 
     public init(id: String, role: Role, text: String, streaming: Bool = false,
-                reasoning: String = "", tools: [DSHTool] = [], notice: DSHNotice? = nil,
+                reasoning: String = "", tools: [DSHTool] = [], images: [DSHImageRef] = [],
+                notice: DSHNotice? = nil,
                 turn: Int? = nil, durationSeconds: Int? = nil,
                 createdAt: Int64 = 0, seq: Int64 = 0, step: Int? = nil,
                 displayRowId: String? = nil, revision: Int64 = 0) {
@@ -158,6 +203,7 @@ public struct DSHMessage: Identifiable, Hashable, Sendable {
         self.streaming = streaming
         self.reasoning = reasoning
         self.tools = tools
+        self.images = images
         self.notice = notice
         self.turn = turn
         self.durationSeconds = durationSeconds
@@ -194,17 +240,20 @@ public struct DSHTranscriptItem: Identifiable, Sendable {
     public var displayRowId: String = ""
     public let text: String
     public let summary: DSHSummary?
+    /// Pictures this row carries. A row with pictures and no text is still shown.
+    public let images: [DSHImageRef]
     /// What a `.notice` row is: its style and, for a context line, its controlled source name.
     public let notice: DSHNotice?
     /// When the message was written (ms since epoch), for the page's time separators.
     public let createdAt: Int64
 
     public init(id: String, kind: Kind, text: String, summary: DSHSummary?, createdAt: Int64,
-                notice: DSHNotice? = nil) {
+                images: [DSHImageRef] = [], notice: DSHNotice? = nil) {
         self.id = id
         self.kind = kind
         self.text = text
         self.summary = summary
+        self.images = images
         self.notice = notice
         self.createdAt = createdAt
     }
@@ -226,10 +275,11 @@ public enum DSHConversationAdapter {
         switch message.role {
         case .notice:
             return DSHTranscriptItem(id: message.id, kind: .notice, text: message.text,
-                                     summary: nil, createdAt: message.createdAt, notice: message.notice)
+                                     summary: nil, createdAt: message.createdAt,
+                                     images: message.images, notice: message.notice)
         case .user:
             return DSHTranscriptItem(id: message.id, kind: .user, text: message.text,
-                                     summary: nil, createdAt: message.createdAt)
+                                     summary: nil, createdAt: message.createdAt, images: message.images)
         case .assistant:
             let hasDetail = !message.reasoning.isEmpty || !message.tools.isEmpty
             let summary = hasDetail
@@ -237,7 +287,7 @@ public enum DSHConversationAdapter {
                              reasoning: message.reasoning, tools: message.tools)
                 : nil
             return DSHTranscriptItem(id: message.id, kind: .assistant, text: message.text,
-                                     summary: summary, createdAt: message.createdAt)
+                                     summary: summary, createdAt: message.createdAt, images: message.images)
         }
     }
 
