@@ -2832,3 +2832,74 @@
   ui-preview 覆盖、构建号 199）**编译通过，0 error**，改动文件 0 warning；`xcrun devicectl device install app`
   装到 iPhone 16 Pro（`com.suiyikou.codync.uipreview` 2.36.0 / 199）成功。按要求**不自测**。
 - 关联：C0210（状态行头像）、C0208/C0209（会话页搬迁）、备份 tag `backup/before-avatar-dot-c0211`（`ab462079`）。
+
+### C0212 · 2026-11-05 · DSH 运行中按当前步骤显示四句状态行
+
+- 原因：C0210 把会话页统一成一行扫光状态行，但 DSH 页只有 `isStreaming` 一个信号，运行中一律「在处理」，
+  拿不到「在想 / 在跑命令 / 在看文件 / 在改代码」；而且 `assistant/message` 与 attempt 结束都会把
+  `isStreaming` 置回 false，工具执行期间状态行反而会消失。穗要求按当前步骤显示，turn/end 后消失。
+  四方已定 Q1=A：App 用结构化事件＋工具白名单，认不出的降级「在处理」，网关不改、WS 线上格式不变。
+- 行为（用户可见）：
+  - DSH 会话运行中，底部状态行按当前步骤显示：turn/step 开始、模型 attempt、reasoning-delta →「在想」；
+    bash / pwsh / shell / exec / exec_command / terminal →「在跑命令」；read / read_file / readfile →「在看文件」；
+    write / write_file / writefile / edit / edit_file / editfile / apply_patch →「在改代码」；
+    其余（run_code、search / glob / grep / fetch、命名空间工具、缺 callId 的调用、未知工具）→「在处理」。
+  - 同时有多个未完成工具时显示最近发起的那个；一个工具返回后回到「在处理」，等下个 step/attempt。
+  - turn/end 后整行消失；assistant/message、attempt end、step/end 都不再隐藏它，工具在跑时不会闪没。
+  - 新开会话、关闭会话、断线、连接失败、`session-stream-reset` 都会清掉当前活动：切会话再切回、
+    断网再连上都不残留上一个工具名，也不会卡着不消失。旧 socket、旧 subscriptionId、旧 streamId 的帧一律丢弃；
+    seq 重放忽略，seq 出现缺口时降级为「在处理」，不跨缺口拼工具。
+  - Coe 的会话页不受影响：仍走 `WorkingPhrase.title(for:)`，四个短语抽成常量后字符串与行为不变。
+- 分类与状态机（只在前端；网关未改，WS 字段未增）：
+  | 输入 | running / 状态行 |
+  |---|---|
+  | turn/start、step/start、attempt start、reasoning-delta | 运行中 →「在想」 |
+  | text-delta | 运行中 →「在处理」（有未完成工具时显示该工具） |
+  | tool/call | 按白名单分类；最近一个未完成的调用优先 |
+  | tool/result | 只移除匹配的 callId；还有别的 pending 显示最近那个，否则「在处理」 |
+  | assistant/message、attempt end、step/end | 保持运行中，不隐藏 |
+  | turn/end | 消失，清该轮全部 pending/attempt |
+  | session-status、sessions[].running | 仅在没有可信基线时兜底；`false` 清细分状态，不作完成通知 |
+  | session-snapshot | 完整窗口才折叠未结束 turn 与 pending call；裁剪窗口只保留 running →「在处理」 |
+  | session-stream-reset | 当前 stream 作废、清细分；仍在跑就显示「在处理」，等新基线 |
+- 变化：
+  - `DSHKit/Sources/DSHKit/DSHModels.swift`：新增 `DSHActivityKind`（thinking/executing/reading/editing/processing，
+    `forTool(named:)` 走小写精确别名，不用 contains、不读 arguments）、输入 DTO
+    （`DSHActivityEnvelope` / `DSHActivityEvent` / `DSHActivityFrame` / `DSHActivityAttempt` / `DSHActivitySnapshot`），
+    以及纯 reducer `DSHActivityState`：session/subscription/stream 代际、seq 水位、pending 调用（最近激活顺序）、
+    attempt 的 revision/index、running 与 kind。DSHKit 不依赖 CodyncUI，不放颜色或 SwiftUI token，
+    `DSHMessage` 正文结构未改。
+  - `DSHKit/Sources/DSHKit/DSHGateway.swift`：发布 `currentActivity: DSHActivityKind?` 与 `isRunning`；
+    `handleFrame` 新增 `subscribed`、`session-status` 两个分支，`sessions` 之后给打开会话做兜底；
+    `event` / `assistant-stream` / `session-snapshot` 在正文处理之外先喂 reducer；`session-stream-reset` 清细分；
+    `open` / `closeConversation` / `disconnect` / `handleDrop` / `requirePairingAgain` / `fail` 清空当前活动。
+    tool/call 的 `arguments` 按 JSON 取值（字符串、数字、结构化 JSON 都收），不再只认 String。
+    `send(text:)`、`upsertFinishedAssistant` 与正文处理分支未改。
+  - `Kit/Sources/CodyncUI/Thread/ConversationStatusLine.swift`：`WorkingPhrase` 新增 `thinking` / `executing` /
+    `reading` / `editing` 四个常量，`title(for:)` 改为引用它们（返回的字符串不变）。
+  - `Kit/Sources/CodyncUI/Thread/ChatTranscript.swift`：`ChatTranscriptView` 新增
+    `workingTitle: String = WorkingPhrase.generic`，状态行用它当标题；working 行的 revision 计入
+    `workingTitle.hashValue`，列表复用时标题变化会重绘该行。
+  - `apps/ios/Views/DSHConversationView.swift`：`working: gateway.isRunning`，`workingTitle` 由
+    `gateway.currentActivity` 映射到 `WorkingPhrase`；头像仍是 `SourceAvatar(.dsh, size: 24)`，
+    toolbar、composer、summary sheet、`onDisappear` 均未动。
+- 未做 / 需要你注意：
+  - 按你的要求没加测试 target、没写测试、没跑测试、没截图、没用 CDP；验证只有编译和安装。
+  - 正文里的 `turnTools`（summary sheet 里工具参数）仍用 `as? String`，结构化 arguments 在**正文**仍会丢；
+    按「不动正文处理分支」没改，要不要下一刀一起修由你定。
+  - 工具白名单按旧 M / KMP 的别名定，没有做命名空间（`ns.tool` 一律「在处理」），run_code 也不猜。
+  - 快照里的 `activeAttempt` 恢复依赖 `assistantStream.activeAttempt` 的字段形状（`attemptId` / `nextIndex` /
+    `stream` 紧凑记录）；网关若改字段名会静默降级成「在想 / 在处理」，不会崩。
+  - 改动文件里剩 1 个既有 warning（`DSHGateway.swift` 的 `if let openSessionId`），基线 C0211 就存在，
+    不是本刀引入的，按「不顺手改」留着。
+  - DSH 页的 `isStreaming` 语义保持原样（下一刀做正文归并）；`DSHViews.swift` 里还有一处旧的
+    `isStreaming` typing 指示器，不在本刀范围。
+- 文件：`apps/ios/DSHKit/Sources/DSHKit/DSHModels.swift`、`apps/ios/DSHKit/Sources/DSHKit/DSHGateway.swift`、
+  `apps/ios/Kit/Sources/CodyncUI/Thread/ConversationStatusLine.swift`、
+  `apps/ios/Kit/Sources/CodyncUI/Thread/ChatTranscript.swift`、`apps/ios/Views/DSHConversationView.swift`、
+  `CHANGELOG.md`。
+- 验证：`xcodebuild build -project apps/Codync.xcodeproj -scheme 'iOS Dev' -configuration DevDebug`（真机 destination、
+  ui-preview 覆盖、构建号 200）**编译通过，0 error**，改动文件 0 新增 warning；`xcrun devicectl device install app`
+  装到 iPhone 16 Pro（`com.suiyikou.codync.uipreview` 2.36.0 / 200）成功。按要求**不自测**。
+- 关联：C0210（状态行）、C0211（头像与来源点）、设计 `streaming-step1.md`（Q1=A）、
+  备份 tag `backup/before-dsh-activity-c0212`（`b5e25c39`）。

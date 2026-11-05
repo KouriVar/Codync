@@ -26,6 +26,12 @@ public final class DSHGateway: ObservableObject {
     @Published public private(set) var messages: [DSHMessage] = []
     @Published public private(set) var openSessionId: String?
     @Published public private(set) var isStreaming = false
+    /// What the running turn is doing right now, for the chat's one status line; nil when nothing
+    /// runs (the line disappears). Separate from `isStreaming`: a model attempt ending is not a turn
+    /// ending, and a tool running has no attempt at all.
+    @Published public private(set) var currentActivity: DSHActivityKind?
+    /// Whether the open conversation has a turn under way.
+    @Published public private(set) var isRunning = false
 
     public private(set) var profile: DSHGatewayProfile?
 
@@ -43,6 +49,9 @@ public final class DSHGateway: ObservableObject {
     private var turnStartedAt: Date?
     private var turnNumber: Int?
     private var turnTools: [DSHTool] = []
+    /// The running-turn state behind the status line. Its own generation, seq watermark and attempt
+    /// bookkeeping; it never touches `messages` or the body's own handling.
+    private var activity = DSHActivityState()
 
     private var pendingPairing: CheckedContinuation<DSHGatewayProfile, Error>?
     private var pairingTimeoutTask: Task<Void, Never>?
@@ -92,6 +101,8 @@ public final class DSHGateway: ObservableObject {
         task = nil
         phase = .idle
         isStreaming = false
+        activity.endSession()
+        syncActivity()
     }
 
     private func start() {
@@ -227,6 +238,11 @@ public final class DSHGateway: ObservableObject {
             sessions = Self.decodeSessions(frame)
             reconnectAttempt = 0
             if phase != .ready { phase = .ready }
+            applySessionsHint()
+        case "subscribed":
+            handleSubscribed(frame)
+        case "session-status":
+            handleSessionStatus(frame)
         case "history":
             handleHistory(frame)
         case "projection-baseline":
@@ -246,6 +262,8 @@ public final class DSHGateway: ObservableObject {
         case "session-stream-reset":
             isStreaming = false
             streamingAttempts.removeAll()
+            activity.applyStreamReset(in: activityEnvelope(frame))
+            syncActivity()
         case "error":
             let message = frame.string("message") ?? "未知错误"
             if frame.string("code") == "authentication-required" { requirePairingAgain() }
@@ -302,6 +320,9 @@ public final class DSHGateway: ObservableObject {
     private func handleEvent(_ frame: DSHFrame) {
         guard let sid = frame.string("sessionId"), sid == openSessionId,
               let event = frame.dict("event"), let type = event["type"] as? String else { return }
+        // The status line's state is folded first, before the body's own handling below; the two
+        // never share a watermark, and nothing here returns early into the body's branches.
+        applyActivityEvent(frame, payload: event, type: type)
         switch type {
         case "turn/start":
             turnNumber = event["turn"] as? Int
@@ -355,6 +376,7 @@ public final class DSHGateway: ObservableObject {
     /// `history` page so both paths produce the same messages (thinking + tools included).
     private func handleSnapshot(_ frame: DSHFrame) {
         guard let sid = frame.string("sessionId"), sid == openSessionId else { return }
+        applyActivitySnapshot(frame)
         let events = frame.array("events") ?? []
         let decoded = Self.decodeHistory(events)
         if !decoded.isEmpty, messages.isEmpty { messages = decoded }
@@ -442,6 +464,7 @@ public final class DSHGateway: ObservableObject {
 
     private func handleStream(_ frame: DSHFrame) {
         guard frame.string("sessionId") == openSessionId, let payload = frame.dict("frame") else { return }
+        applyActivityStream(frame, payload: payload)
         switch payload["type"] as? String {
         case "start":
             if let attempt = payload["attemptId"] as? String { streamingAttempts.insert(attempt) }
@@ -464,6 +487,158 @@ public final class DSHGateway: ObservableObject {
         }
     }
 
+    // MARK: - Current activity (the status line's state)
+
+    /// The subscription is confirmed: a new generation. No stream is known until a snapshot names
+    /// one, and nothing from the previous subscription survives.
+    private func handleSubscribed(_ frame: DSHFrame) {
+        guard let sid = frame.string("sessionId"), sid == openSessionId,
+              let subscriptionId = frame.string("subscriptionId") else { return }
+        activity.applySubscribed(subscriptionId: subscriptionId, streamId: frame.string("streamId"))
+        syncActivity()
+    }
+
+    /// `{sessionId, running}`: process metadata with no persistent seq, so only a hint.
+    private func handleSessionStatus(_ frame: DSHFrame) {
+        guard let sid = frame.string("sessionId"), sid == openSessionId,
+              let running = frame.bool("running") else { return }
+        activity.applySessionStatus(running: running)
+        syncActivity()
+    }
+
+    /// `sessions[].running` for the open conversation: a fallback for when no baseline has arrived
+    /// yet, so a turn already under way is not silently blank until the snapshot lands.
+    private func applySessionsHint() {
+        guard let sessionId = openSessionId,
+              let row = sessions.first(where: { $0.id == sessionId }) else { return }
+        activity.applySessionsHint(running: row.running)
+        syncActivity()
+    }
+
+    /// One persistent event: the status line's state, folded before the body's own handling.
+    private func applyActivityEvent(_ frame: DSHFrame, payload: [String: Any], type: String) {
+        let event = Self.activityEvent(type: type, from: payload, seq: frame.int("seq"))
+        if activity.apply(event, in: activityEnvelope(frame)) { syncActivity() }
+    }
+
+    /// One temporary attempt frame. Its `revision`/`index` clock is checked here and never mixed
+    /// with the persistent `seq`.
+    private func applyActivityStream(_ frame: DSHFrame, payload: [String: Any]) {
+        let chunk = payload["chunk"] as? [String: Any]
+        let input = DSHActivityFrame(
+            type: payload["type"] as? String ?? "",
+            attemptId: payload["attemptId"] as? String,
+            revision: (payload["revision"] as? NSNumber)?.intValue,
+            turn: (payload["turn"] as? NSNumber)?.intValue,
+            step: (payload["step"] as? NSNumber)?.intValue,
+            index: (payload["index"] as? NSNumber)?.intValue,
+            chunkType: chunk?["type"] as? String)
+        if activity.apply(input, in: activityEnvelope(frame)) { syncActivity() }
+    }
+
+    /// The server's atomic baseline: identity, watermark, a window of events and any attempt still
+    /// being written.
+    private func applyActivitySnapshot(_ frame: DSHFrame) {
+        let events = (frame.array("events") ?? []).compactMap { record -> DSHActivityEvent? in
+            guard let type = record["type"] as? String else { return nil }
+            // History/snapshot records wrap the payload in `data`; live events carry it at the top.
+            let payload = record["data"] as? [String: Any] ?? record
+            return Self.activityEvent(type: type, from: payload,
+                                      seq: (record["seq"] as? NSNumber)?.intValue)
+        }
+        let assistantStream = frame.dict("assistantStream")
+        var attempt: DSHActivityAttempt?
+        if let active = assistantStream?["activeAttempt"] as? [String: Any],
+           let attemptId = active["attemptId"] as? String {
+            attempt = DSHActivityAttempt(
+                attemptId: attemptId,
+                turn: (active["turn"] as? NSNumber)?.intValue,
+                step: (active["step"] as? NSNumber)?.intValue,
+                nextIndex: (active["nextIndex"] as? NSNumber)?.intValue,
+                revision: (assistantStream?["revision"] as? NSNumber)?.intValue,
+                lastDeltaType: Self.lastDeltaType(in: active["stream"]))
+        }
+        let snapshot = DSHActivitySnapshot(
+            subscriptionId: frame.string("subscriptionId"),
+            streamId: frame.string("streamId"),
+            replace: frame.bool("replace") ?? false,
+            cursor: frame.int("cursor"),
+            hasMore: frame.bool("hasMore") ?? false,
+            events: events,
+            attempt: attempt)
+        activity.applySnapshot(snapshot, runningHint: openSessionId.flatMap { id in
+            sessions.first(where: { $0.id == id })?.running
+        })
+        syncActivity()
+    }
+
+    /// Mirrors the reducer onto the two published values the page reads.
+    private func syncActivity() {
+        let kind = activity.activity
+        if currentActivity != kind { currentActivity = kind }
+        if isRunning != activity.running { isRunning = activity.running }
+    }
+
+    private func activityEnvelope(_ frame: DSHFrame) -> DSHActivityEnvelope {
+        DSHActivityEnvelope(sessionId: frame.string("sessionId"),
+                            subscriptionId: frame.string("subscriptionId"),
+                            streamId: frame.string("streamId"))
+    }
+
+    /// One event, reduced to what the activity needs. A history `tool/result` carries its id in
+    /// `message.toolCallId` (or `source.callId`), a live one in `callId`.
+    static func activityEvent(type: String, from payload: [String: Any], seq: Int?) -> DSHActivityEvent {
+        let message = payload["message"] as? [String: Any]
+        let source = payload["source"] as? [String: Any]
+        return DSHActivityEvent(
+            type: type,
+            turn: (payload["turn"] as? NSNumber)?.intValue,
+            step: (payload["step"] as? NSNumber)?.intValue,
+            callId: payload["callId"] as? String
+                ?? message?["toolCallId"] as? String
+                ?? source?["callId"] as? String,
+            toolName: payload["name"] as? String,
+            arguments: argumentsText(payload["arguments"]),
+            seq: seq)
+    }
+
+    /// A tool call's `arguments` are JSON and not guaranteed to be a string: keep a structured
+    /// payload as JSON text instead of dropping the call the way `as? String` would.
+    static func argumentsText(_ raw: Any?) -> String? {
+        switch raw {
+        case nil, is NSNull:
+            return nil
+        case let text as String:
+            return text
+        case let number as NSNumber:
+            return number.stringValue
+        default:
+            guard let value = raw, JSONSerialization.isValidJSONObject(value),
+                  let data = try? JSONSerialization.data(withJSONObject: value) else { return nil }
+            return String(data: data, encoding: .utf8)
+        }
+    }
+
+    /// The compact records a baseline's attempt stream is made of (`text-chunks`,
+    /// `reasoning-chunks`, raw `chunk`): what it was last emitting, so the phrase can be restored.
+    static func lastDeltaType(in raw: Any?) -> String? {
+        guard let records = raw as? [[String: Any]] else { return nil }
+        var last: String?
+        for record in records {
+            switch record["type"] as? String {
+            case "text-chunks": last = "text-delta"
+            case "reasoning-chunks": last = "reasoning-delta"
+            case "chunk":
+                if let chunk = record["chunk"] as? [String: Any], let type = chunk["type"] as? String {
+                    last = type
+                }
+            default:
+                break
+            }
+        }
+        return last
+    }
+
     // MARK: - Conversation
 
     public func open(sessionId: String) {
@@ -471,6 +646,8 @@ public final class DSHGateway: ObservableObject {
         messages = []
         isStreaming = false
         streamingAttempts.removeAll()
+        activity.beginSession(sessionId)
+        syncActivity()
         send(["type": "subscribe", "sessionId": sessionId, "assistantStream": true])
         // One page of history for this session, so the transcript is not empty when it opens
         // (the live snapshot only covers what happens after subscribing).
@@ -486,6 +663,8 @@ public final class DSHGateway: ObservableObject {
         openHistoryRequestId = nil
         messages = []
         isStreaming = false
+        activity.endSession()
+        syncActivity()
     }
 
     public func send(text: String) {
@@ -610,6 +789,9 @@ public final class DSHGateway: ObservableObject {
             pairingTimeoutTask = nil
         }
         phase = .failed(message)
+        // A dropped socket must not leave the status line claiming that a tool is still running.
+        activity.endSession()
+        syncActivity()
         scheduleReconnect()
     }
 
@@ -636,10 +818,14 @@ public final class DSHGateway: ObservableObject {
         phase = .failed(DSHError.authenticationRequired.localizedDescription)
         if let id = profile?.id { DSHCredentialStore.delete(id: id) }
         profile = nil
+        activity.endSession()
+        syncActivity()
     }
 
     private func fail(_ error: Error) {
         phase = .failed(error.localizedDescription)
+        activity.endSession()
+        syncActivity()
     }
 
     // MARK: - Decoding helpers

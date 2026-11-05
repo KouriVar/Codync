@@ -46,6 +46,10 @@ public struct ConversationStatusLine: View {
 /// own type — never the model's words, never a generated title.
 public enum WorkingPhrase {
     public static let generic = "在处理"
+    public static let thinking = "在想"
+    public static let executing = "在跑命令"
+    public static let reading = "在看文件"
+    public static let editing = "在改代码"
 
     /// Coe's running steps, the last one being the step under way. `thought`/`tool`/`plan` are the
     /// kinds the host marks as working steps; a tool's `toolKind` says which kind of tool it is.
@@ -53,13 +57,13 @@ public enum WorkingPhrase {
         guard let step = steps.last else { return generic }
         switch step.kind {
         case "thought":
-            return "在想"
+            return thinking
         case "tool":
             switch step.data.toolKind {
-            case "think": return "在想"
-            case "execute": return "在跑命令"
-            case "read": return "在看文件"
-            case "edit", "move", "delete": return "在改代码"
+            case "think": return thinking
+            case "execute": return executing
+            case "read": return reading
+            case "edit", "move", "delete": return editing
             default: return generic
             }
         default:

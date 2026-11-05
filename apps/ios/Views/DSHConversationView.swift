@@ -12,7 +12,9 @@ struct DSHConversationView: View {
     @State private var draft = ""
 
     var body: some View {
-        ChatTranscriptView(items: items, following: $following, working: gateway.isStreaming) { summary in
+        ChatTranscriptView(items: items, following: $following,
+                           working: gateway.isRunning,
+                           workingTitle: Self.workingTitle(for: gateway.currentActivity)) { summary in
             details = summary
         }
         .background(Palette.background)
@@ -97,6 +99,16 @@ struct DSHConversationView: View {
             sections.append("工具\n" + rows.joined(separator: "\n\n"))
         }
         return sections.joined(separator: "\n\n")
+    }
+
+    private static func workingTitle(for activity: DSHActivityKind?) -> String {
+        switch activity {
+        case .thinking: return WorkingPhrase.thinking
+        case .executing: return WorkingPhrase.executing
+        case .reading: return WorkingPhrase.reading
+        case .editing: return WorkingPhrase.editing
+        case .processing, nil: return WorkingPhrase.generic
+        }
     }
 
     /// The page's title button, in the bar: a 24pt avatar and the conversation's name at 16pt

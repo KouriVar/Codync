@@ -63,13 +63,16 @@ public struct ChatTranscriptView: View {
     let items: [TranscriptItem]
     @Binding var following: Bool
     let working: Bool
+    let workingTitle: String
     let onOpenSummary: (TranscriptSummary) -> Void
 
     public init(items: [TranscriptItem], following: Binding<Bool>, working: Bool = false,
+                workingTitle: String = WorkingPhrase.generic,
                 onOpenSummary: @escaping (TranscriptSummary) -> Void) {
         self.items = items
         _following = following
         self.working = working
+        self.workingTitle = workingTitle
         self.onOpenSummary = onOpenSummary
     }
 
@@ -99,8 +102,8 @@ public struct ChatTranscriptView: View {
             }
         }
         if working {
-            out.append(ConversationRow("working") {
-                ConversationStatusLine(title: WorkingPhrase.generic) {
+            out.append(ConversationRow("working", revision: workingTitle.hashValue) {
+                ConversationStatusLine(title: workingTitle) {
                     // A DSH gateway has no bot: the source's own face, dot and all.
                     SourceAvatar(.dsh, size: 24)
                 }
