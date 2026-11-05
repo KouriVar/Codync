@@ -121,7 +121,8 @@ struct BotDetailsView: View {
 
     private func identity(_ bot: Bot) -> some View {
         VStack(spacing: 14) {
-            LeadAgentAvatar(bot: bot, size: 88)
+            // The plain face: the lead agent's star is gone here as everywhere else.
+            CharacterAvatar(bot: bot, size: 88)
             Text(bot.name).font(.title2.weight(.semibold)).multilineTextAlignment(.center)
             Button("编辑") { page = .edit }
                 .font(.body.weight(.medium))

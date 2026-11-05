@@ -3014,3 +3014,32 @@
   装到 iPhone 16 Pro（`com.suiyikou.codync.uipreview` 2.36.0 / 202）成功。按要求**不自测**。
 - 关联：C0210（状态行）、C0212（DSH 当前步骤与工具白名单）、C0213（尺寸与「名字 + 状态」）、
   备份 tag `backup/before-dynamic-title-c0214`（`d226f98d`）。
+
+### C0215 · 2026-11-05 · 去掉主 bot 的五角星徽标（iOS 所有位置）
+
+- 原因：穗要求五角星所有地方都去掉，包括详情页。
+- 变化：
+  - `Kit/Sources/CodyncKit/Design/CharacterAvatar.swift`：`AvatarWithStatus` 删掉主 bot 的星标 overlay
+    （原在 `sourceDot == nil ? .bottomTrailing : .topTrailing` 上画 `LeadAgentBadge(size: max(12, size * 0.34))`）。
+    头像本体、来源点、未读/需要输入标记都没动。
+  - `Kit/Sources/CodyncUI/Bots/BotDetailsView.swift`（`identity` 里）：详情页 88pt 大头像由 `LeadAgentAvatar`
+    换成 `CharacterAvatar`，尺寸仍 88；那颗可点的星（点开是「主 bot 说明」sheet）随之消失。
+  - 删除 `Kit/Sources/CodyncKit/Design/LeadAgentBadge.swift` 与 `Kit/Sources/CodyncUI/Bots/LeadAgentAvatar.swift`：
+    全仓库 rg 后 iOS 侧已无任何引用（`apps/android` 与 `apps/desktop` 各有一份同名实现，属别的 App，未在本次范围）。
+- 未改（按你的要求）：`bot.lead` 字段，以及主 bot 的选择、排序、语音入口、发送给主 bot、菜单显示规则、Host 逻辑；
+  C0211 的来源点（`SourceKind.dot` / `SourceAvatar`）；首页长按菜单里「设为主 Bot」的 star-line 图标；`Palette.warning`。
+- 待穗确认（按「别自己发明新排布」保守处理）：
+  - 状态标记（未读点 / 需要输入的感叹号）位置仍是 `bot.lead ? .topTrailing : .bottomTrailing`：列表行右下角是
+    来源点（`BotRow` 会传 `sourceDot`），主 bot 的标记如果统一挪到右下会和它重叠；按「重叠就先保持现状」没有改。
+    要统一成右下是一行改动（顺带说明：非主 bot 现在本来就和来源点重叠，C0211 已记录）。
+  - 详情页去掉那颗星以后，「主 bot 说明」sheet 没有入口了；按要求没有另加入口。
+- 文件：`apps/ios/Kit/Sources/CodyncKit/Design/CharacterAvatar.swift`、
+  `apps/ios/Kit/Sources/CodyncUI/Bots/BotDetailsView.swift`；删除
+  `apps/ios/Kit/Sources/CodyncKit/Design/LeadAgentBadge.swift`、
+  `apps/ios/Kit/Sources/CodyncUI/Bots/LeadAgentAvatar.swift`；`CHANGELOG.md`。
+- 验证：`xcodebuild build -project apps/Codync.xcodeproj -scheme 'iOS Dev' -configuration DevDebug`（真机 destination、
+  ui-preview 覆盖、构建号 203）**编译通过，0 error**，改动文件 0 warning；`xcrun devicectl device install app` 装到
+  iPhone 16 Pro（`com.suiyikou.codync.uipreview` 2.36.0 / 203）成功。按要求**不自测**。
+  另：C0212–C0214 的构建命令多传了 `CODYNC_APP_NAME=Codync UI 测试`（抄自 `docs/guides/ios-ui-preview.md` 的示例），
+  它覆盖了 `DevDebug` 配置里的 App 名；这次起不再传，安装后的显示名回到 `project.yml` 里 `DevDebug` 的名字。
+- 关联：C0211（来源点）、备份 tag `backup/before-remove-lead-star-c0215`（`485f865f`）。

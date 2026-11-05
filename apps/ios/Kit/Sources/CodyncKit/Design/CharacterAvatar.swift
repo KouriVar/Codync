@@ -327,8 +327,7 @@ public struct AvatarWithStatus: View {
     let bot: Bot
     let members: [Bot]
     let size: CGFloat
-    /// The source's dot, when the row's source has one: it takes the bottom-right corner, so the
-    /// lead badge steps up to the top-right.
+    /// The source's dot, when the row's source has one: it takes the bottom-right corner.
     let sourceDot: Color?
 
     public init(bot: Bot, members: [Bot] = [], size: CGFloat = 44, sourceDot: Color? = nil) {
@@ -342,6 +341,8 @@ public struct AvatarWithStatus: View {
         Group {
             if bot.isGroup && bot.customIcon == nil { GroupAvatar(members: members, size: size) } else { CharacterAvatar(bot: bot, size: size) }
         }
+            // The lead agent has no star any more. Its status mark stays where it was, in the top
+            // corner, because the source dot already owns the bottom-right one.
             .overlay(alignment: bot.lead ? .topTrailing : .bottomTrailing) {
                 if bot.needsInput {
                     Image(systemName: "exclamationmark")
@@ -356,9 +357,6 @@ public struct AvatarWithStatus: View {
                         .frame(width: size * 0.28, height: size * 0.28)
                         .overlay(Circle().stroke(Palette.background, lineWidth: 2))
                 }
-            }
-            .overlay(alignment: sourceDot == nil ? .bottomTrailing : .topTrailing) {
-                if bot.lead { LeadAgentBadge(size: max(12, size * 0.34)) }
             }
             .overlay(alignment: .bottomTrailing) {
                 if let sourceDot {
