@@ -3622,3 +3622,28 @@
 - 验证：`xcodebuild build ... -configuration DevDebug`（`generic/platform=iOS`）**BUILD SUCCEEDED，0 error**，
   构建号 **225**；已装到 iPhone 16 Pro（2.36.0 / 225）。不跑测试、不截图。
 - 关联：C0223a/a2/b、协议见 `/tmp/codync-audit/c0223-protocol.md` #4–#8。
+
+### C0223d1 · 2026-11-05 · chat 页右上角「更多」：上下文用量 / Token 统计 / 重命名 / 归档 / 分叉
+
+- 说明：C0223 第五组（「更多」第一批）。加号/模型之外的会话级操作入口。
+- 变化（只动 chat 页右上角工具栏与相应面板/请求；不碰底部布局/宽度/按钮/箭头/状态行/串流）：
+  - `DSHGateway`：新增 `loadContextUsage()`（`context-usage`）、`loadSessionStats()`（`session-stats`，返回原始
+    json 供面板渲染 `sessionStats`/`tokenUsage`/`contextPressure`）、`forkSession()`（`fork`，成功返回新
+    sessionId；`fork-unavailable` 提示稍后再试）、`renameSession(_:)`（`session-rename`）、`archiveSession()`
+    （`session-archive`）。
+  - chat 页右上角新增「更多」（省略号 `Menu`）：上下文用量、Token 统计、重命名（capability `session-rename`）、
+    分叉、归档（capability `session-archive`，红色项 + 二次确认，文案「归档」）。
+  - `DSHContextUsageSheet`：展示 `context-usage` 的 `tokenUsage`/`contextPressure` 键值，并有「立即压缩」按钮
+    （发 `/compact` 命令）。
+  - `DSHStatsSheet`：展示 `session-stats` 的 `sessionStats`/`tokenUsage`/`contextPressure` 键值（只有 token 数，
+    不编造金额）。
+  - 重命名：带输入框的 alert；归档：二次确认后发 `session-archive` 并收起会话；分叉：成功 `open` 新会话，
+    失败弹提示。
+- 「未确认」：`tokenUsage`/`contextPressure` 的**具体字段结构**网关协议未文档化，面板按字典原样逐项显示（key 为
+  英文原字段名），未做语义命名；如需中文标签，请在拿到一次真实返回后我再映射。
+- 待后续（C0223d2）：步骤/轨迹页、轮次导航（turn-outline）、工作区文件（file-list/下载）、本会话定时任务、
+  团队与子智能体（只读）。
+- 边界：不改 bot 页、底部输入框设计、串流。不加依赖/测试 target。
+- 验证：`xcodebuild build ... -configuration DevDebug`（`generic/platform=iOS`）**BUILD SUCCEEDED，0 error**，
+  构建号 **226**；已装到 iPhone 16 Pro（2.36.0 / 226）。不跑测试、不截图。
+- 关联：C0223a/a2/b/c、协议见 `/tmp/codync-audit/c0223-protocol.md` #10–#14。

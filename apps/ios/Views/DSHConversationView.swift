@@ -12,6 +12,12 @@ struct DSHConversationView: View {
     @State private var following = true
     @State private var confirmResend: DSHSubmission?
     @State private var draft = ""
+    @State private var showContextUsage = false
+    @State private var showStats = false
+    @State private var showingRename = false
+    @State private var renameText = ""
+    @State private var showingArchive = false
+    @State private var moreMessage: String?
 
     var body: some View {
         ChatTranscriptView(items: items, following: $following,
@@ -40,6 +46,7 @@ struct DSHConversationView: View {
                 Button { gateway.newSession() } label: { Image(systemName: "square.and.pencil") }
                     .accessibilityLabel("新建会话")
             }
+            ToolbarItem(placement: .topBarTrailing) { moreMenu }
         }
         .alert("可能重复发送", isPresented: Binding(get: { confirmResend != nil },
                                                     set: { if !$0 { confirmResend = nil } })) {
@@ -51,7 +58,54 @@ struct DSHConversationView: View {
         } message: {
             Text("历史中没有看到不等于服务端未接收。再次发送可能重复执行，请确认后再发。")
         }
+        .sheet(isPresented: $showContextUsage) { DSHContextUsageSheet(gateway: gateway) }
+        .sheet(isPresented: $showStats) { DSHStatsSheet(gateway: gateway) }
+        .alert("重命名", isPresented: $showingRename) {
+            TextField("会话名", text: $renameText)
+            Button("确定") { Task { _ = await gateway.renameSession(renameText) } }
+            Button("取消", role: .cancel) {}
+        }
+        .alert("归档这个会话？", isPresented: $showingArchive) {
+            Button("归档", role: .destructive) {
+                Task { if await gateway.archiveSession() { gateway.closeConversation() } }
+            }
+            Button("取消", role: .cancel) {}
+        } message: {
+            Text("归档后不会删除，只是从这里收起。")
+        }
+        .alert("提示", isPresented: Binding(get: { moreMessage != nil }, set: { if !$0 { moreMessage = nil } })) {
+            Button("好", role: .cancel) { moreMessage = nil }
+        } message: { Text(moreMessage ?? "") }
         .onDisappear { gateway.closeConversation() }
+    }
+
+    /// The chat page's "更多" menu: usage, stats, rename, fork and archive — each gated on what the
+    /// gateway offers, the destructive one red and confirmed.
+    private var moreMenu: some View {
+        Menu {
+            Button { showContextUsage = true } label: { Label("上下文用量", systemImage: "chart.bar") }
+            Button { showStats = true } label: { Label("Token 统计", systemImage: "number") }
+            if gateway.capabilities.contains("session-rename") {
+                Button {
+                    renameText = title
+                    showingRename = true
+                } label: { Label("重命名", systemImage: "pencil") }
+            }
+            Button {
+                Task {
+                    let result = await gateway.forkSession()
+                    if let newId = result.sessionId { gateway.open(sessionId: newId) }
+                    else { moreMessage = result.message }
+                }
+            } label: { Label("分叉", systemImage: "arrow.triangle.branch") }
+            if gateway.capabilities.contains("session-archive") {
+                Divider()
+                Button(role: .destructive) { showingArchive = true } label: { Label("归档", systemImage: "archivebox") }
+            }
+        } label: {
+            Image(systemName: "ellipsis")
+        }
+        .accessibilityLabel("更多")
     }
 
     private var title: String {
@@ -868,6 +922,114 @@ private struct DSHModelSheet: View {
 
     private func sectionTitle(_ text: String) -> some View {
         Text(text).font(.footnote.weight(.semibold)).foregroundStyle(Palette.secondary)
+    }
+}
+
+/// Context usage: the gateway's `context-usage` reply rendered as key/value rows, plus a button that
+/// runs the `/compact` command. The exact `tokenUsage` keys are not documented, so every entry is
+/// shown as-is (marked in the report as 未确认 structure).
+private struct DSHContextUsageSheet: View {
+    @ObservedObject var gateway: DSHGateway
+    @Environment(\.dismissModal) private var dismiss
+    @State private var rows: [(String, String)] = []
+    @State private var loaded = false
+
+    var body: some View {
+        NavigationStack {
+            List {
+                if !loaded {
+                    Text("加载中…").foregroundStyle(Palette.secondary)
+                } else if rows.isEmpty {
+                    Text("没有上下文用量数据").foregroundStyle(Palette.secondary)
+                } else {
+                    ForEach(rows, id: \.0) { row in
+                        HStack { Text(row.0).foregroundStyle(Palette.secondary); Spacer()
+                            Text(row.1).foregroundStyle(Palette.text) }
+                    }
+                }
+                Section {
+                    Button {
+                        gateway.executeCommand("/compact")
+                        dismiss()
+                    } label: { Label("立即压缩", systemImage: "arrow.down.right.and.arrow.up.left") }
+                }
+            }
+            .navigationTitle("上下文用量")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("关闭") { dismiss() } } }
+            .task {
+                if let json = await gateway.loadContextUsage() {
+                    var out: [(String, String)] = []
+                    out += Self.kvRows(json["tokenUsage"])
+                    out += Self.kvRows(json["contextPressure"])
+                    rows = out
+                }
+                loaded = true
+            }
+        }
+    }
+
+    /// Flattens one nested dict into readable rows (numbers and strings; nested dicts one level deep).
+    static func kvRows(_ value: Any?) -> [(String, String)] {
+        guard let dict = value as? [String: Any] else { return [] }
+        var rows: [(String, String)] = []
+        for key in dict.keys.sorted() {
+            let v = dict[key]
+            if let n = v as? NSNumber { rows.append((key, DSHNumberFormat.string(n))) }
+            else if let s = v as? String { rows.append((key, s)) }
+            else if let nested = v as? [String: Any] {
+                for inner in nested.keys.sorted() {
+                    if let n = nested[inner] as? NSNumber { rows.append((key + "." + inner, DSHNumberFormat.string(n))) }
+                    else if let s = nested[inner] as? String { rows.append((key + "." + inner, s)) }
+                }
+            }
+        }
+        return rows
+    }
+}
+
+/// Token usage and execution stats from `session-stats`, as key/value rows.
+private struct DSHStatsSheet: View {
+    @ObservedObject var gateway: DSHGateway
+    @Environment(\.dismissModal) private var dismiss
+    @State private var rows: [(String, String)] = []
+    @State private var loaded = false
+
+    var body: some View {
+        NavigationStack {
+            List {
+                if !loaded { Text("加载中…").foregroundStyle(Palette.secondary) }
+                else if rows.isEmpty { Text("没有统计数据").foregroundStyle(Palette.secondary) }
+                else {
+                    ForEach(rows, id: \.0) { row in
+                        HStack { Text(row.0).foregroundStyle(Palette.secondary); Spacer()
+                            Text(row.1).foregroundStyle(Palette.text) }
+                    }
+                }
+            }
+            .navigationTitle("Token 统计")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("关闭") { dismiss() } } }
+            .task {
+                if let json = await gateway.loadSessionStats() {
+                    var out: [(String, String)] = []
+                    out += DSHContextUsageSheet.kvRows(json["sessionStats"])
+                    out += DSHContextUsageSheet.kvRows(json["tokenUsage"])
+                    out += DSHContextUsageSheet.kvRows(json["contextPressure"])
+                    rows = out
+                }
+                loaded = true
+            }
+        }
+    }
+}
+
+/// Formats a gateway number: integers stay integers, fractional values keep a little precision.
+private enum DSHNumberFormat {
+    static func string(_ n: NSNumber) -> String {
+        let d = n.doubleValue
+        if d == d.rounded() { return String(Int64(d)) }
+        return String(format: "%.1f", d)
     }
 }
 

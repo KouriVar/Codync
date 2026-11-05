@@ -67,6 +67,7 @@ public final class DSHGateway: ObservableObject {
         "file-upload-opened", "file-upload-chunk-accepted", "file-upload-completed", "file-upload-cancelled",
         "models", "select-model", "agent-presets", "session-agent-preset", "select-agent-preset",
         "permission-options", "permission", "save-default-model",
+        "context-usage", "session-stats", "fork", "session-renamed", "session-archived",
     ]
 
     public private(set) var profile: DSHGatewayProfile?
@@ -926,6 +927,51 @@ public final class DSHGateway: ObservableObject {
     public func setPermission(_ name: String) {
         guard let sid = openSessionId else { return }
         send(["type": "permission", "sessionId": sid, "name": name])
+    }
+
+    // MARK: - More menu (usage, stats, fork, rename, archive)
+
+    /// The raw `context-usage` reply (`tokenUsage`, `contextPressure`, …) for the usage sheet.
+    public func loadContextUsage() async -> [String: Any]? {
+        guard phase == .ready, let sid = openSessionId,
+              let frame = await requestFrame(["type": "context-usage", "sessionId": sid],
+                                             expecting: "context-usage"), frame.kind == "context-usage"
+        else { return nil }
+        return frame.json
+    }
+
+    /// The raw `session-stats` reply (`sessionStats`, `tokenUsage`, …) for the stats sheet.
+    public func loadSessionStats() async -> [String: Any]? {
+        guard phase == .ready, let sid = openSessionId,
+              let frame = await requestFrame(["type": "session-stats", "sessionId": sid],
+                                             expecting: "session-stats"), frame.kind == "session-stats"
+        else { return nil }
+        return frame.json
+    }
+
+    /// Forks the session; on success returns the new session id. `fork-unavailable` means a turn is in
+    /// progress. No `atSeq`, so no `historyFormatVersion` is needed.
+    public func forkSession() async -> (sessionId: String?, message: String?) {
+        guard let sid = openSessionId,
+              let frame = await requestFrame(["type": "fork", "sessionId": sid], expecting: "fork")
+        else { return (nil, "分叉失败") }
+        if frame.kind == "fork", let newId = frame.string("sessionId") { return (newId, nil) }
+        if frame.string("code") == "fork-unavailable" { return (nil, "本轮还在进行，稍后再分叉") }
+        return (nil, frame.string("message") ?? "分叉失败")
+    }
+
+    public func renameSession(_ title: String) async -> Bool {
+        guard let sid = openSessionId else { return false }
+        let frame = await requestFrame(["type": "session-rename", "sessionId": sid, "title": title],
+                                       expecting: "session-renamed")
+        return frame?.kind == "session-renamed"
+    }
+
+    public func archiveSession() async -> Bool {
+        guard let sid = openSessionId else { return false }
+        let frame = await requestFrame(["type": "session-archive", "sessionId": sid],
+                                       expecting: "session-archived")
+        return frame?.kind == "session-archived"
     }
 
     // MARK: - Pictures (attachment fetch)
