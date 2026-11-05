@@ -347,23 +347,18 @@ extension ThreadView {
                 row(item)
             }
         }
-        // Offline, "working" is only what the computer last said; don't show it as live.
-        if let bot, working {
-            rows.append(ConversationRow("working", revision: workingRevision) {
-                // One line, no steps and nothing to open: the bot's name and what kind of work is
-                // under way, swept. The gaps to the message above and the input below are the shared
-                // bottom-area numbers, the same ones the chat page uses.
-                ConversationStatusLine(bot: bot, title: workingTitle)
-                    .padding(.top, ConversationBottomMetrics.statusTopPadding)
-                    .padding(.bottom, ConversationBottomMetrics.statusBottomPadding)
-                    .transition(.opacity)
-            })
+        // The running-turn line ("working") is handed to the list as its status row, so the list can
+        // keep the exact gap to the input's top with its measured bottom inset. Offline, it is only
+        // what the computer last said; don't show it as live.
+        let status = (working ? bot : nil).map { bot in
+            AnyView(ConversationStatusLine(bot: bot, title: workingTitle))
         }
         // Pull to refresh reconnects, like Reconnect in the computer menu, until the link is back.
-        return ChatTranscriptList(rows: rows, following: $following, nearTop: { showEarlier() }, refresh: {
+        return ChatTranscriptList(rows: rows, following: $following, nearTop: { showEarlier() },
+                                  refresh: {
             model.restartStream()
             _ = try? await model.ready()
-        })
+        }, status: status)
     }
 
     private var moreOnComputer: Bool {

@@ -3479,3 +3479,21 @@
 - 验证：`xcodebuild build ... -configuration DevDebug`（`generic/platform=iOS`）**BUILD SUCCEEDED，0 error**，
   构建号 **218**；已装到 iPhone 16 Pro（2.36.0 / 218）。不跑测试、不截图。
 - 关联：C0222b（`d930dd6d`）、C0221（`69568869`）。
+
+### C0222d · 2026-11-05 · 状态行到输入框的间距改回 24（实测修正）
+
+- 背景：穗确认「头像 + 正在处理/正在输入中」那一行就是状态行，它的间距和置底箭头同一个来源，C0222b 之后
+  从设计的 24 变成约 58。
+- 变化（只改状态行定位，不动别处）：
+  - 状态行不再由 `ThreadView`/`ChatTranscriptView` 各自当普通列表行去画（那两处拿不到底部 inset，只能写死
+    padding）。改为把状态行交给 `ConversationList`（用 `status:` 参数），由它作为最后一行渲染。
+  - `ConversationList` 已有 `fullFrame`/`safeFrame` 实测，按与箭头相同的公式算状态行的下边距：
+    `statusInputGap(24) + restingBottomPadding(28) + inputHeight(48) − inset`，保证状态行底边离输入框顶
+    **24**，换机型也对。
+  - `ChatTranscriptList` 增加 `status:` 透传；`ChatTranscriptView`、`ThreadView` 把状态行内容（`ConversationStatusLine`）
+    作为 `status` 传入、不再塞进普通 rows。
+- 边界：不改箭头（C0222c 已到 32）、按钮间距（已 6）、层级、外观、胶囊/展开两态、C0220 单一 TextField、串流；
+  不加新功能。
+- 验证：`xcodebuild build ... -configuration DevDebug`（`generic/platform=iOS`）**BUILD SUCCEEDED，0 error**，
+  构建号 **219**；已装到 iPhone 16 Pro（2.36.0 / 219）。不跑测试、不截图。
+- 关联：C0222c（`97bcfe26`）、C0222b（`d930dd6d`）。
