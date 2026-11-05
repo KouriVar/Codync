@@ -29,7 +29,7 @@ public final class DSHGateway: ObservableObject {
     /// What the running turn is doing right now, for the chat's one status line; nil when nothing
     /// runs (the line disappears). Separate from `isStreaming`: a model attempt ending is not a turn
     /// ending, and a tool running has no attempt at all.
-    @Published public private(set) var currentActivity: DSHActivityKind?
+    @Published public private(set) var currentActivity: DSHActivityDetail?
     /// Whether the open conversation has a turn under way.
     @Published public private(set) var isRunning = false
 
@@ -525,6 +525,7 @@ public final class DSHGateway: ObservableObject {
     /// with the persistent `seq`.
     private func applyActivityStream(_ frame: DSHFrame, payload: [String: Any]) {
         let chunk = payload["chunk"] as? [String: Any]
+        let chunkType = chunk?["type"] as? String
         let input = DSHActivityFrame(
             type: payload["type"] as? String ?? "",
             attemptId: payload["attemptId"] as? String,
@@ -532,7 +533,9 @@ public final class DSHGateway: ObservableObject {
             turn: (payload["turn"] as? NSNumber)?.intValue,
             step: (payload["step"] as? NSNumber)?.intValue,
             index: (payload["index"] as? NSNumber)?.intValue,
-            chunkType: chunk?["type"] as? String)
+            chunkType: chunkType,
+            text: chunkType == "reasoning-delta"
+                ? (chunk?["text"] as? String ?? chunk?["textDelta"] as? String) : nil)
         if activity.apply(input, in: activityEnvelope(frame)) { syncActivity() }
     }
 
@@ -574,8 +577,8 @@ public final class DSHGateway: ObservableObject {
 
     /// Mirrors the reducer onto the two published values the page reads.
     private func syncActivity() {
-        let kind = activity.activity
-        if currentActivity != kind { currentActivity = kind }
+        let detail = activity.activity
+        if currentActivity != detail { currentActivity = detail }
         if isRunning != activity.running { isRunning = activity.running }
     }
 
@@ -590,6 +593,7 @@ public final class DSHGateway: ObservableObject {
     static func activityEvent(type: String, from payload: [String: Any], seq: Int?) -> DSHActivityEvent {
         let message = payload["message"] as? [String: Any]
         let source = payload["source"] as? [String: Any]
+        let toolName = payload["name"] as? String
         return DSHActivityEvent(
             type: type,
             turn: (payload["turn"] as? NSNumber)?.intValue,
@@ -597,25 +601,40 @@ public final class DSHGateway: ObservableObject {
             callId: payload["callId"] as? String
                 ?? message?["toolCallId"] as? String
                 ?? source?["callId"] as? String,
-            toolName: payload["name"] as? String,
-            arguments: argumentsText(payload["arguments"]),
+            toolName: toolName,
+            toolArgument: toolArgument(payload["arguments"], toolName: toolName),
             seq: seq)
     }
 
-    /// A tool call's `arguments` are JSON and not guaranteed to be a string: keep a structured
-    /// payload as JSON text instead of dropping the call the way `as? String` would.
-    static func argumentsText(_ raw: Any?) -> String? {
+    /// The one argument the status line can name: a file's path or the command line. `arguments` is
+    /// JSON and not guaranteed to be a string, so it is read as an object (a JSON string is parsed
+    /// too). Which key matters depends on the tool's own kind; nothing else is read from it.
+    static func toolArgument(_ raw: Any?, toolName: String?) -> String? {
+        let object: [String: Any]
         switch raw {
-        case nil, is NSNull:
-            return nil
+        case let dict as [String: Any]:
+            object = dict
         case let text as String:
-            return text
-        case let number as NSNumber:
-            return number.stringValue
+            guard let data = text.data(using: .utf8),
+                  let parsed = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+            else { return nil }
+            object = parsed
         default:
-            guard let value = raw, JSONSerialization.isValidJSONObject(value),
-                  let data = try? JSONSerialization.data(withJSONObject: value) else { return nil }
-            return String(data: data, encoding: .utf8)
+            return nil
+        }
+        switch DSHActivityKind.forTool(named: toolName ?? "") {
+        case .reading, .editing:
+            for key in ["path", "file_path", "filePath", "filename", "file", "target_file", "targetFile"] {
+                if let path = object[key] as? String, !path.isEmpty { return path }
+            }
+            return nil
+        case .executing:
+            for key in ["command", "cmd", "script"] {
+                if let command = object[key] as? String, !command.isEmpty { return command }
+            }
+            return nil
+        default:
+            return nil
         }
     }
 
@@ -867,10 +886,21 @@ public final class DSHGateway: ObservableObject {
         return object["text"] as? String ?? ""
     }
 
+    /// The visible words of a chunk — and only those. A `reasoning-delta` carries the model's
+    /// thinking, which belongs to the status line's title, never to a message bubble; reading its
+    /// `text` here is what used to put the thinking in the reply and then lose it when the
+    /// committed `assistant/message` replaced the bubble.
     static func text(ofChunk payload: [String: Any]) -> String? {
         if let chunk = payload["chunk"] as? [String: Any] {
-            if (chunk["type"] as? String) == "text-delta" { return chunk["text"] as? String ?? chunk["textDelta"] as? String }
-            return chunk["text"] as? String
+            switch chunk["type"] as? String {
+            case "text-delta":
+                return chunk["text"] as? String ?? chunk["textDelta"] as? String
+            case nil:
+                // An older host's plain `{text}` chunk: no type, but it is the answer's words.
+                return chunk["text"] as? String
+            default:
+                return nil
+            }
         }
         return payload["text"] as? String
     }

@@ -243,6 +243,28 @@ extension DSHActivityKind {
     }
 }
 
+/// What the status line shows right now: the kind of work, plus the one detail that names it.
+/// DSHKit never turns this into words — the host app owns the language and the shortening.
+public struct DSHActivityDetail: Sendable, Equatable {
+    public var kind: DSHActivityKind
+    /// The tool being called, when the step is a tool call.
+    public var toolName: String?
+    /// The call's key argument as it arrived — a file's path, or the command line — taken from the
+    /// call's JSON. Left raw: the page takes the file's name or the command's first word.
+    public var toolArgument: String?
+    /// The reasoning written so far in this attempt, capped. The line's short summary comes from its
+    /// first sentence; it is never shown in the transcript.
+    public var reasoning: String?
+
+    public init(kind: DSHActivityKind, toolName: String? = nil, toolArgument: String? = nil,
+                reasoning: String? = nil) {
+        self.kind = kind
+        self.toolName = toolName
+        self.toolArgument = toolArgument
+        self.reasoning = reasoning
+    }
+}
+
 /// Who a frame belongs to. A frame carrying another session, subscription or stream is from an
 /// earlier connection and must not touch the current state.
 public struct DSHActivityEnvelope: Sendable, Equatable {
@@ -265,19 +287,19 @@ public struct DSHActivityEvent: Sendable, Equatable {
     public var step: Int?
     public var callId: String?
     public var toolName: String?
-    /// The call's arguments as text, whatever JSON shape they arrived in. Kept for the record; the
-    /// classification never reads them.
-    public var arguments: String?
+    /// The call's key argument, taken from its JSON (a file's path, or the command line). The
+    /// classification never reads it; the status line's short description does.
+    public var toolArgument: String?
     public var seq: Int?
 
     public init(type: String, turn: Int? = nil, step: Int? = nil, callId: String? = nil,
-                toolName: String? = nil, arguments: String? = nil, seq: Int? = nil) {
+                toolName: String? = nil, toolArgument: String? = nil, seq: Int? = nil) {
         self.type = type
         self.turn = turn
         self.step = step
         self.callId = callId
         self.toolName = toolName
-        self.arguments = arguments
+        self.toolArgument = toolArgument
         self.seq = seq
     }
 }
@@ -292,9 +314,12 @@ public struct DSHActivityFrame: Sendable, Equatable {
     public var index: Int?
     /// `reasoning-delta` / `text-delta` / anything else the host sends.
     public var chunkType: String?
+    /// The chunk's text: kept only for reasoning, which the status line summarizes. A text delta's
+    /// words go to the transcript, never here.
+    public var text: String?
 
     public init(type: String, attemptId: String? = nil, revision: Int? = nil, turn: Int? = nil,
-                step: Int? = nil, index: Int? = nil, chunkType: String? = nil) {
+                step: Int? = nil, index: Int? = nil, chunkType: String? = nil, text: String? = nil) {
         self.type = type
         self.attemptId = attemptId
         self.revision = revision
@@ -302,6 +327,7 @@ public struct DSHActivityFrame: Sendable, Equatable {
         self.step = step
         self.index = index
         self.chunkType = chunkType
+        self.text = text
     }
 }
 
@@ -367,21 +393,30 @@ public struct DSHActivityState: Sendable, Equatable {
     private var attemptRevision: Int?
     private var attemptNextIndex: Int?
     private var pending: [Pending] = []
+    /// The reasoning written so far in the current attempt. Only ever summarized into the status
+    /// line's title; it is not a message and never reaches the transcript.
+    private var reasoning = ""
+    private static let reasoningLimit = 400
     /// Streams that were reset: their frames can never be trusted again.
     private var deadStreams: Set<String> = []
 
     private struct Pending: Sendable, Equatable {
         var callId: String
         var kind: DSHActivityKind
+        var name: String?
+        var argument: String?
     }
 
     public init() {}
 
     /// What the status line says right now; nil when no turn is running (the line disappears).
-    public var activity: DSHActivityKind? {
+    public var activity: DSHActivityDetail? {
         guard running else { return nil }
-        if let last = pending.last { return last.kind }
-        return kind ?? .processing
+        let call = pending.last
+        return DSHActivityDetail(kind: call?.kind ?? kind ?? .processing,
+                                 toolName: call?.name,
+                                 toolArgument: call?.argument,
+                                 reasoning: reasoning.isEmpty ? nil : reasoning)
     }
 
     /// A persistent event or a baseline has been folded in: from then on a bare `session-status`
@@ -412,6 +447,7 @@ public struct DSHActivityState: Sendable, Equatable {
         turn = nil
         step = nil
         lastSeq = nil
+        reasoning = ""
         kind = running ? .processing : nil
     }
 
@@ -462,6 +498,7 @@ public struct DSHActivityState: Sendable, Equatable {
             kind = .thinking
             pending.removeAll()
             clearAttempt()
+            reasoning = ""
             turn = event.turn ?? turn
             step = event.step
         case "step/start":
@@ -485,8 +522,11 @@ public struct DSHActivityState: Sendable, Equatable {
             let toolKind = DSHActivityKind.forTool(named: event.toolName ?? "")
             if let index = pending.firstIndex(where: { $0.callId == callId }) {
                 pending[index].kind = toolKind
+                pending[index].name = event.toolName
+                pending[index].argument = event.toolArgument
             } else {
-                pending.append(Pending(callId: callId, kind: toolKind))
+                pending.append(Pending(callId: callId, kind: toolKind,
+                                       name: event.toolName, argument: event.toolArgument))
             }
             turn = event.turn ?? turn
             step = event.step ?? step
@@ -526,6 +566,7 @@ public struct DSHActivityState: Sendable, Equatable {
             attemptNextIndex = nil   // a start carries no index
             turn = frame.turn ?? turn
             step = frame.step ?? step
+            reasoning = ""           // a new attempt thinks from the start
             if pending.isEmpty { kind = .thinking }
         case "chunk":
             guard let attempt = frame.attemptId else { return false }
@@ -541,6 +582,11 @@ public struct DSHActivityState: Sendable, Equatable {
             }
             attemptRevision = frame.revision ?? attemptRevision
             if let index = frame.index { attemptNextIndex = index + 1 }
+            // The reasoning is only ever the status line's material: the transcript's text comes
+            // from text deltas alone (see `DSHGateway.text(ofChunk:)`).
+            if !degraded, frame.chunkType == "reasoning-delta", let text = frame.text {
+                appendReasoning(text)
+            }
             if pending.isEmpty, !degraded {
                 switch frame.chunkType {
                 case "reasoning-delta": kind = .thinking
@@ -567,6 +613,9 @@ public struct DSHActivityState: Sendable, Equatable {
     /// a clipped one keeps the coarse running signal and shows the generic phrase.
     public mutating func applySnapshot(_ snapshot: DSHActivitySnapshot, runningHint: Bool? = nil) {
         if let subscription = snapshot.subscriptionId { subscriptionId = subscription }
+        // A baseline does not carry the attempt's reasoning as a sentence: the line falls back to
+        // "思考中" until the next reasoning delta arrives.
+        reasoning = ""
         if let stream = snapshot.streamId, stream != streamId {
             // A new stream replaces what the old one left behind; the old one is never read again.
             streamId = stream
@@ -673,6 +722,7 @@ public struct DSHActivityState: Sendable, Equatable {
         clearAttempt()
         turn = nil
         step = nil
+        reasoning = ""
         if running { kind = .processing }
     }
 
@@ -683,12 +733,23 @@ public struct DSHActivityState: Sendable, Equatable {
         clearAttempt()
         turn = nil
         step = nil
+        reasoning = ""
     }
 
     private mutating func clearAttempt() {
         attemptId = nil
         attemptRevision = nil
         attemptNextIndex = nil
+    }
+
+    /// Keeps only the start of the attempt's reasoning: the line shows its first sentence, so the
+    /// rest is never needed (and a long turn must not grow this without bound).
+    private mutating func appendReasoning(_ text: String) {
+        guard reasoning.count < Self.reasoningLimit else { return }
+        reasoning += text
+        if reasoning.count > Self.reasoningLimit {
+            reasoning = String(reasoning.prefix(Self.reasoningLimit))
+        }
     }
 }
 

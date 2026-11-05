@@ -101,19 +101,28 @@ struct DSHConversationView: View {
         return sections.joined(separator: "\n\n")
     }
 
-    /// A DSH conversation has no bot of its own, so the line names the model: "DeepSeek 思考中".
-    private static func workingTitle(for activity: DSHActivityKind?) -> String {
+    /// A DSH conversation has no bot of its own, so the line names the model: "DeepSeek 正在看 README.md".
+    private static func workingTitle(for activity: DSHActivityDetail?) -> String {
         WorkingPhrase.line(name: "DeepSeek", phrase: phrase(for: activity))
     }
 
-    private static func phrase(for activity: DSHActivityKind?) -> String {
-        switch activity {
-        case .thinking: return WorkingPhrase.thinking
-        case .typing: return WorkingPhrase.typing
-        case .executing: return WorkingPhrase.executing
-        case .reading: return WorkingPhrase.reading
-        case .editing: return WorkingPhrase.editing
-        case .processing, nil: return WorkingPhrase.processing
+    /// The line's description, built from what the reducer already has: the thinking's first
+    /// sentence, the tool and its file or command, or the fixed fallback.
+    private static func phrase(for activity: DSHActivityDetail?) -> String {
+        guard let activity else { return WorkingPhrase.processing }
+        switch activity.kind {
+        case .thinking:
+            return WorkingPhrase.summary(of: activity.reasoning ?? "") ?? WorkingPhrase.thinking
+        case .typing:
+            return WorkingPhrase.typing
+        case .reading:
+            return WorkingPhrase.tool(.reading, subject: activity.toolArgument)
+        case .executing:
+            return WorkingPhrase.tool(.executing, subject: activity.toolArgument)
+        case .editing:
+            return WorkingPhrase.tool(.editing, subject: activity.toolArgument)
+        case .processing:
+            return WorkingPhrase.tool(.other, subject: activity.toolName)
         }
     }
 

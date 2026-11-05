@@ -2961,3 +2961,56 @@
   ui-preview 覆盖、构建号 201）**编译通过，0 error**，0 warning；`xcrun devicectl device install app` 装到
   iPhone 16 Pro（`com.suiyikou.codync.uipreview` 2.36.0 / 201）成功。按要求**不自测**。
 - 关联：C0210（状态行）、C0212（DSH 当前步骤）、备份 tag `backup/before-status-line-c0213`（`95fb3af9`）。
+
+### C0214 · 2026-11-05 · 状态行动态标题 + 思考内容误进气泡的修复
+
+- 原因：① C0213 的标题是固定短语，同一轮里从「思考中」到「正在看文件」之外没有更多信息；
+  穗要求改成「名字 + 根据上下文动态生成的短描述」。② DSH 会话运行中，思考过程会被当成回复正文
+  显示在气泡里，提交后又消失。
+- **Bug 根因（DSH）**：`DSHGateway.text(ofChunk:)` 只对 `text-delta` 取正文，其余 chunk 落到兜底
+  `chunk["text"]`；而 `reasoning-delta` 的 payload 正好也是 `{"type":"reasoning-delta","text":…}`，
+  于是思考的每一段都被 `appendStreaming` 追加进了那条运行中的 assistant 气泡。等本轮
+  `assistant/message` 提交时，`upsertFinishedAssistant` 用正式正文覆盖同一个气泡，所以那段思考
+  「输出完又消失」。修法：只有 `text-delta`（以及没有 `type` 的旧式纯文本 chunk）算正文，
+  `reasoning-delta` / `tool-call-delta` / `usage` / `finish` 一律返回 nil；思考改由活动 reducer 单独累积，
+  只用于状态行标题。**Coe 无此问题**：Coe 的思考是 `thought` 步骤，在 `ThreadView.transcript` 里被
+  `WorkingPhrase.isStepOnly` 过滤掉，从不画成气泡；`agent` 步骤才是正文。
+- 行为（动态标题，**建议方案，穗尚未确认**）：
+  | 状态 | 标题里的描述 | 数据来源（Coe / DSH） |
+  |---|---|---|
+  | 思考 | 当前思考内容的第一句，去 Markdown，截到 16 字加省略号；拿不到写「思考中」 | Coe：`thought` / `tool(think)` 的 `data.text`；DSH：本轮 `reasoning-delta` 累积文本 |
+  | 输出正文 | 正在输入中 | Coe：非 final 的 `agent`；DSH：`text-delta` |
+  | 调用工具 | 「正在看 README.md」「正在跑 xcodebuild」「正在改 ChatTranscript.swift」；认不出的写「正在用 工具名」；拿不到参数用「正在看文件 / 正在跑命令 / 正在改代码」 | Coe：`locations[0].path` / `command` / `diffs[0].path` / `title`；DSH：tool/call 的 JSON 里 `path|file_path|filename|file|target_file` 或 `command|cmd|script` |
+  | 其它 | 处理会话中 | — |
+  - 名字规则不变：Coe 用该 bot 的名字，DSH 固定「DeepSeek」。
+  - 最多每秒换一次（`StatusTitle` 里按最后一次变更时间节流），换的时候 0.18s 淡入淡出，扫光从新文字重新开始。
+  - 不额外调用模型，只用已经收到的实时数据。
+- 变化：
+  - `DSHKit/Sources/DSHKit/DSHModels.swift`：新增 `DSHActivityDetail`（kind + toolName + toolArgument + reasoning）；
+    `DSHActivityEvent.arguments`（原样 JSON 文本）改为 `toolArgument`（调用里的关键参数）；
+    `DSHActivityFrame` 增加 `text`（只收 reasoning-delta 的文字）；reducer 累积本轮思考（上限 400 字，
+    在新 turn / 新 attempt / 断线 / 重置 / gap / 快照时清空），`activity` 由 `DSHActivityKind?` 改为
+    `DSHActivityDetail?`。
+  - `DSHKit/Sources/DSHKit/DSHGateway.swift`：发布 `currentActivity: DSHActivityDetail?`；新增
+    `toolArgument(_:toolName:)` 从 tool/call 的 JSON 取 path 或 command（字符串形式的 JSON 也会解析）；
+    reasoning-delta 的文字交给 reducer；**`text(ofChunk:)` 修掉把思考当正文的兜底**。
+  - `Kit/Sources/CodyncUI/Thread/ConversationStatusLine.swift`：`WorkingPhrase` 新增 `Verb`（看/跑/改/用）与
+    `tool(_:subject:)`（只取文件名或命令第一个词，缺参数回落到固定短语）、`summary(of:)`（第一句 + 去 Markdown +
+    16 字截断）；Coe 的 `phrase(for:)` 改为按最后一个步骤的 `toolKind`/`locations`/`command`/`diffs`/`title` 取描述。
+    状态行文字抽成 `StatusTitle`：每秒最多换一次 + 淡入淡出 + 扫光重启；其余尺寸不变。
+  - `apps/ios/Views/DSHConversationView.swift`：标题由 `DSHActivityDetail` 生成（思考用 `summary(of:)`，
+    工具用 `WorkingPhrase.tool(...)`）。
+- 未做 / 需要你注意：
+  - 动态标题是**建议方案**，穗确认前随时可调（截断字数、动词措辞、是否保留「正在用」）。
+  - Coe 的「正在输入中」仍依赖非 final 的 `agent` 步骤；没有该步骤的轮次只会看到「思考中 / 处理会话中」。
+  - DSH 断线重连后，snapshot 里没有「思考正文」的句子，标题会先回到「思考中」，等下一段 reasoning-delta 再变。
+  - 状态行每秒最多变一次是**显示层节流**：数据本身仍按实时更新，气泡与正文不受影响。
+  - 按你的要求没跑测试、没截图、没用 CDP；只编译和安装。
+- 文件：`apps/ios/DSHKit/Sources/DSHKit/DSHModels.swift`、`apps/ios/DSHKit/Sources/DSHKit/DSHGateway.swift`、
+  `apps/ios/Kit/Sources/CodyncUI/Thread/ConversationStatusLine.swift`、`apps/ios/Views/DSHConversationView.swift`、
+  `CHANGELOG.md`。
+- 验证：`xcodebuild build -project apps/Codync.xcodeproj -scheme 'iOS Dev' -configuration DevDebug`（真机 destination、
+  ui-preview 覆盖、构建号 202）**编译通过，0 error**，改动文件 0 新增 warning；`xcrun devicectl device install app`
+  装到 iPhone 16 Pro（`com.suiyikou.codync.uipreview` 2.36.0 / 202）成功。按要求**不自测**。
+- 关联：C0210（状态行）、C0212（DSH 当前步骤与工具白名单）、C0213（尺寸与「名字 + 状态」）、
+  备份 tag `backup/before-dynamic-title-c0214`（`d226f98d`）。
