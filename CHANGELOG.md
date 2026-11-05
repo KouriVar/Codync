@@ -3576,3 +3576,24 @@
 - 验证：`xcodebuild build ... -configuration DevDebug`（`generic/platform=iOS`）**BUILD SUCCEEDED，0 error**，
   构建号 **223**；已装到 iPhone 16 Pro（2.36.0 / 223）。不跑测试、不截图。
 - 关联：C0223a（图片附件同属加号 sheet）、C0221 共用底部组件 `accessory` 槽。
+
+### C0223a2 · 2026-11-05 · chat 页文件附件（分块上传）
+
+- 说明：C0223 第三组，把加号 sheet 的文件附件补齐，走网关分块上传。
+- 变化（只动 chat 页加号 sheet、输入区附件卡与发送；不碰底部布局/宽度/按钮/箭头/状态行/串流）：
+  - `DSHGateway`：新增 `supportsFileUpload`（capability `file-upload-v1`）与 `fileUploads`（发布，进度卡数据）。
+    `uploadFile(data:name:)` 依次 `file-upload-open`（带 sha256/size）→ 循环 `file-upload-chunk`（按响应
+    `chunkBytes` 分块、按 `nextOffset` 更新进度）→ `file-upload-finish` 拿 `receiptId`；失败置 failed 可重试。
+    `retryFileUpload`/`removeFileUpload`。断线把在途上传标失败、并让挂起请求以 error 收尾。
+    `send(text:images:files:)` 支持 `files:[DSHOutgoingFile]` → `message.files:[{receiptId}]`（`requestId` 始终带）；
+    `DSHSubmission` 冻结 files，重试/重发沿用同一批 receiptId。上传与命令共用「发请求→等回复帧」机制（一次一个）。
+  - `DSHModels`：新增 `DSHOutgoingFile`（name+receiptId）、`DSHFileUpload`（progress/status/receiptId/error）。
+  - 加号 sheet 增「文件」入口（`fileImporter`，可多选）；`file-upload-v1` 缺省时置灰。
+  - 输入框上方文件卡：文件名、大小、上传进度条；失败显示原因+重试；每张可移除（✕）。与图片缩略条共处同一
+    `accessory` 槽。
+  - 发送：仅把**上传完成（ready）**的文件随消息发出，`canSend/showsStop` 已计入；发送成功后清掉用掉的卡片。
+- 能力开关：无 `file-upload-v1` → 文件入口置灰。
+- 边界：不改 bot 页、底部输入框设计、串流。不加依赖/测试 target。
+- 验证：`xcodebuild build ... -configuration DevDebug`（`generic/platform=iOS`）**BUILD SUCCEEDED，0 error**，
+  构建号 **224**；已装到 iPhone 16 Pro（2.36.0 / 224）。不跑测试、不截图。
+- 关联：C0223a（图片）、C0223b（命令）、`message.files`/`file-upload-*` 协议见 `/tmp/codync-audit/c0223-protocol.md` #24/#25。

@@ -231,6 +231,7 @@ struct DSHComposer: View {
     // Pictures picked but not sent yet: shown as a thumbnail strip above the input.
     @State private var pendingImages: [DSHPreparedImage] = []
     @State private var pickingPhotos = false
+    @State private var pickingFiles = false
     @State private var photoItems: [PhotosPickerItem] = []
     @State private var preparingImages = false
     @State private var attachError: String?
@@ -246,10 +247,17 @@ struct DSHComposer: View {
     /// `gateway.phase == .ready` means the transport is up and the input can be used at all.
     private var connected: Bool { gateway.phase == .ready }
     /// A running turn with an empty field shows stop instead of send.
-    private var showsStop: Bool { gateway.isRunning && isEmpty && pendingImages.isEmpty }
-    /// Text or a picture may be sent when connected, a session is open, and there is something to send.
+    private var showsStop: Bool { gateway.isRunning && isEmpty && pendingImages.isEmpty && readyFiles.isEmpty }
+    /// Files whose upload finished and can go with the next message.
+    private var readyFiles: [DSHOutgoingFile] {
+        gateway.fileUploads.compactMap { upload in
+            guard upload.status == .ready, let receipt = upload.receiptId else { return nil }
+            return DSHOutgoingFile(name: upload.name, receiptId: receipt)
+        }
+    }
+    /// Text, a picture or a ready file may be sent when connected and a session is open.
     private var canSend: Bool {
-        connected && gateway.openSessionId != nil && (!isEmpty || !pendingImages.isEmpty)
+        connected && gateway.openSessionId != nil && (!isEmpty || !pendingImages.isEmpty || !readyFiles.isEmpty)
     }
 
     var body: some View {
@@ -268,9 +276,11 @@ struct DSHComposer: View {
         .sheet(isPresented: $showAddSheet) {
             DSHAddSheet(
                 canPhoto: gateway.capabilities.contains("images"),
+                canFile: gateway.supportsFileUpload,
                 groups: gateway.supportsCommands ? gateway.commandGroups : [],
                 onPhotos: { pickingPhotos = true },
                 onCamera: { capturePhoto { image in add(captured: image) } },
+                onFiles: { pickingFiles = true },
                 onCommand: runCommand
             )
             .presentationDetents([.medium, .large])
@@ -293,6 +303,10 @@ struct DSHComposer: View {
             photoItems = []
             Task { await addPhotos(items) }
         }
+        .fileImporter(isPresented: $pickingFiles, allowedContentTypes: [.item], allowsMultipleSelection: true) { result in
+            guard case .success(let urls) = result else { return }
+            for url in urls { addFile(url) }
+        }
         .alert("图片没加上", isPresented: Binding(get: { attachError != nil },
                                               set: { if !$0 { attachError = nil } })) {
             Button("好", role: .cancel) { attachError = nil }
@@ -301,11 +315,54 @@ struct DSHComposer: View {
         }
     }
 
-    /// What sits above the input: the pending pictures, or the `/` command menu while one is being typed.
+    /// What sits above the input: pending files and pictures, or the `/` command menu while typing.
     private var attachmentAccessory: AnyView? {
-        if !pendingImages.isEmpty { return AnyView(pendingStrip) }
+        let hasFiles = !gateway.fileUploads.isEmpty
+        if hasFiles || !pendingImages.isEmpty {
+            return AnyView(
+                VStack(spacing: 4) {
+                    if hasFiles { fileCards }
+                    if !pendingImages.isEmpty { pendingStrip }
+                }
+            )
+        }
         if !commandSuggestions.isEmpty { return AnyView(commandMenu) }
         return nil
+    }
+
+    /// Cards for files being uploaded or ready: name, size, progress, retry when failed, remove.
+    private var fileCards: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(gateway.fileUploads) { upload in
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "doc")
+                            Text(upload.name).font(.caption).lineLimit(1)
+                                .truncationMode(.middle).frame(maxWidth: 120, alignment: .leading)
+                            Button { gateway.removeFileUpload(upload.id) } label: {
+                                Image(systemName: "xmark").font(.system(size: 10, weight: .bold))
+                            }.buttonStyle(.plain)
+                        }
+                        if upload.status == .ready {
+                            Text(ByteCountFormatter.string(fromByteCount: Int64(upload.size), countStyle: .file))
+                                .font(.caption2).foregroundStyle(Palette.secondary)
+                        } else if upload.status == .failed {
+                            HStack(spacing: 8) {
+                                Text(upload.error ?? "上传失败").font(.caption2).foregroundStyle(Palette.danger).lineLimit(1)
+                                Button("重试") { gateway.retryFileUpload(upload.id) }.font(.caption2)
+                            }
+                        } else {
+                            ProgressView(value: upload.progress).frame(width: 120)
+                        }
+                    }
+                    .padding(.horizontal, 10).padding(.vertical, 8)
+                    .background(Palette.surface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                }
+            }
+            .padding(.horizontal, 10)
+            .padding(.top, 8)
+        }
     }
 
     /// A leading `/partial` in the field (no space yet), as a lowercase query.
@@ -503,10 +560,22 @@ struct DSHComposer: View {
     private func send() {
         let text = draft
         let images = pendingImages.map(DSHOutgoingImage.init)
-        if gateway.send(text: text, images: images) {
+        let files = readyFiles
+        let usedFileIds = gateway.fileUploads.filter { $0.status == .ready }.map(\.id)
+        if gateway.send(text: text, images: images, files: files) {
             draft = ""
             pendingImages = []
+            usedFileIds.forEach(gateway.removeFileUpload)
         }
+    }
+
+    /// Reads a picked file and uploads it in chunks; the card shows progress on `gateway.fileUploads`.
+    private func addFile(_ url: URL) {
+        let scoped = url.startAccessingSecurityScopedResource()
+        defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+        guard let data = try? Data(contentsOf: url, options: .mappedIfSafe) else { return }
+        let name = url.lastPathComponent
+        Task { await gateway.uploadFile(data: data, name: name) }
     }
 }
 
@@ -514,9 +583,11 @@ struct DSHComposer: View {
 /// `message.images`; the rest arrive in later steps.
 private struct DSHAddSheet: View {
     let canPhoto: Bool
+    let canFile: Bool
     let groups: [DSHCommandGroup]
     let onPhotos: () -> Void
     let onCamera: () -> Void
+    let onFiles: () -> Void
     let onCommand: (DSHCommand) -> Void
     @Environment(\.dismissModal) private var dismiss
 
@@ -527,9 +598,10 @@ private struct DSHAddSheet: View {
                     HStack(spacing: 12) {
                         tile("照片", icon: "image-line", enabled: canPhoto, action: onPhotos)
                         tile("拍照", icon: "camera-line", enabled: canPhoto, action: onCamera)
+                        tile("文件", icon: "attachment-line", enabled: canFile, action: onFiles)
                     }
-                    if !canPhoto {
-                        Text("这个网关不支持发图片")
+                    if !canPhoto && !canFile {
+                        Text("这个网关不支持发附件")
                             .font(.footnote).foregroundStyle(Palette.secondary)
                     }
                     ForEach(groups) { group in

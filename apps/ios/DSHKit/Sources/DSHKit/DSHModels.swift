@@ -163,6 +163,40 @@ public struct DSHOutgoingImage: Hashable, Sendable {
     }
 }
 
+/// A file the reader is sending: the gateway only accepts the `receiptId` a finished chunked upload
+/// returned, never the bytes on the message.
+public struct DSHOutgoingFile: Hashable, Sendable {
+    public let name: String
+    public let receiptId: String
+    public init(name: String, receiptId: String) {
+        self.name = name
+        self.receiptId = receiptId
+    }
+}
+
+/// One file upload in progress: shown as a card above the input with progress, retry and remove.
+public struct DSHFileUpload: Identifiable, Hashable, Sendable {
+    public enum Status: String, Hashable, Sendable { case uploading, ready, failed }
+    public let id: String
+    public let name: String
+    public let size: Int
+    public let data: Data
+    public var progress: Double
+    public var status: Status
+    public var receiptId: String?
+    public var error: String?
+
+    public init(id: String, name: String, size: Int, data: Data, progress: Double = 0,
+                status: Status = .uploading) {
+        self.id = id
+        self.name = name
+        self.size = size
+        self.data = data
+        self.progress = progress
+        self.status = status
+    }
+}
+
 /// A neutral line in the conversation that is neither the reader nor the model: injected context, or
 /// how a turn ended.
 public struct DSHNotice: Hashable, Sendable {

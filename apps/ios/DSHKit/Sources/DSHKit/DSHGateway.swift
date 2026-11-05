@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 import os
 import Network
@@ -44,10 +45,18 @@ public final class DSHGateway: ObservableObject {
     @Published public private(set) var commandGroups: [DSHCommandGroup] = []
     /// A gateway that did not announce `commands` shows no command menu.
     public var supportsCommands: Bool { capabilities.contains("commands") }
+    /// A gateway that did not announce `file-upload-v1` cannot take file attachments.
+    public var supportsFileUpload: Bool { capabilities.contains("file-upload-v1") }
+
+    /// Files being uploaded (or ready to send), shown as cards above the input.
+    @Published public private(set) var fileUploads: [DSHFileUpload] = []
 
     /// The single outstanding request/reply (commands, options, …). The UI serialises them.
     private var commandAwaiter: CheckedContinuation<DSHFrame, Never>?
-    private static let requestKinds: Set<String> = ["commands", "command-executed", "command-options", "command-selected"]
+    private static let requestKinds: Set<String> = [
+        "commands", "command-executed", "command-options", "command-selected",
+        "file-upload-opened", "file-upload-chunk-accepted", "file-upload-completed", "file-upload-cancelled",
+    ]
 
     public private(set) var profile: DSHGatewayProfile?
 
@@ -637,13 +646,16 @@ public final class DSHGateway: ObservableObject {
     /// Returns whether the local intent was saved; only then may the caller clear its draft. Pictures
     /// may go alone, with no text. A gateway that never offered `images` is refused, and a message over
     /// the local frame budget is refused rather than split.
-    @discardableResult public func send(text: String, images: [DSHOutgoingImage] = []) -> Bool {
+    @discardableResult public func send(text: String, images: [DSHOutgoingImage] = [],
+                                        files: [DSHOutgoingFile] = []) -> Bool {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty || !images.isEmpty, openSessionId != nil, conversation != nil else { return false }
+        guard !trimmed.isEmpty || !images.isEmpty || !files.isEmpty,
+              openSessionId != nil, conversation != nil else { return false }
         guard images.isEmpty || supportsImages else { return false }
+        guard files.isEmpty || supportsFileUpload else { return false }
         guard imageSendProblem(text: trimmed, images: images) == nil else { return false }
         let available = phase == .ready && task != nil && networkAvailable && validatedGatewayId != nil
-        guard let id = conversation?.submit(text: trimmed, images: images,
+        guard let id = conversation?.submit(text: trimmed, images: images, files: files,
                                             connection: connectionGeneration,
                                             available: available) else { return false }
         publishConversation()
@@ -654,6 +666,9 @@ public final class DSHGateway: ObservableObject {
             payload["images"] = images.map {
                 ["mediaType": $0.mediaType, "name": $0.name, "data": $0.data.base64EncodedString()]
             }
+        }
+        if !files.isEmpty {
+            payload["files"] = files.map { ["receiptId": $0.receiptId] }
         }
         if !send(payload, completion: { [weak self] error in
             if let error { self?.updateDelivery(id, status: .unknown, detail: "送达待核对：" + error.localizedDescription) }
@@ -745,6 +760,66 @@ public final class DSHGateway: ObservableObject {
             }
             return DSHCommandGroup(id: group["id"] as? String ?? title, title: title, commands: commands)
         }
+    }
+
+    // MARK: - File upload (chunked)
+
+    /// Uploads a file in chunks and records it on `fileUploads` with progress; the finished receipt is
+    /// what `message.files` will carry. Gated on `file-upload-v1`.
+    public func uploadFile(data: Data, name: String) async {
+        guard supportsFileUpload, phase == .ready, let sid = openSessionId else { return }
+        let local = UUID().uuidString
+        fileUploads.append(DSHFileUpload(id: local, name: name, size: data.count, data: data))
+        await runUpload(local: local, data: data, name: name, sessionId: sid)
+    }
+
+    public func retryFileUpload(_ id: String) {
+        guard let upload = fileUploads.first(where: { $0.id == id }), let sid = openSessionId else { return }
+        setUpload(id) { $0.status = .uploading; $0.progress = 0; $0.error = nil }
+        Task { await runUpload(local: id, data: upload.data, name: upload.name, sessionId: sid) }
+    }
+
+    public func removeFileUpload(_ id: String) {
+        fileUploads.removeAll { $0.id == id }
+    }
+
+    private func setUpload(_ id: String, _ mutate: (inout DSHFileUpload) -> Void) {
+        if let index = fileUploads.firstIndex(where: { $0.id == id }) { mutate(&fileUploads[index]) }
+    }
+
+    private func runUpload(local: String, data: Data, name: String, sessionId: String) async {
+        func fail(_ message: String) {
+            setUpload(local) { $0.status = .failed; $0.error = message }
+        }
+        let sha = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+        let opened = await requestFrame(
+            ["type": "file-upload-open", "requestId": UUID().uuidString, "sessionId": sessionId,
+             "name": name, "size": data.count, "sha256": sha], expecting: "file-upload-opened")
+        guard let opened, opened.kind == "file-upload-opened", let uploadId = opened.string("uploadId") else {
+            fail(opened?.string("message") ?? "上传开始失败"); return
+        }
+        let chunkBytes = max(1, opened.int("chunkBytes") ?? 256 * 1024)
+        var offset = 0
+        while offset < data.count {
+            let end = min(offset + chunkBytes, data.count)
+            let chunk = data.subdata(in: offset..<end)
+            let ack = await requestFrame(
+                ["type": "file-upload-chunk", "requestId": UUID().uuidString, "uploadId": uploadId,
+                 "offset": offset, "data": chunk.base64EncodedString()], expecting: "file-upload-chunk-accepted")
+            guard let ack, ack.kind == "file-upload-chunk-accepted", let next = ack.int("nextOffset") else {
+                fail(ack?.string("message") ?? "上传中断"); return
+            }
+            offset = next
+            setUpload(local) { $0.progress = Double(min(offset, data.count)) / Double(max(1, data.count)) }
+        }
+        let finished = await requestFrame(
+            ["type": "file-upload-finish", "requestId": UUID().uuidString, "uploadId": uploadId],
+            expecting: "file-upload-completed")
+        guard let finished, finished.kind == "file-upload-completed",
+              let receipt = finished.string("receiptId") else {
+            fail(finished?.string("message") ?? "上传完成失败"); return
+        }
+        setUpload(local) { $0.status = .ready; $0.progress = 1; $0.receiptId = receipt }
     }
 
     // MARK: - Pictures (attachment fetch)
@@ -844,7 +919,7 @@ public final class DSHGateway: ObservableObject {
     public func retrySubmission(_ id: String) {
         guard let submission = conversation?.submissions.first(where: { $0.id == id }), submission.status == .failed else { return }
         // The frozen pictures are re-sent exactly as they were: never re-compressed into a new payload.
-        if send(text: submission.text, images: submission.images) {
+        if send(text: submission.text, images: submission.images, files: submission.files) {
             conversation?.dismissSubmission(id); publishConversation()
         }
     }
@@ -852,7 +927,7 @@ public final class DSHGateway: ObservableObject {
     public func resendUnknownSubmission(_ id: String) {
         guard let submission = conversation?.submissions.first(where: { $0.id == id }),
               submission.status == .unknown, submission.historyChecked else { return }
-        if send(text: submission.text, images: submission.images) {
+        if send(text: submission.text, images: submission.images, files: submission.files) {
             conversation?.dismissSubmission(id); publishConversation()
         }
     }

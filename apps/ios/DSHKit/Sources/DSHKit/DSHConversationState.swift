@@ -7,6 +7,8 @@ public struct DSHSubmission: Identifiable, Hashable, Sendable {
     /// The pictures frozen with this send. A retry re-sends exactly these bytes: a picture is never
     /// re-compressed into a different payload, and pictures picked later never join this one.
     public let images: [DSHOutgoingImage]
+    /// Finished file uploads frozen with this send; a retry re-sends the same receiptIds.
+    public let files: [DSHOutgoingFile]
     public private(set) var status: Status
     public private(set) var detail: String
     public private(set) var historyChecked = false
@@ -14,8 +16,8 @@ public struct DSHSubmission: Identifiable, Hashable, Sendable {
     mutating func retire() { isRetired = true }
     var connection: UInt64
 
-    init(text: String, images: [DSHOutgoingImage], connection: UInt64, available: Bool) {
-        id = UUID().uuidString; self.text = text; self.images = images; self.connection = connection
+    init(text: String, images: [DSHOutgoingImage], files: [DSHOutgoingFile], connection: UInt64, available: Bool) {
+        id = UUID().uuidString; self.text = text; self.images = images; self.files = files; self.connection = connection
         status = available ? .writing : .failed
         detail = available ? "发送中" : "没有发出去，请连接后手动重试"
     }
@@ -217,9 +219,9 @@ struct DSHConversationState: Sendable {
         pageError = message
     }
 
-    mutating func submit(text: String, images: [DSHOutgoingImage], connection: UInt64,
-                         available: Bool) -> String {
-        let submission = DSHSubmission(text: text, images: images, connection: connection,
+    mutating func submit(text: String, images: [DSHOutgoingImage], files: [DSHOutgoingFile],
+                         connection: UInt64, available: Bool) -> String {
+        let submission = DSHSubmission(text: text, images: images, files: files, connection: connection,
                                        available: available)
         submissions.append(submission)
         return submission.id
