@@ -313,6 +313,9 @@ struct DSHComposer: View {
     @State private var editingGoal = false
     @State private var goalObjective = ""
     @State private var confirmClearGoal = false
+    @State private var editingQueue: DSHQueueHint?
+    @State private var queueEditText = ""
+    @State private var confirmRemoveQueue: DSHQueueHint?
 
     private var trimmed: String { draft.trimmingCharacters(in: .whitespacesAndNewlines) }
     private var isEmpty: Bool { trimmed.isEmpty }
@@ -359,6 +362,23 @@ struct DSHComposer: View {
             Button("删除", role: .destructive) { Task { await gateway.clearGoal() } }
             Button("取消", role: .cancel) {}
         } message: { Text("会清空这个会话的目标。") }
+        .alert("编辑排队消息", isPresented: Binding(get: { editingQueue != nil },
+                                                 set: { if !$0 { editingQueue = nil } })) {
+            TextField("内容", text: $queueEditText)
+            Button("保存") {
+                if let item = editingQueue { gateway.queueUpdate(itemId: item.id, action: "edit", text: queueEditText) }
+                editingQueue = nil
+            }
+            Button("取消", role: .cancel) { editingQueue = nil }
+        }
+        .alert("删除这条排队消息？", isPresented: Binding(get: { confirmRemoveQueue != nil },
+                                                      set: { if !$0 { confirmRemoveQueue = nil } })) {
+            Button("删除", role: .destructive) {
+                if let item = confirmRemoveQueue { gateway.queueUpdate(itemId: item.id, action: "remove") }
+                confirmRemoveQueue = nil
+            }
+            Button("取消", role: .cancel) { confirmRemoveQueue = nil }
+        }
         .sheet(isPresented: $showAddSheet) {
             DSHAddSheet(
                 canPhoto: gateway.capabilities.contains("images"),
@@ -408,12 +428,14 @@ struct DSHComposer: View {
         let hasGoal = gateway.supportsGoals && gateway.goal != nil
         let hasTasks = gateway.supportsTasks && !gateway.todos.isEmpty
         let hasAttach = hasFiles || !pendingImages.isEmpty
+        let hasQueue = gateway.capabilities.contains("queue-control") && !gateway.queuedMessages.isEmpty
         let hasCommandMenu = !commandSuggestions.isEmpty
-        guard hasGoal || hasTasks || hasAttach || hasCommandMenu else { return nil }
+        guard hasGoal || hasTasks || hasQueue || hasAttach || hasCommandMenu else { return nil }
         return AnyView(
             VStack(spacing: 6) {
                 if hasGoal { goalPanel }
                 if hasTasks { taskPanel }
+                if hasQueue { queuePanel }
                 if hasAttach {
                     VStack(spacing: 4) {
                         if hasFiles { fileCards }
@@ -424,6 +446,29 @@ struct DSHComposer: View {
                 }
             }
         )
+    }
+
+    /// Queued messages for the running turn: edit, steer or remove each.
+    @ViewBuilder private var queuePanel: some View {
+        if !gateway.queuedMessages.isEmpty {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("排队消息 · \(gateway.queuedMessages.count)")
+                    .font(.caption.weight(.semibold)).foregroundStyle(Palette.secondary)
+                ForEach(gateway.queuedMessages) { item in
+                    HStack(spacing: 8) {
+                        Text(item.text).font(.caption).foregroundStyle(Palette.text).lineLimit(2)
+                        Spacer(minLength: 0)
+                        Button("编辑") { queueEditText = item.text; editingQueue = item }.font(.caption)
+                        Button("插话") { gateway.queueUpdate(itemId: item.id, action: "steer") }.font(.caption)
+                        Button("删除") { confirmRemoveQueue = item }.font(.caption).foregroundStyle(Palette.danger)
+                    }
+                }
+            }
+            .padding(.horizontal, 12).padding(.vertical, 10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Palette.surface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .padding(.horizontal, 10).padding(.top, 8)
+        }
     }
 
     /// The session goal: objective, phase and progress, with pause/resume, edit and delete.

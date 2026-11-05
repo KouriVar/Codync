@@ -92,6 +92,8 @@ public final class DSHGateway: ObservableObject {
     @Published public private(set) var historyError: String?
     @Published public private(set) var submissions: [DSHSubmission] = []
     @Published public private(set) var queueHints: [DSHQueueHint] = []
+    /// The open session's queued messages (running turn), shown above the input with edit/remove/steer.
+    @Published public private(set) var queuedMessages: [DSHQueueHint] = []
     @Published public private(set) var queueIsKnown = false
     private var gatewayQueues: [String: [DSHQueueHint]] = [:]
     private var hasQueueBaseline = false
@@ -363,12 +365,16 @@ public final class DSHGateway: ObservableObject {
         case "session-queues":
             guard validatedGatewayId != nil, let queues = frame.dict("queues") as? [String: [[String: Any]]] else { return }
             gatewayQueues = queues.mapValues(DSHQueueHint.decode)
+            queuedMessages = openSessionId.flatMap { queues[$0].map(DSHQueueHint.decode) } ?? []
             hasQueueBaseline = true
             publishConversation()
         case "session-queue":
             guard validatedGatewayId != nil, let sid = frame.string("sessionId"), let rows = frame.array("items") else { return }
             gatewayQueues[sid] = DSHQueueHint.decode(rows)
+            if sid == openSessionId { queuedMessages = DSHQueueHint.decode(rows) }
             publishConversation()
+        case "queue-item-updated":
+            break
         case "sent":
             if let id = frame.string("requestId") { updateDelivery(id, status: .accepted, detail: "已接收") }
             reconnectAttempt = 0
@@ -942,6 +948,16 @@ public final class DSHGateway: ObservableObject {
     public func setPermission(_ name: String) {
         guard let sid = openSessionId else { return }
         send(["type": "permission", "sessionId": sid, "name": name])
+    }
+
+    /// Edits, removes or steers a queued message (`action` = edit|remove|steer). The push
+    /// `session-queue` then replaces the list; the receipt is not the final state.
+    public func queueUpdate(itemId: String, action: String, text: String? = nil) {
+        guard capabilities.contains("queue-control"), let sid = openSessionId else { return }
+        var payload: [String: Any] = ["type": "queue-update", "sessionId": sid,
+                                      "itemId": itemId, "action": action]
+        if let text, !text.isEmpty { payload["text"] = text }
+        send(payload)
     }
 
     // MARK: - More menu (usage, stats, fork, rename, archive)

@@ -3688,3 +3688,21 @@
 - 验证：`xcodebuild build ... -configuration DevDebug`（`generic/platform=iOS`）**BUILD SUCCEEDED，0 error**，
   构建号 **228**；已装到 iPhone 16 Pro（2.36.0 / 228）。不跑测试、不截图。
 - 关联：C0223d2、协议见 `/tmp/codync-audit/c0223-protocol.md` #18/#19。
+
+### C0223e2 · 2026-11-05 · chat 页会话内：排队消息（编辑/删除/插话）
+
+- 说明：C0223 第八组。运行中发的消息进"排队消息"区，挂在输入框上方。
+- 变化（只动输入框上方排队区与网关请求；不碰底部布局/宽度/按钮/箭头/状态行/串流）：
+  - `DSHGateway`：新增 `queuedMessages`（发布，`[DSHQueueHint]`）。在既有的 `session-queues`/`session-queue`
+    推送处理里同时刷新它（只取当前打开会话）；`queueUpdate(itemId:action:text:)` 发 `queue-update`
+    （action = edit|remove|steer，edit 带 text），回执不是最终态、以随后的 `session-queue` 推送为准。capability
+    `queue-control`。
+  - `DSHComposer.aboveInput`：新增「排队消息 · N」区，每条显示内容 + 编辑/插话/删除。
+  - 编辑带输入框 alert；删除二次确认；插话（steer）直接发。
+- 「未确认」：`items[].message.content` 的文本由既有 `DSHQueueHint.decode` 取 text 块拼接（沿用 C0216 的实现）。
+- 待后续（C0223e3）：压缩事件提示（compaction/start·summary·end）与重试提示（llm/retry）在消息流/状态行的展示；
+  步骤/轨迹、轮次导航（C0223d3）；审批/提问卡（C0223f）；文件交付卡/工具图/长按复制（C0223g）。
+- 边界：不改 bot 页、底部输入框设计、串流。不加依赖/测试 target。
+- 验证：`xcodebuild build ... -configuration DevDebug`（`generic/platform=iOS`）**BUILD SUCCEEDED，0 error**，
+  构建号 **229**；已装到 iPhone 16 Pro（2.36.0 / 229）。不跑测试、不截图。
+- 关联：C0223e1、协议见 `/tmp/codync-audit/c0223-protocol.md` #20。
