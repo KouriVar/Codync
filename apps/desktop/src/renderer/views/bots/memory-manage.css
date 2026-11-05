@@ -1,7 +1,13 @@
 /* The Mac's memory page (C0102): one row per fact, with its edit and delete controls, and a box at
    the foot to add one. Sized to sit inside a sheet from the main bot's menu. */
 .memory-manage {
-  padding: 4px 2px;
+  /* C0103: the page fills the sheet and keeps a 24px side inset, so nothing hugs the edge; it
+     scrolls here rather than the sheet. */
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 12px 24px 16px;
+  box-sizing: border-box;
 }
 .memory-manage-row {
   display: flex;

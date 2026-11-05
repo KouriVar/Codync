@@ -29,15 +29,21 @@ export function MemoryManagerView({ botId }: { botId: string }) {
   const [confirm, setConfirm] = useState<number | null>(null)
   const [adding, setAdding] = useState('')
 
+  /** An older host answers "unknown method"; say so plainly instead of showing the raw wire error. */
+  const friendly = (e: unknown) => {
+    const text = e instanceof Error ? e.message : String(e)
+    return /unknown method/i.test(text) ? tr('The connected Host is too old to edit memory.') : text
+  }
+
   const load = useCallback(async () => {
     try {
       const client = await store.ready()
       setView(await client.call<MemoryView>('memory', { botId }))
       setError(null)
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+      setError(friendly(e))
     }
-  }, [store, botId])
+  }, [store, botId, tr])
 
   useEffect(() => { void load() }, [load])
   // The shared layer can be switched off elsewhere; fall back to the bot's own.
@@ -51,7 +57,7 @@ export function MemoryManagerView({ botId }: { botId: string }) {
       await load()
       return true
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+      setError(friendly(e))
       return false
     } finally {
       setBusy(false)
@@ -85,14 +91,14 @@ export function MemoryManagerView({ botId }: { botId: string }) {
   return (
     <div className="memory-panel memory-manage">
       <TabChoice label="Memory" selection={section} options={sections} onChange={(next) => { setSection(next); setEditing(null); setConfirm(null) }} />
-      {error ? <p role="alert" className="memory-error">{tr(error)}</p> : null}
+      {error ? <p role="alert" className="memory-error">{error}</p> : null}
       {!view && !error ? <p className="memory-muted">{tr('Loading memory…')}</p> : null}
       {view && layer ? (
         <>
           <p className="memory-muted">
             {tr(section === 'yours'
-              ? 'Your name, time zone, people and lasting preferences, shared by your bots. {used} of {cap} in use.'
-              : 'What this bot learned about you. {used} of {cap} in use.')
+              ? 'About you — your name, time zone, people and lasting preferences, shared by every bot. {used} of {cap} in use.'
+              : 'This bot — only what this bot itself learned about you. {used} of {cap} in use.')
               .replace('{used}', String(layer.used)).replace('{cap}', String(layer.cap))}
           </p>
           {layer.entries.length === 0 ? (

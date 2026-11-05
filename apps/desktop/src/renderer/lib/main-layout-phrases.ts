@@ -22,8 +22,9 @@ export const mainLayoutHans = {
   'Add a memory…': '新增一条记忆…',
   'Delete this memory?': '删除这条记忆？',
   'Open a bot to see its memory.': '先打开一个 Bot 会话才能看它的记忆。',
-  'Your name, time zone, people and lasting preferences, shared by your bots. {used} of {cap} in use.': '你的名字、时区、身边的人和长期的偏好，你的 Bot 们共享。已用 {used}/{cap}。',
-  'What this bot learned about you. {used} of {cap} in use.': '这个 Bot 学到的关于你的事。已用 {used}/{cap}。',
+  'The connected Host is too old to edit memory.': '当前连接的 Host 版本太旧，不支持编辑记忆',
+  'About you — your name, time zone, people and lasting preferences, shared by every bot. {used} of {cap} in use.': '「关于你」：你的名字、时区、身边的人和长期偏好，所有 Bot 共享这一层。已用 {used}/{cap}。',
+  'This bot — only what this bot itself learned about you. {used} of {cap} in use.': '「这个 Bot」：只有这个 Bot 自己学到的关于你的事。已用 {used}/{cap}。',
 }
 
 export const mainLayoutHant = {
@@ -43,6 +44,7 @@ export const mainLayoutHant = {
   'Add a memory…': '新增一條記憶…',
   'Delete this memory?': '刪除這條記憶？',
   'Open a bot to see its memory.': '先打開一個 Bot 會話才能看它的記憶。',
-  'Your name, time zone, people and lasting preferences, shared by your bots. {used} of {cap} in use.': '你的名字、時區、身邊的人和長期的偏好，你的 Bot 們共享。已用 {used}/{cap}。',
-  'What this bot learned about you. {used} of {cap} in use.': '這個 Bot 學到的關於你的事。已用 {used}/{cap}。',
+  'The connected Host is too old to edit memory.': '當前連線的 Host 版本太舊，不支援編輯記憶',
+  'About you — your name, time zone, people and lasting preferences, shared by every bot. {used} of {cap} in use.': '「關於你」：你的名字、時區、身邊的人和長期偏好，所有 Bot 共享這一層。已用 {used}/{cap}。',
+  'This bot — only what this bot itself learned about you. {used} of {cap} in use.': '「這個 Bot」：只有這個 Bot 自己學到的關於你的事。已用 {used}/{cap}。',
 }

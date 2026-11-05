@@ -1085,3 +1085,15 @@ iOS 定制分支：`ui/ios-customization`；当前 Mac 工作分支：`ui/macos-
 - **验证** `host` 下 `cargo check` 通过；`apps/desktop` 下 `npm run typecheck` 与 `npm run build`（electron-vite build）通过。按规则只编译、不自测：未启动应用、未实际新增/编辑/删除记忆、未等 dreaming 触发提示。
 - **限制与待办** 需配套本版 Host（旧 Host 不认 `memoryAdd/Edit/Delete`，页面会报 unknown method）。dreaming 提炼仍是自由事实行，**未做「偏好/决定/待办」分类**（需改上游提示词与格式，按"不改已有逻辑"本轮不做）。可改删的是 `MEMORY.md` 的事实行；长文笔记仍是详情页只读。未加单元测试。
 - **关联** 上游 `docs/features/context-and-memory.md`、`docs/design/bot-memory.md`；编号接 C0101。
+
+### C0103 · 2026-11-06 · 记忆第一期修复：旧 Host 报错提示 + 记忆页内边距与分层说明
+
+- **原因** 第一期在 dev 上点「记住」报 `unknown method`。排查：dev 窗口连的是本 worktree 的 dev Host（`http://127.0.0.1:19300/health` → environment=dev、binaryPath=`apps/desktop/build/native/codync-host`、数据目录 `~/.codync-dev-Codync-macos-ui`），但该进程与二进制都是 **2026-11-05 22:04** 的构建（早于 C0102），所以没有 `memoryAdd/Edit/Delete`。已安装的正式 Host 在 **19222**（environment=main、`/Applications/Codync.app/Contents/Resources/codync-host`，版本 2.39.1），**未受影响**；手机连接走正式 Host，不受影响。接口注册本身没有问题（C0102 已在 `api/bots.rs` 加分支，`cargo check` 通过），问题只是 dev 用了旧二进制。
+- **变化**
+  - 不改 Host 逻辑（接口注册无需修）。保证 dev 连到本 worktree 现编的 Host 的方式：`npm run dev` 的 sandbox 流程本就会 `cargo build`（`tools/native-host.mjs dev`）后启动 `build/native/codync-host`；只要**新起一个 dev 会话**（换一个 sandbox 名，避开已占用的 19300），即用上最新二进制。给出可直接复制的启动命令（见当次报告）。全程不触碰正式 App/Host。
+  - 记忆页对旧 Host：把 `unknown method` 翻译成「当前连接的 Host 版本太旧，不支持编辑记忆」（简体/繁体），不再直接显示英文 wire 错误。
+  - 记忆页样式：内容区左右内边距 24（页面自身滚动，不贴边）；「关于你」「这个 Bot」两个标签的说明文字分开写、各自说明是共享层/本 bot 层；输入框与「记住」按钮在列表下方，同样 24 内边距。
+- **文件** `apps/desktop/src/renderer/{views/bots/{MemoryManagerView.tsx,memory-manage.css},lib/main-layout-phrases.ts}`、`CHANGELOG.md`。
+- **验证** `apps/desktop` 下 `npm run typecheck` 与 `npm run build`（electron-vite build）通过；Host 未改动。按规则只编译、未自测（未启动应用、未实际点「记住」）。
+- **限制与待办** 旧 Host 只能读不能改，这是设计使然（提示已改为中文）。要复用同一个 sandbox（端口 19300）需先停掉那次遗留的 dev 会话；推荐的命令用新 sandbox 名即可免停。
+- **关联** C0102。
