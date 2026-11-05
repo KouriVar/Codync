@@ -244,7 +244,8 @@ struct DSHComposer: View {
             leading: AnyView(addButton),
             field: AnyView(field),
             trailing: AnyView(trailing),
-            status: status
+            status: status,
+            focused: focused
         )
         .sheet(isPresented: $showAddSheet) {
             PlaceholderSheet(title: "添加")

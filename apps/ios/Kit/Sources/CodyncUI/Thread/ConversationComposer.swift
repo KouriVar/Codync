@@ -27,11 +27,15 @@ public struct ConversationComposer: View {
     var mode: Mode
     var topPadding: CGFloat
     var bottomPadding: CGFloat
+    /// Whether the field has the keyboard. Unfocused it rests narrower; focused it takes the full
+    /// side margin. Both pages follow this, so they look the same.
+    var focused: Bool
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     public init(accessory: AnyView? = nil, leading: AnyView, field: AnyView, trailing: AnyView,
-                mode: Mode = .capsule, topPadding: CGFloat = 6, bottomPadding: CGFloat = 12) {
+                mode: Mode = .capsule, topPadding: CGFloat = 6, bottomPadding: CGFloat = 12,
+                focused: Bool = false) {
         self.accessory = accessory
         self.leading = leading
         self.field = field
@@ -39,18 +43,25 @@ public struct ConversationComposer: View {
         self.mode = mode
         self.topPadding = topPadding
         self.bottomPadding = bottomPadding
+        self.focused = focused
     }
 
     public var body: some View {
         VStack(spacing: 6) {
-            if let accessory { accessory }
-            frame
+            if let accessory { accessory.padding(.horizontal, Layout.side) }
+            frame.padding(.horizontal, frameSideInset)
         }
-        .padding(.horizontal, Layout.side)
         .padding(.top, topPadding)
         .padding(.bottom, bottomPadding)
         // Capsule → box is a size change: it takes the layout spring, never a hard cut.
         .animation(Motion.reduced(Motion.layout, reduceMotion), value: mode)
+        // The resting capsule is narrower; gaining the keyboard widens it back to the full margin.
+        .animation(Motion.reduced(Motion.layout, reduceMotion), value: focused)
+    }
+
+    /// The glass frame's side inset: the full margin while focused, the wider resting inset when not.
+    private var frameSideInset: CGFloat {
+        focused ? Layout.side : Layout.side + Layout.collapsedExtra
     }
 
     /// The frame, built once with a single structure so the field never leaves its place.
@@ -105,6 +116,8 @@ public struct ConversationComposer: View {
 private enum Layout {
     /// The screen's side margin, the same as the home bar.
     static let side: CGFloat = ConversationBottomMetrics.sideMargin
+    /// Extra side inset while the field is unfocused: the resting capsule sits narrower.
+    static let collapsedExtra: CGFloat = ConversationBottomMetrics.collapsedExtraSideInset
     /// The frame's minimum height.
     static let minHeight: CGFloat = ConversationBottomMetrics.inputHeight
     /// The expanded button row: the same height as the capsule.

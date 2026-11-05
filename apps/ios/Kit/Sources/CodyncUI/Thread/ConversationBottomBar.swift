@@ -11,6 +11,9 @@ import UIKit
 public enum ConversationBottomMetrics {
     /// The screen's side margin, the same as the home bar.
     public static let sideMargin: CGFloat = 16
+    /// Extra side inset for the resting (unfocused) input: it sits narrower until the keyboard comes
+    /// up, then widens back to `sideMargin`. 20 a side turns a 358-wide capsule into 318, centred.
+    public static let collapsedExtraSideInset: CGFloat = 20
     /// The input frame's height: the capsule, and the expanded button row.
     public static let inputHeight: CGFloat = 48
     /// The composer's own top padding — the gap between the frame's glass and what sits above it.
@@ -50,13 +53,17 @@ public struct ConversationBottomBar: View {
     /// The running-turn status line. It sits just above the input's glass, inside the bar so the
     /// transcript reserves its height (it can never be covered) and its gap stays exact.
     let status: AnyView?
+    /// Whether the field has the keyboard: the resting capsule is narrower, the focused one is full width.
+    let focused: Bool
 
     @State private var keyboardUp = false
 
     public init(mode: ConversationComposer.Mode = .capsule, accessory: AnyView? = nil,
-                leading: AnyView, field: AnyView, trailing: AnyView, status: AnyView? = nil) {
+                leading: AnyView, field: AnyView, trailing: AnyView, status: AnyView? = nil,
+                focused: Bool = false) {
         self.mode = mode
         self.accessory = accessory
+        self.focused = focused
         self.leading = leading
         self.field = field
         self.trailing = trailing
@@ -82,7 +89,8 @@ public struct ConversationBottomBar: View {
                 mode: mode,
                 topPadding: ConversationBottomMetrics.composerTopPadding,
                 bottomPadding: keyboardUp ? ConversationBottomMetrics.keyboardBottomPadding
-                                          : ConversationBottomMetrics.restingBottomPadding
+                                          : ConversationBottomMetrics.restingBottomPadding,
+                focused: focused
             )
         }
         .animation(Motion.layout, value: status != nil)

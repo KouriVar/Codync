@@ -3518,3 +3518,19 @@
 - 验证：`xcodebuild build ... -configuration DevDebug`（`generic/platform=iOS`）**BUILD SUCCEEDED，0 error**，
   构建号 **220**；已装到 iPhone 16 Pro（2.36.0 / 220）。不跑测试、不截图。
 - 关联：C0222d（`8ea744aa`，本次取代其做法）、C0222c（`97bcfe26`）。
+
+### C0222f · 2026-11-05 · 未获焦时输入框缩窄（318），获焦展开到 358
+
+- 需求：默认（未获焦 / 往下滑看历史）输入框窄一点，点输入框唤键盘时展开回满宽；bot 页与 chat 页手感一致。
+- 变化：
+  - `ConversationBottomMetrics` 增 `collapsedExtraSideInset = 20`：未获焦时左右各多缩 20（边距 16→36，宽 358→318，
+    居中）；获焦时回到 16（358）。
+  - `ConversationComposer` 增 `focused` 输入，玻璃框左右边距按 `focused ? 16 : 36` 取值，并对 `focused` 挂
+    `Motion.layout` 动画（键盘弹起/收起时平滑变宽变窄）。附件/引用条仍按 16（不跟着缩）。
+  - `ConversationBottomBar`、`Composer`（bot 页）、`DSHComposer`（chat 页）逐层透传 `focused`。两页都用同一条
+    规则：未获焦窄、获焦宽。bot 页形状仍是胶囊，只是宽度随焦点变。
+- 不变：胶囊/展开两态、按钮四边 6、箭头 32、状态行 24、层级、外观、C0220 单一 TextField、串流。
+- 边界：只改输入框在未获焦/获焦时的宽度，不加新功能。
+- 验证：`xcodebuild build ... -configuration DevDebug`（`generic/platform=iOS`）**BUILD SUCCEEDED，0 error**，
+  构建号 **221**；已装到 iPhone 16 Pro（2.36.0 / 221）。不跑测试、不截图。
+- 关联：C0222e（`f5a96dad`）、C0221 共用底部组件。

@@ -125,7 +125,8 @@ struct Composer: View {
             leading: canAttach ? AnyView(addButton) : AnyView(EmptyView()),
             field: AnyView(box),
             trailing: AnyView(trailingButton),
-            status: status
+            status: status,
+            focused: focused
         )
         // Lines, not the text: an animated transaction on every keystroke breaks IME composition.
         .animation(Motion.layout, value: draft.count(where: \.isNewline))
