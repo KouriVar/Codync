@@ -3289,3 +3289,37 @@
 - 关联：布局方案 `~/Downloads/布局方案.md` 及线框图（`00` 结构、`01`–`03`、`10` 机器人页）；备份 tag
   `backup/before-new-composer-c0219`（`3bc3e9a6`，含 C0218）。回滚可 revert 本次提交，回到三处分离的旧输入框与
   无展开的 DSH 输入；不改协议、无数据迁移，`cancelTurn` 属新增但可随本次一并撤掉。
+
+### C0220 · 2026-11-05 · 修 chat 会话页点输入框卡死
+
+- 原因（已定位到具体代码）：`apps/ios/Kit/Sources/CodyncUI/Thread/ConversationComposer.swift` 的
+  `frame`（C0219 写的）用 `Group { switch mode { case .capsule: capsule; case .expanded: expanded } }`
+  在两种形态间切换，而 `capsule`（`HStack`）和 `expanded`（`VStack`）两个分支**各自引用了同一个 `field`
+  （即 TextField 的 `AnyView`）**。同一个 View 值放在条件编译的两个不同分支里，就是 SwiftUI 眼里的
+  **两个不同结构位置**，也就有两个不同的身份。于是点输入框获焦 → `mode` 变 `.expanded` → 分支切换，旧的
+  TextField 被销毁、新的被重建 → 焦点丢失（`@FocusState focused` 被置回 false）→ `mode` 变回 `.capsule`
+  → 又切分支、再重建 → 重建出来的 TextField 因为绑定仍要求获焦而再次拿到焦点……`focused` 每帧在
+  true/false 之间来回，`frame` 又对 `mode` 挂了 `.animation(Motion.layout, value: mode)`，展开/收起动画
+  永远播不完，SwiftUI 一直重排，App 就卡死。bot 页 `mode` 恒为 `.capsule`，从不切分支，所以正常——和
+  「bot 页没事、只有 chat 页卡」的现象完全对上。
+- 变化：只改 `ConversationComposer.swift` 的 `frame`。把输入框固定成**同一个实例**：`VStack` 里始终是
+  同一个 `HStack { leading; field; trailing }`，`field` 永远是它中间那个孩子、位置不变（身份不变）。切换
+  形态只改外层几何：
+  - 胶囊：`leading`/`trailing` 在 `field` 两侧正常显示，`HStack` 内边距 6、最小高 48。
+  - 展开：`leading`/`trailing` 的宽度收到 0（`opacity 0` + `clipped`，但仍留在树里，保证 `field` 位置不动），
+    `field` 变整行（上内边距 12、左右 12），并在 `HStack` **之后**追加一行 48 高的按钮行（左加号、右模型+发送）。
+  `mode` 变化只改修饰符数值和追加一个后置兄弟节点，不再换分支，所以 TextField 全程不销毁、不重建，焦点
+  不再抖，循环消失。胶囊视觉与 C0219 保持一致（`frame(minHeight:48)` 把 36 的按钮/输入垂直居中=上下各 6）；
+  展开视觉也与设计一致（打字区 12、按钮行 48、按钮离边 6）。
+- 未改动：`DSHConversationView.swift` / `DSHComposer`（两态切换、按钮可用性、两个 sheet、停止/未连接逻辑
+  原样）、bot 页 `Composer.swift`、`GlassButton`、`DSHKit`。没有改设计：未获焦是胶囊（左加号、右发送，空
+  输入发送置灰），点输入框展开成方框（上打字、下左加号右模型+发送），收起键盘回胶囊、文字保留；bot 页仍
+  一直是胶囊。
+- 边界：只修这一处死循环，没有顺手改别的；不加依赖、测试 target，不改 Package.swift/project.yml/pbxproj。
+- 验证：`xcodebuild build -project apps/Codync.xcodeproj -scheme 'iOS Dev' -configuration DevDebug`
+  （`generic/platform=iOS` 与真机 destination）均 **BUILD SUCCEEDED，0 error**，构建号 214。装机时设备
+  tunnel 多次失败（`The tunnel connection failed`，与 C0216 同款环境问题），已产出包在
+  `build/dd/Build/Products/DevDebug-iphoneos/`；若后台重试仍未装上也只需手机解锁/同 Wi-Fi 后一条
+  `devicectl device install app` 即可。按穗要求不跑测试、不截图、不自测。
+- 关联：根因由 C0219（`a432069b`）引入；备份 tag `backup/before-composer-hang-c0220`（`7ffd963b`，含
+  C0219）。回滚可 revert 本次提交，回到 C0219 的两分支结构（会重新出现卡死），不建议。

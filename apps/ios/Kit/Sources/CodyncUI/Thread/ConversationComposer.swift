@@ -53,46 +53,50 @@ public struct ConversationComposer: View {
         .animation(Motion.reduced(Motion.layout, reduceMotion), value: mode)
     }
 
+    /// The frame, built once with a single structure so the field never leaves its place.
+    ///
+    /// The field is always the middle child of the same `HStack`; switching shapes only changes the
+    /// HStack's own geometry and, when expanded, adds a button row *after* it. Putting the field in a
+    /// `switch` over `mode` instead would give the two shapes two different branches, so SwiftUI would
+    /// tear the `TextField` down and rebuild it on every flip — it would lose focus, flip back, and the
+    /// focus/rebuild pair would loop (C0220). One field, one identity, no loop.
     private var frame: some View {
-        Group {
-            switch mode {
-            case .capsule: capsule
-            case .expanded: expanded
+        VStack(spacing: 0) {
+            HStack(alignment: .bottom, spacing: Layout.innerGap) {
+                // Beside the field in the capsule. In the box the buttons move to the row below, so
+                // these collapse to nothing — but they stay in the tree, which keeps the field's
+                // position (and identity) fixed.
+                leading
+                    .frame(width: isExpanded ? 0 : nil)
+                    .opacity(isExpanded ? 0 : 1)
+                    .clipped()
+                field
+                    .padding(.vertical, isExpanded ? 0 : Layout.fieldVerticalPadding)
+                    .padding(.horizontal, isExpanded ? Layout.expandedFieldPadding : 0)
+                    .padding(.top, isExpanded ? Layout.expandedFieldPadding : 0)
+                trailing
+                    .frame(width: isExpanded ? 0 : nil)
+                    .opacity(isExpanded ? 0 : 1)
+                    .clipped()
+            }
+            .padding(.horizontal, isExpanded ? 0 : Layout.buttonInset)
+            .frame(minHeight: isExpanded ? 0 : Layout.minHeight)
+
+            if isExpanded {
+                HStack(spacing: Layout.innerGap) {
+                    leading
+                    Spacer(minLength: 0)
+                    trailing
+                }
+                .padding(.horizontal, Layout.buttonInset)
+                .frame(height: Layout.buttonRowHeight)
             }
         }
         .glass(in: RoundedRectangle(cornerRadius: Layout.cornerRadius, style: .continuous),
                interactive: true)
     }
 
-    /// One row: + left, field, send right. The buttons sit on the frame's bottom edge, so they stay
-    /// put while a growing field pushes the frame upward.
-    private var capsule: some View {
-        HStack(alignment: .bottom, spacing: Layout.innerGap) {
-            leading
-            field.padding(.vertical, Layout.fieldVerticalPadding)
-            trailing
-        }
-        .padding(.horizontal, Layout.buttonInset)
-        .padding(.vertical, Layout.buttonInset)
-        .frame(minHeight: Layout.minHeight)
-    }
-
-    /// The focused shape: the field on top (full width), a button row below with + on the left and the
-    /// page's trailing controls (model, send) on the right.
-    private var expanded: some View {
-        VStack(spacing: 0) {
-            field
-                .padding(.horizontal, Layout.expandedFieldPadding)
-                .padding(.top, Layout.expandedFieldPadding)
-            HStack(spacing: Layout.innerGap) {
-                leading
-                Spacer(minLength: 0)
-                trailing
-            }
-            .padding(.horizontal, Layout.buttonInset)
-            .frame(height: Layout.buttonRowHeight)
-        }
-    }
+    private var isExpanded: Bool { mode == .expanded }
 }
 
 /// The frame's numbers, in one place. Every size comes from the app's control metrics so the frame
