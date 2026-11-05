@@ -952,3 +952,19 @@ iOS 定制分支：`ui/ios-customization`；当前 Mac 工作分支：`ui/macos-
 - **验证** Electron typecheck 和 build、签名的 `Screen Dev` 编译、本机主版打包通过。对最终包检查了 LaunchAgent 的标签、路径与启动约束，helper 的签名满足团队和标识要求，整包通过严格签名校验。
 - **限制与待办** 按用户要求验证到编译、打包和签名为止。由用户安装并检查内置任务 PID，再停用手工任务验证手机画面。
 - **关联** C0092。
+
+### C0094 · 2026-11-05 · Mac 主会话把「已发消息」一行做成派活卡片
+
+- **原因** 主 bot 派活给别的 bot 后，主会话里只有一行「已发消息 · 对方 ›」，只能看出“发过消息”，看不出这次派活进展如何。需要把这一行改成一张小卡片，并保持点开对话浮层的行为不变。
+- **变化** 原来居中一行文字（图标 + 动词 + 对方头像名字 + 箭头）改为消息流里同一位置的一张卡片：第一行与浮层标题用同一个组件，显示主 bot 头像名字 ⇆ 对方头像名字；右上角是状态；第二行是对方最新一条消息的前两行，超出用省略号；点卡片仍调用原来的 `openBotChat` 打开同一个 `Sheet`（`BotConversationView` 未改逻辑）。
+  状态按现有数据判断：该次派活已失败/取消 → 保留原有红色「未完成」；对方已回复（对方消息已到，或该次派活已完成）→「已回复」；尚未完成且对方还没有回复 → 对方 bot 状态为 `needsInput` 时「要你拍板」，否则「在做」。
+  样式沿用会话气泡的色板与圆角刻度：背景 `--chat-agent`、文字 `--text`/`--secondary`，圆角 `--radius-m`（12），内边距 12，两行间距 4，最大宽度 `--agent-bubble-max`，因此不超过主 bot 消息气泡。
+  新增 `needsInput` 判断只读取渲染层已有的 bot 状态，未改网关、Host、DSH、bot 后端或共享协议；浮层、输入框、左侧列表、标签栏和手机端均未改动。
+- **文件** 新增 `apps/desktop/src/renderer/views/thread/{DelegateCard.tsx,delegate-card.ts,delegate-card.css,BotPair.tsx}`、`apps/desktop/src/renderer/lib/delegate-card-phrases.ts`；
+  修改 `apps/desktop/src/renderer/views/thread/{BotConversation.tsx,bot-conversation.css}`、`apps/desktop/src/renderer/lib/{l10n.ts,message-preview.ts}`（`message-preview.ts` 仅为卡片预览抽出 `messagePreviewLines`，原 `messagePreview` 行为不变）。
+- **验证** `apps/desktop` 下 `npm run typecheck` 与 `npm run build`（electron-vite build）在 `feat/delegate-card` 分支通过。按用户要求只编译、不做功能自测：未启动应用、未实际点击卡片、未验证三种状态在真实会话里的显示。本地提交，未 push。
+- **限制与待办**
+  - 「要你拍板」目前只能借用对方 bot 的全局状态 `needsInput`（且该次派活尚未完成）推断，不是会话级判据：对方需要输入也可能来自它自己和用户的对话。现有数据缺一个会话级字段——Host 的 bot 消息 notice 只有 `status`（completed/failed/cancelled），`BotMessage` 只有 `text`/`reply`/`detail`，没有「等用户决策 / 向用户提问」这类标记。要精确判断需在网关或 Host 协议里新增字段，本轮按用户要求不动。
+  - 失败/取消不在三种状态之内，作为已有失败信号保留为红色「未完成」；如果设计只要三种，可把这一支并到「已回复」或另议。
+  - 新增状态文案只有简体与繁体中文，其他语言回退英文；未加单元测试。
+- **关联** 编号接 C0093。

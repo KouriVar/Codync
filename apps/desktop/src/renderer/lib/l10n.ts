@@ -9,6 +9,7 @@ import ptBRPhrases from '../../../../ios/Kit/Sources/CodyncKit/Resources/Languag
 import hansPhrases from '../../../../ios/Kit/Sources/CodyncKit/Resources/Languages/zh-Hans.json' with { type: 'json' }
 import hantPhrases from '../../../../ios/Kit/Sources/CodyncKit/Resources/Languages/zh-Hant.json' with { type: 'json' }
 import { macAccessHans, macAccessHant } from './computer-access-phrases.ts'
+import { delegateCardHans, delegateCardHant } from './delegate-card-phrases.ts'
 
 /** This app's interface language. `zh` is Simplified, kept so a saved choice still means that. */
 export const appLanguages = ['system', 'en', 'zh', 'zh-Hant', 'ja', 'ko', 'fr', 'de', 'es', 'pt-BR', 'ru', 'it'] as const
@@ -17,8 +18,8 @@ export type AppLanguage = typeof appLanguages[number]
 /** Traditional is its own table. A boolean `true` from older callers means Simplified. */
 export type ChineseScript = 'hans' | 'hant'
 
-const hans = { ...hansPhrases, ...macAccessHans }
-const hant = { ...hantPhrases, ...macAccessHant }
+const hans = { ...hansPhrases, ...macAccessHans, ...delegateCardHans }
+const hant = { ...hantPhrases, ...macAccessHant, ...delegateCardHant }
 
 function languageTag(system: string | boolean, fallback = typeof navigator === 'undefined' ? '' : navigator.language): string {
   if (system === true) return 'zh-Hans'
