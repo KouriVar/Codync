@@ -18,7 +18,7 @@ public enum ConversationBottomMetrics {
     /// Below the glass while the keyboard is down. Read by the home bar too, so the conversation's
     /// input bottom and the home's search bar sit at the same place above the screen's bottom edge.
     public static let restingBottomPadding: CGFloat = 28
-    /// Below the glass while the keyboard is up (the conversation pages' own gap).
+    /// Below the glass while the keyboard is up.
     public static let keyboardBottomPadding: CGFloat = 8
     /// The jump-to-latest arrow's bottom edge sits this far above the input's top edge.
     public static let jumpGap: CGFloat = 36
@@ -76,5 +76,11 @@ public struct ConversationBottomBar: View {
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
             keyboardUp = false
         }
+        // Exactly the home bar's bottom policy, applied on the bar itself (not on the transcript): with
+        // the keyboard down the bar escapes the bottom safe area so the input's bottom sits at the same
+        // place as the home's search bar; with the keyboard up it stays above it. Putting this on the
+        // transcript instead (C0222) made the scroll content and the safe area inset re-layout each
+        // other every frame while typing → a layout loop that froze the app; the escape belongs here.
+        .ignoresSafeArea(.container, edges: keyboardUp ? [] : .bottom)
     }
 }

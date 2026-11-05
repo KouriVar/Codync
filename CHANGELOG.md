@@ -3415,3 +3415,41 @@
   **不跑测试、不截图、不自测**，观感留穗验收（尤其「首页↔会话页重合」和「箭头 36」两项）。
 - 关联：C0221（`69568869`）、C0219/C0220；备份 tag `backup/before-bottom-align-c0222`（`294b9a85`）。回滚可
   revert 本次提交，回到 C0221 的「输入偏上」状态。
+
+### C0222b · 2026-11-05 · 回退 C0222 的错误改法，按首页写法重做底部对齐
+
+- 现象（穗真机）：bot 页和 chat 页点输入框打字几下就闪退、发消息几秒后闪退；底部状态行和回到底部箭头掉到
+  输入框下面、箭头比输入框还低；刚发出的气泡被输入框压住；bot 页输入框玻璃外框消失、发送位置多一个灰色圆圈、
+  停止按钮和占位文字叠在一起。
+- 崩溃原因（代码定位，非猜测）：C0222 把 `.ignoresSafeArea(.container, edges: .bottom)` 放在了
+  **transcript（`safeAreaInset` 里面那一层）** 上——`ThreadView.swift` 的 `chat`、`DSHConversationView.swift` 的
+  body。这样滚动内容与安全区 inset 每帧互相触发重新布局：打字时输入框高度每变一次就重排一次，形成布局自激，
+  最终主线程被拖死 / 触发 watchdog 闪退；同时浮层（`JumpToLatest` 箭头、状态行）和 `safeAreaInset` 的定位被
+  打乱，于是箭头/状态行掉到输入框下方、玻璃外框丢失（灰色圆圈是回到底部箭头被错位画到了发送位置）。bot 页
+  `mode` 不变也照样闪退，因为问题在 transcript 层，与模式无关——与「两页都闪退」一致。
+  **设备崩溃日志已核对**（`devicectl device copy from --domain-type systemCrashLogs` 拉取，机型
+  Sully Coe / iOS 27.3）：事故时段共 4 份 `bug_type 309` 崩溃，`build_version` 都是 **216（即 C0222）**，
+  同一堆栈：`EXC_BREAKPOINT / SIGTRAP`（`_assertionFailure`），**主线程**，`-[UICollectionView
+  _updateVisibleCellsNow:]` 连续出现 **100 次**（`_invalidateLayoutWithContext` →
+  `UICollectionViewCompositionalLayout _didPerformUpdateVisibleCellsPassWithLayoutOffset` → `_updateVisibleCellsNow`
+  自递归），最终 UIKitCore 抛出 Swift 断言失败。即：transcript 的 collection view 在「更新可见 cell」过程中被
+  反复 invalidate layout，递归 100 层后断言崩溃——正是 C0222 把 `.ignoresSafeArea` 放在 transcript 上、每帧
+  触发布局重算导致的。崩溃 .ips 已拉存 `/tmp/crashlogs/Sully Coe-2026-11-05-1225*.ips`。
+- 修复：按穗要求**回退 C0222 的改法**，改为和首页底部搜索栏**完全相同的写法**——把底部安全区逃逸放在**输入框
+  （bar）自己**上，而不是 transcript 上：
+  - `ConversationBottomMetrics.restingBottomPadding` = 28；`ConversationBottomBar` 自身加
+    `.ignoresSafeArea(.container, edges: keyboardUp ? [] : .bottom)`（与 `HomeSourcesView.swift:542-545` 的首页
+    底部栏逐字一致：`sideMargin 16 / composerTopPadding 6 / 静止 28 / 键盘忽略策略`）。
+  - `ThreadView`、`DSHConversationView` 恢复 C0222 之前（无 transcript 级 `.ignoresSafeArea`）。
+  - 首页底部栏改读同一组常量（`sideMargin`/`composerTopPadding`/`restingBottomPadding`），不再写字面量。
+  - 层级恢复：消息列表（`safeAreaInset` 预留输入框高度，最后一条不被压住）→ 回到底部箭头（离输入框顶 36）→
+    状态行（离输入框顶 24）→ 输入框 → 与首页底部搜索栏对齐的底边。输入框外观回到 C0221：玻璃外框、左加号、
+    右发送/停止，无多余灰圆。
+  - 不动：共用组件结构、胶囊/展开两态、C0220 单一 TextField、C0216/C0217 串流、bot 页功能；不加任何新功能。
+- 边界：本次只修 C0222 引入的崩溃/层级/外观/对齐，未动 C0223 的任何功能（C0223 仍暂停）。
+- 验证：`xcodebuild build -project apps/Codync.xcodeproj -scheme 'iOS Dev' -configuration DevDebug`
+  （`generic/platform=iOS`）**BUILD SUCCEEDED，0 error**，构建号 **217**；`xcrun devicectl device install app`
+  装到 iPhone 16 Pro（`00008140-000A31311AE3001C`，`com.suiyikou.codync.uipreview`，2.36.0 / 217）成功。按穗要求
+  不跑测试、不截图。
+- 关联：C0222（`0726b46b`，本次回退其代码改法）、C0221（`69568869`）、C0219/C0220；备份 tag
+  `backup/before-bottom-align-c0222`（`294b9a85`，C0222 前）。回滚本次即回到 C0222 的崩溃状态，不建议。

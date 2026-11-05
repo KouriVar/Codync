@@ -24,10 +24,6 @@ struct DSHConversationView: View {
                            imageReloadKey: gateway.phase == .ready ? "ready" : "waiting",
                            loadImage: { id in await gateway.imageData(attachmentId: id) })
         .background(Palette.background)
-        // The transcript runs to the screen's bottom edge; the composer (in the inset below) then sits
-        // at the home bar's resting position, and the jump arrow and status line — measured from the
-        // content's bottom — keep their exact gap to the input's top.
-        .ignoresSafeArea(.container, edges: .bottom)
         // The input bar is an inset rather than a stacked row: the transcript runs under it and
         // comes up with the keyboard. It has no backing of its own — only the field's glass — so the
         // messages stay visible behind it, exactly as on Coe's page.

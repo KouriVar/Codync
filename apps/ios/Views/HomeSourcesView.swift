@@ -541,7 +541,7 @@ struct HomeSourcesView: View {
         .frame(maxWidth: .infinity, alignment: .trailing)
         .padding(.horizontal, ConversationBottomMetrics.sideMargin)
         .padding(.top, ConversationBottomMetrics.composerTopPadding)
-        // The resting gap is the shared bottom-area constant, so the home's search bar and the
+        // The resting gap is the shared bottom-area constant: the home's search bar and the
         // conversation composers sit at the same place above the screen's bottom edge.
         .padding(.bottom, keyboardUp ? 12 : ConversationBottomMetrics.restingBottomPadding)
         .ignoresSafeArea(.container, edges: keyboardUp ? [] : .bottom)
