@@ -1296,6 +1296,9 @@ private struct DSHScheduleSheet: View {
     @Environment(\.dismissModal) private var dismiss
     @State private var items: [DSHSchedule] = []
     @State private var deleteTarget: DSHSchedule?
+    @State private var editTarget: DSHSchedule?
+    @State private var editTitle = ""
+    @State private var editPrompt = ""
 
     var body: some View {
         NavigationStack {
@@ -1310,6 +1313,10 @@ private struct DSHScheduleSheet: View {
                             }
                         }
                         Spacer()
+                        Button { editTarget = item; editTitle = item.title; editPrompt = "" } label: {
+                            Image(systemName: "pencil")
+                        }
+                        .buttonStyle(.plain)
                         Button(role: .destructive) { deleteTarget = item } label: {
                             Image(systemName: "trash")
                         }
@@ -1334,6 +1341,23 @@ private struct DSHScheduleSheet: View {
                     deleteTarget = nil
                 }
                 Button("取消", role: .cancel) { deleteTarget = nil }
+            }
+            .alert("编辑定时任务", isPresented: Binding(get: { editTarget != nil },
+                                                   set: { if !$0 { editTarget = nil } })) {
+                TextField("标题", text: $editTitle)
+                TextField("提示词（可选）", text: $editPrompt)
+                Button("保存") {
+                    if let target = editTarget {
+                        Task {
+                            if await gateway.updateSchedule(target.id, title: editTitle,
+                                                            prompt: editPrompt.isEmpty ? nil : editPrompt) {
+                                items = await gateway.listSchedules()
+                            }
+                        }
+                    }
+                    editTarget = nil
+                }
+                Button("取消", role: .cancel) { editTarget = nil }
             }
         }
     }

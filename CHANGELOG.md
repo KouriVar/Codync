@@ -3785,3 +3785,16 @@
 - 验证：`xcodebuild build ... -configuration DevDebug`（`generic/platform=iOS`）**BUILD SUCCEEDED，0 error**，
   构建号 **233**；已装到 iPhone 16 Pro（2.36.0 / 233）。不跑测试、不截图。
 - 关联：C0223d2、协议见 `/tmp/codync-audit/c0223-protocol.md` #9。
+
+### C0223d2b · 2026-11-05 · chat 页定时任务：补上编辑（schedule-update）
+
+- 说明：补 C0223d2 里"未做"的定时任务编辑。
+- 变化：
+  - `DSHGateway`：`listSchedules()` 同时在内存保留每条原始记录 `scheduleRaw`；新增 `updateSchedule(_:title:prompt:)`
+    —— 按协议把 `expected` 设为**完整原记录**（白名单字段 id/kind/title/prompt/scheduledAt/afterSeconds/everySeconds/
+    time/timeZone/weekdays/expression），带新 `title`/`prompt` 发 `schedule-update`，以 `updated:true` 判定成功。
+  - `DSHScheduleSheet`：每行加「编辑」（标题+提示词两个输入框的 alert），保存后重新拉列表；删除仍二次确认。
+- 边界：不改 bot 页、底部输入框设计、串流。不加依赖/测试 target。
+- 验证：`xcodebuild build ... -configuration DevDebug`（`generic/platform=iOS`）**BUILD SUCCEEDED，0 error**，
+  构建号 **234**；已装到 iPhone 16 Pro（2.36.0 / 234）。不跑测试、不截图。
+- 关联：C0223d2、协议 `/tmp/codync-audit/c0223-protocol.md` #16。

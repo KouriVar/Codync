@@ -103,6 +103,8 @@ public final class DSHGateway: ObservableObject {
     @Published public private(set) var queuedMessages: [DSHQueueHint] = []
     @Published public private(set) var queueIsKnown = false
     private var gatewayQueues: [String: [DSHQueueHint]] = [:]
+    /// The raw schedule records last seen, for the `expected` field of `schedule-update`.
+    private var scheduleRaw: [String: [String: Any]] = [:]
     private var hasQueueBaseline = false
     private var conversations: [DSHSessionScope: DSHConversationState] = [:]
     private var selectedScope: DSHSessionScope?
@@ -1128,11 +1130,34 @@ public final class DSHGateway: ObservableObject {
                                              expecting: "schedule-list"), frame.kind == "schedule-list"
         else { return [] }
         let items = frame.json["items"] as? [[String: Any]] ?? []
+        scheduleRaw = [:]
+        for item in items { if let id = item["id"] as? String { scheduleRaw[id] = item } }
         return items.compactMap { item in
             guard let id = item["id"] as? String else { return nil }
             return DSHSchedule(id: id, title: item["title"] as? String ?? id,
                                detail: Self.scheduleDetail(item))
         }
+    }
+
+    /// Updates a schedule's title and/or prompt. The gateway requires `expected` to be the complete
+    /// original record, so the raw item from the last `schedule-list` is echoed back (whitelist fields).
+    public func updateSchedule(_ id: String, title: String?, prompt: String?) async -> Bool {
+        guard supportsSchedule, let sid = openSessionId, let raw = scheduleRaw[id] else { return false }
+        var payload: [String: Any] = ["type": "schedule-update", "sessionId": sid, "id": id,
+                                      "expected": Self.scheduleExpected(raw)]
+        if let title, !title.isEmpty { payload["title"] = title }
+        if let prompt, !prompt.isEmpty { payload["prompt"] = prompt }
+        guard let frame = await requestFrame(payload, expecting: "schedule-update"),
+              frame.kind == "schedule-update" else { return false }
+        return frame.bool("updated") == true
+    }
+
+    private static func scheduleExpected(_ raw: [String: Any]) -> [String: Any] {
+        let keys = ["id", "kind", "title", "prompt", "scheduledAt", "afterSeconds", "everySeconds",
+                    "time", "timeZone", "weekdays", "expression"]
+        var expected: [String: Any] = [:]
+        for key in keys { if let value = raw[key] { expected[key] = value } }
+        return expected
     }
 
     public func deleteSchedule(_ id: String) async -> Bool {
