@@ -79,9 +79,6 @@ public struct ThreadView: View {
                 marks.set(false, account: model.storage.accountID, computer: model.computer.id, bot: botId)
                 manualUnreadData = marks.data
             }
-            .reviewReading(botId: botId, unobscured: following && !calling && !showTrace && botChat == nil
-                           && openArtifact == nil && openCall == nil && details == nil && !editingGroup
-                           && model.composerDraft(for: botId).isEmpty && model.fileDownloads.export == nil)
             .onChange(of: model.voiceCallRequest, initial: true) { _, _ in
                 if model.takeVoiceCallRequest(for: botId) { startShortcutCall() }
             }

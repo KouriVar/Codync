@@ -3908,3 +3908,32 @@
 - 限制/待办：未确认/未做——工具结果图（网关无数据）、步骤/轨迹（网关无专用请求）、轮次导航精确跳转（无 scroll API）、
   团队进子会话、正文本地路径预览、重试放状态行（受“不改状态行”约束）；命令中文名为客户端映射，未知命令回落原名。
 - 关联：C0223 系列（C0223a/a2/b/c/d1/d2/d2b/e1/e2/e3/f/g/g2/d3/fix1–fix5）。
+
+## 2026-11-05
+
+### C0225 · 2026-11-05 · 合并上游 upstream/main e34b319a（保留我方 DSH 与全部定制）
+
+- 原因：上游 `upstream/main` 更新到 `e34b319a`（自共同祖先 `5e6b1c93` 起 81 个提交）。在保留我方全部定制（DSH、界面、交互、Google 登录）的前提下同步；冲突文件保留我方，非冲突的上游改动照常合入。
+- 变化：
+  - 从 `ui/voice-morph` 新建 `sync/upstream-20261105-voice-morph`，`git merge upstream/main e34b319a`（merge 提交，未 push）。
+  - 31 个冲突：21 个取我方版本（`AGENTS.md`、`README.md`、桌面 `SettingsView.tsx`、`AnalyticsEvent.swift`、`CharacterAvatar.swift`、iOS `BotRow`/`CallRows`/`CustomConnectorSheet`/`InstallConnectorSheet`/`InstalledView`/`MarketplaceView`/`AccountStore`/`ChatRows`/`Composer`/`RoutineNoticeRow`/`ThreadView`/`TraceView`/`AccessRequestView`/`RootView`、host 两个测试文件）。
+  - 语言 `de/es/fr/ja/ko/zh-Hans/zh-Hant` 按 key 并集（我方值优先）：并入上游新 key（de/es/fr/ja/ko 各 301，zh-Hans 278、zh-Hant 278）；双方都改过的 key 保留我方：zh-Hans 14 个、zh-Hant 15 个（如 `Delete {name}?`、`Friday`、`Schedule`、`Send now`、`Webhook` 等，详见合并日志）。
+  - `apps/Codync.xcodeproj/project.pbxproj` 由 `xcodegen generate` 按并集重新生成：保留我方 bundle id/app group/keychain/`DEVELOPMENT_TEAM=KQQ6SD2P4C`/GoogleSignIn/DSHKit/Remix；并入上游 `ChooseComputerView.swift` 等新文件引用；`MARKETING_VERSION=2.39.1`。
+  - 接口适配（只改我方文件，不改上游文件）：
+    - `ConnectorSignInFlow` 改无参并补 `.signInCodeDialog`：`CustomConnectorSheet.swift`、`InstallConnectorSheet.swift`、`InstalledView.swift`。
+    - 上游移除评审打断/阅读（基线代码、非我方定制）：采用删除，移除我方调用处 `Composer.swift`、`ThreadView.swift`、`RootView.swift`。
+    - `AnalyticsEvent.swift`：`reviewRequested(completed:)` 改为 `reviewRequested(prompts:)`（上游新版 `ReviewInvitation.swift` 需要）；补 `OnboardingStep.choose`（上游新文件 `ChooseComputerView.swift` 需要）、`Link.installLink`（上游新版 `PairingView.swift` 需要）；保留我方移除 `Link.appStore` 的定制。
+  - 规则 7（modify/delete，保留我方删除）：
+    - `apps/ios/Kit/Sources/CodyncUI/Thread/RecordingPill.swift`：上游把 `LevelDots(... color: Palette.text ...)` 改为不带 `color` 参数（随通话条改动）；按规则保留我方删除，未采纳。
+    - `apps/ios/Views/BotListView.swift`：上游新增 agent logo（`AgentLogos.storageKey`、`bot.runningAgent`、`BotRow(bot:agent:)`）、移除 `.reviewInvitation(blocked:)`、无障碍标签改用 agent 名；按规则保留我方删除，未采纳。
+  - 锁文件：`host/Cargo.lock` 为 2.39.1 且含 `jsonwebtoken`；`apps/desktop/package-lock.json` 含 `@playwright/test`；`cargo metadata --locked`、`npm ci` 通过。
+- 文件：`apps/project.yml`、`apps/Codync.xcodeproj/project.pbxproj`、`apps/ios/Kit/Sources/CodyncKit/Analytics/AnalyticsEvent.swift`、`apps/ios/Kit/Sources/CodyncUI/Marketplace/*`、`apps/ios/Kit/Sources/CodyncUI/Thread/{Composer,ThreadView}.swift`、`apps/ios/Views/RootView.swift`、`apps/ios/Kit/Sources/CodyncKit/Resources/Languages/*.json`、`CHANGELOG.md`。
+- 验证：iOS `iOS Dev`/`DevDebug`（模拟器）编译通过；桌面 `npm run typecheck`、`npm run build` 通过；`Screen Dev`（macOS，`CODE_SIGNING_ALLOWED=NO`）编译通过；真机构建/安装/启动结果见下。
+- 特别保护（已核对）：
+  - `apps/ios/DSHKit/` 整个目录、`apps/ios/Views/DSHConversationView.swift`、DSH 资源（`agent-dsh.imageset`、`agent_dsh.xml`、`dsh.svg` 等）在合并前后**逐字节一致**：`git diff --cached HEAD -- <DSH 路径>` 为空、blob 列表与合并前完全相同、工作区无改动。
+  - Google 登录链路保留：`apps/project.yml` 仍为 `GoogleSignIn`，无 Clerk。
+- 限制/待办：
+  - 冲突文件里放弃的上游功能：每 bot 的 agent logo、通话条/通话会话改进、connector 验证码登录入口（共享类型已合入）、手机设置选账户电脑、消息排队入口、GitHub 点星/App Store 评分邀请、routine/trace 的 i18n、settings 的 tr 翻译、host 账户离开/加入配对测试。
+  - 上游新增文件里因入口被放弃而未接线的代码（仅列出，未删未接）：`apps/ios/Kit/Sources/CodyncKit/Models/Entry+Queue.swift`、`apps/ios/Kit/Sources/CodyncUI/Thread/QueuedMessages.swift`、`apps/ios/Kit/Sources/CodyncUI/Bots/AgentBadge.swift`、`apps/ios/Views/ChooseComputerView.swift`。
+  - 未 push；未做功能自测（按约定只编译 + 安装）。
+- 关联：C0122、C0091（同批上游同步）。

@@ -86,13 +86,8 @@ struct RootView: View {
             .tint(Palette.text)
             .tracked(.screenViewed(.bots))
             // Opening a bot (notification, widget, link) always lands on the Bots tab.
-            .onChange(of: accounts.selection) { old, ref in
-                if ref != nil {
-                    app.tab = .bots
-                    ReviewInvitation.shared.cancel(.interaction)
-                } else if let old {
-                    ReviewInvitation.shared.returned(from: "\(accounts.storage.id)/\(old.computerId)/\(old.botId)")
-                }
+            .onChange(of: accounts.selection) { _, ref in
+                if ref != nil { app.tab = .bots }
             }
     }
 
