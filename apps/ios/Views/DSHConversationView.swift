@@ -286,7 +286,7 @@ struct DSHComposer: View {
             .presentationDetents([.medium, .large])
         }
         .sheet(isPresented: $showModelSheet) {
-            PlaceholderSheet(title: "模型")
+            DSHModelSheet(gateway: gateway)
                 .presentationDetents([.medium, .large])
         }
         .sheet(item: $selectedCommand) { command in
@@ -696,6 +696,178 @@ private struct DSHCommandOptionsSheet: View {
                 ToolbarItem(placement: .topBarTrailing) { Button("取消") { onCancel() } }
             }
         }
+    }
+}
+
+/// The "模型" sheet: reasoning effort, the model list by provider, the agent preset (locked once the
+/// session has started) and the permission level. Every write is a gateway request; "设为默认" asks first.
+private struct DSHModelSheet: View {
+    @ObservedObject var gateway: DSHGateway
+    @Environment(\.dismissModal) private var dismiss
+    @State private var confirmDefault = false
+
+    private var currentModelInfo: DSHModel? {
+        guard let current = gateway.currentModel else { return nil }
+        return gateway.modelGroups.first { $0.id == current.provider }?
+            .models.first { $0.id == current.model }
+    }
+    private var efforts: [DSHReasoningEffort] { currentModelInfo?.reasoning ?? [] }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    if !efforts.isEmpty { effortSection }
+                    modelSection
+                    if gateway.supportsAgentPreset { agentSection }
+                    if !gateway.permissionOptions.isEmpty { permissionSection }
+                    if gateway.currentModel != nil { defaultButton }
+                }
+                .padding(16)
+            }
+            .navigationTitle("模型")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("关闭") { dismiss() } } }
+            .task {
+                await gateway.loadModels()
+                if gateway.supportsAgentPreset {
+                    await gateway.loadAgentPresets()
+                    await gateway.loadSessionAgentPreset()
+                }
+                await gateway.loadPermissionOptions()
+            }
+            .alert("设为新会话默认？", isPresented: $confirmDefault) {
+                Button("设为默认") {
+                    if let current = gateway.currentModel {
+                        gateway.saveDefaultModel(provider: current.provider, model: current.model,
+                                                 reasoningEffort: current.reasoningEffort)
+                    }
+                }
+                Button("取消", role: .cancel) {}
+            } message: {
+                Text("以后新建会话会默认用这个模型和思考等级。")
+            }
+        }
+    }
+
+    private var effortSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            sectionTitle("思考等级")
+            HStack(spacing: 8) {
+                ForEach(efforts) { effort in
+                    let on = (gateway.currentModel?.reasoningEffort ?? efforts.first?.id) == effort.id
+                    Button {
+                        if let current = gateway.currentModel {
+                            gateway.selectModel(provider: current.provider, model: current.model,
+                                                reasoningEffort: effort.id)
+                        }
+                    } label: {
+                        Text(effort.name).font(.subheadline)
+                            .padding(.horizontal, 14).padding(.vertical, 8)
+                            .background(on ? Palette.text : Palette.surface, in: Capsule())
+                            .foregroundStyle(on ? Palette.background : Palette.text)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+    }
+
+    private var modelSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            sectionTitle("模型")
+            ForEach(gateway.modelGroups) { group in
+                Text(group.name).font(.caption).foregroundStyle(Palette.secondary).padding(.top, 4)
+                ForEach(group.models) { model in
+                    let on = gateway.currentModel?.provider == group.id && gateway.currentModel?.model == model.id
+                    Button {
+                        let effort = on ? gateway.currentModel?.reasoningEffort : nil
+                        gateway.selectModel(provider: group.id, model: model.id, reasoningEffort: effort)
+                    } label: {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text(model.name).font(.subheadline).foregroundStyle(Palette.text)
+                                if !model.description.isEmpty {
+                                    Text(model.description).font(.caption2).foregroundStyle(Palette.secondary).lineLimit(1)
+                                }
+                            }
+                            Spacer()
+                            if on { Image(systemName: "checkmark").foregroundStyle(Palette.text) }
+                        }
+                        .padding(.horizontal, 12).padding(.vertical, 10)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Palette.surface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+    }
+
+    private var agentSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                sectionTitle("Agent 模式")
+                if gateway.agentPresetLocked {
+                    Text("已锁定").font(.caption2).foregroundStyle(Palette.secondary)
+                }
+            }
+            ForEach(gateway.agentPresets) { preset in
+                let on = gateway.agentPresetSelected == preset.id
+                Button { gateway.selectAgentPreset(preset.id) } label: {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(preset.name).font(.subheadline)
+                                .foregroundStyle(preset.broken ? Palette.tertiary : Palette.text)
+                            if let detail = preset.detail, !detail.isEmpty {
+                                Text(detail).font(.caption2).foregroundStyle(Palette.secondary).lineLimit(1)
+                            }
+                        }
+                        Spacer()
+                        if on { Image(systemName: "checkmark").foregroundStyle(Palette.text) }
+                    }
+                    .padding(.horizontal, 12).padding(.vertical, 10)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Palette.surface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .disabled(gateway.agentPresetLocked || preset.broken)
+                .opacity(gateway.agentPresetLocked ? 0.5 : 1)
+            }
+        }
+    }
+
+    private var permissionSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            sectionTitle("权限档位")
+            ForEach(gateway.permissionOptions) { option in
+                Button { gateway.setPermission(option.id) } label: {
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(option.name).font(.subheadline).foregroundStyle(Palette.text)
+                        if let detail = option.detail, !detail.isEmpty {
+                            Text(detail).font(.caption2).foregroundStyle(Palette.secondary).lineLimit(1)
+                        }
+                    }
+                    .padding(.horizontal, 12).padding(.vertical, 10)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Palette.surface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private var defaultButton: some View {
+        Button { confirmDefault = true } label: {
+            Text("设为新会话默认").font(.subheadline).foregroundStyle(Palette.text)
+                .frame(maxWidth: .infinity, minHeight: 44)
+                .background(Palette.surface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func sectionTitle(_ text: String) -> some View {
+        Text(text).font(.footnote.weight(.semibold)).foregroundStyle(Palette.secondary)
     }
 }
 

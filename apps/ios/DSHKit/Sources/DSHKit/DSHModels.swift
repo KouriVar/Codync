@@ -125,6 +125,47 @@ public struct DSHCommandOption: Identifiable, Hashable, Sendable {
     public let selected: Bool
 }
 
+// MARK: - Models / agent presets / permissions (chat page session controls)
+
+public struct DSHReasoningEffort: Identifiable, Hashable, Sendable {
+    public let id: String
+    public let name: String
+}
+
+public struct DSHModel: Identifiable, Hashable, Sendable {
+    public let id: String
+    public let name: String
+    public let providerId: String
+    public let description: String
+    public let reasoning: [DSHReasoningEffort]
+}
+
+public struct DSHModelGroup: Identifiable, Hashable, Sendable {
+    public let id: String
+    public let name: String
+    public let models: [DSHModel]
+}
+
+public struct DSHCurrentModel: Hashable, Sendable {
+    public let provider: String
+    public let model: String
+    public let reasoningEffort: String?
+}
+
+public struct DSHAgentPreset: Identifiable, Hashable, Sendable {
+    public let id: String
+    public let name: String
+    public let detail: String?
+    public let isDefault: Bool
+    public let broken: Bool
+}
+
+public struct DSHPermissionOption: Identifiable, Hashable, Sendable {
+    public let id: String      // `value`, sent back as `name`
+    public let name: String
+    public let detail: String?
+}
+
 public struct DSHImageRef: Identifiable, Hashable, Sendable {
     public let attachmentId: String
     public let mediaType: String

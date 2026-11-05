@@ -51,11 +51,22 @@ public final class DSHGateway: ObservableObject {
     /// Files being uploaded (or ready to send), shown as cards above the input.
     @Published public private(set) var fileUploads: [DSHFileUpload] = []
 
+    // Session controls for the model sheet.
+    @Published public private(set) var modelGroups: [DSHModelGroup] = []
+    @Published public private(set) var currentModel: DSHCurrentModel?
+    @Published public private(set) var agentPresets: [DSHAgentPreset] = []
+    @Published public private(set) var agentPresetSelected: String?
+    @Published public private(set) var agentPresetLocked = false
+    @Published public private(set) var permissionOptions: [DSHPermissionOption] = []
+    public var supportsAgentPreset: Bool { capabilities.contains("session-agent-preset") }
+
     /// The single outstanding request/reply (commands, options, …). The UI serialises them.
     private var commandAwaiter: CheckedContinuation<DSHFrame, Never>?
     private static let requestKinds: Set<String> = [
         "commands", "command-executed", "command-options", "command-selected",
         "file-upload-opened", "file-upload-chunk-accepted", "file-upload-completed", "file-upload-cancelled",
+        "models", "select-model", "agent-presets", "session-agent-preset", "select-agent-preset",
+        "permission-options", "permission", "save-default-model",
     ]
 
     public private(set) var profile: DSHGatewayProfile?
@@ -322,6 +333,11 @@ public final class DSHGateway: ObservableObject {
             handleSubscribed(frame)
         case "session-status":
             handleSessionStatus(frame)
+        case "session-agent-preset-updated":
+            // The gateway pushes the lock (and any preset change) when a turn starts.
+            guard frame.string("sessionId") == openSessionId else { return }
+            if let locked = frame.bool("locked") { agentPresetLocked = locked }
+            if let preset = frame.string("agentPreset") { agentPresetSelected = preset }
         case "history":
             handleHistory(frame)
         case "projection-baseline":
@@ -820,6 +836,96 @@ public final class DSHGateway: ObservableObject {
             fail(finished?.string("message") ?? "上传完成失败"); return
         }
         setUpload(local) { $0.status = .ready; $0.progress = 1; $0.receiptId = receipt }
+    }
+
+    // MARK: - Models / agent preset / permission (chat page session controls)
+
+    public func loadModels() async {
+        guard phase == .ready, let sid = openSessionId,
+              let frame = await requestFrame(["type": "models", "sessionId": sid], expecting: "models"),
+              frame.kind == "models" else { return }
+        let groups = frame.json["groups"] as? [[String: Any]] ?? []
+        modelGroups = groups.compactMap { group in
+            guard let gid = group["id"] as? String else { return nil }
+            let models = (group["models"] as? [[String: Any]] ?? []).compactMap { m -> DSHModel? in
+                guard let id = m["id"] as? String else { return nil }
+                let reasoning = m["reasoning"] as? [String: Any] ?? [:]
+                let efforts = (reasoning["efforts"] as? [[String: Any]] ?? []).compactMap { e -> DSHReasoningEffort? in
+                    guard let eid = e["id"] as? String else { return nil }
+                    return DSHReasoningEffort(id: eid, name: e["name"] as? String ?? eid)
+                }
+                return DSHModel(id: id, name: m["name"] as? String ?? id, providerId: gid,
+                                description: m["description"] as? String ?? "", reasoning: efforts)
+            }
+            return DSHModelGroup(id: gid, name: group["name"] as? String ?? gid, models: models)
+        }
+        if let current = frame.json["current"] as? [String: Any],
+           let provider = current["provider"] as? String, let model = current["model"] as? String {
+            currentModel = DSHCurrentModel(provider: provider, model: model,
+                                           reasoningEffort: current["reasoningEffort"] as? String)
+        }
+    }
+
+    public func selectModel(provider: String, model: String, reasoningEffort: String?) {
+        guard let sid = openSessionId else { return }
+        var payload: [String: Any] = ["type": "select-model", "sessionId": sid,
+                                      "provider": provider, "model": model]
+        if let effort = reasoningEffort, !effort.isEmpty { payload["reasoningEffort"] = effort }
+        send(payload)
+        currentModel = DSHCurrentModel(provider: provider, model: model, reasoningEffort: reasoningEffort)
+    }
+
+    public func saveDefaultModel(provider: String, model: String, reasoningEffort: String?) {
+        var payload: [String: Any] = ["type": "save-default-model", "provider": provider, "model": model]
+        if let effort = reasoningEffort, !effort.isEmpty { payload["reasoningEffort"] = effort }
+        send(payload)
+    }
+
+    public func loadAgentPresets() async {
+        guard supportsAgentPreset,
+              let frame = await requestFrame(["type": "agent-presets"], expecting: "agent-presets"),
+              frame.kind == "agent-presets" else { return }
+        let presets = frame.json["presets"] as? [[String: Any]] ?? []
+        agentPresets = presets.compactMap { p in
+            guard let id = p["id"] as? String else { return nil }
+            return DSHAgentPreset(id: id, name: p["name"] as? String ?? id,
+                                  detail: p["description"] as? String,
+                                  isDefault: p["isDefault"] as? Bool ?? false,
+                                  broken: p["broken"] as? Bool ?? false)
+        }
+    }
+
+    public func loadSessionAgentPreset() async {
+        guard supportsAgentPreset, let sid = openSessionId,
+              let frame = await requestFrame(["type": "session-agent-preset", "sessionId": sid],
+                                             expecting: "session-agent-preset"),
+              frame.kind == "session-agent-preset" else { return }
+        if let preset = frame.string("agentPreset") { agentPresetSelected = preset }
+        if let locked = frame.bool("locked") { agentPresetLocked = locked }
+    }
+
+    public func selectAgentPreset(_ preset: String) {
+        guard supportsAgentPreset, let sid = openSessionId else { return }
+        send(["type": "select-agent-preset", "sessionId": sid, "agentPreset": preset])
+        agentPresetSelected = preset
+    }
+
+    public func loadPermissionOptions() async {
+        var payload: [String: Any] = ["type": "permission-options"]
+        if let sid = openSessionId { payload["sessionId"] = sid }
+        guard let frame = await requestFrame(payload, expecting: "permission-options"),
+              frame.kind == "permission-options" else { return }
+        let options = frame.json["options"] as? [[String: Any]] ?? []
+        permissionOptions = options.compactMap { o in
+            guard let value = o["value"] as? String else { return nil }
+            return DSHPermissionOption(id: value, name: o["name"] as? String ?? value,
+                                       detail: o["description"] as? String)
+        }
+    }
+
+    public func setPermission(_ name: String) {
+        guard let sid = openSessionId else { return }
+        send(["type": "permission", "sessionId": sid, "name": name])
     }
 
     // MARK: - Pictures (attachment fetch)

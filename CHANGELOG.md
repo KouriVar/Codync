@@ -3597,3 +3597,28 @@
 - 验证：`xcodebuild build ... -configuration DevDebug`（`generic/platform=iOS`）**BUILD SUCCEEDED，0 error**，
   构建号 **224**；已装到 iPhone 16 Pro（2.36.0 / 224）。不跑测试、不截图。
 - 关联：C0223a（图片）、C0223b（命令）、`message.files`/`file-upload-*` 协议见 `/tmp/codync-audit/c0223-protocol.md` #24/#25。
+
+### C0223c · 2026-11-05 · chat 页模型 sheet（模型/思考等级/Agent 模式/权限/设为默认）
+
+- 说明：C0223 第四组，把「模型」占位 sheet 填成真面板。数据全部来自网关。
+- 变化（只动 chat 页模型 sheet 与网关请求；不碰底部布局/宽度/按钮/箭头/状态行/串流）：
+  - `DSHGateway`：新增会话控制请求——
+    - 模型：`loadModels()`（`models{sessionId}` 解析 `current{provider,model,reasoningEffort?}` 与
+      `groups[].models[]`，含每个模型的 `reasoning.efforts[]`）；`selectModel(provider:model:reasoningEffort:)`
+      （`select-model`，字段名 `reasoningEffort`）；`saveDefaultModel(...)`（`save-default-model`）。
+    - Agent 模式：`loadAgentPresets()`（`agent-presets`→`presets[]{id,name,description,isDefault,broken}`）、
+      `loadSessionAgentPreset()`（`session-agent-preset`→`agentPreset/locked`）、`selectAgentPreset(_:)`
+      （`select-agent-preset`）；并接 `session-agent-preset-updated` 推送里的 `locked`/`agentPreset`（首轮
+      `turn/start` 后锁定）。注意：`agent-preset/locked` 是**错误码**不是事件，锁定靠这个 `-updated` 推送。
+    - 权限：`loadPermissionOptions()`（`permission-options`→`options[]{value,name,description}`）、
+      `setPermission(_:)`（`permission`，`name`=选项 value）。
+  - 上述 capability：Agent 模式用 `session-agent-preset`；`models`/`select-model`/`permission*`/`save-default-model`
+    在源码里**无独立 capability**（属 hello 基线不宣告），照常请求、失败静默。
+  - `DSHModels`：新增 `DSHModel/DSHModelGroup/DSHReasoningEffort/DSHCurrentModel/DSHAgentPreset/DSHPermissionOption`。
+  - `DSHModelSheet`：思考等级分段（取当前模型 `reasoning.efforts`）、按 provider 分组的模型列表（当前打勾）、
+    Agent 模式（`session-agent-preset` 能力有才显示，锁定/坏项置灰并写「已锁定」）、权限档位、以及「设为新会话
+    默认」按钮（**二次确认** alert 后再发 `save-default-model`）。
+- 边界：不改 bot 页、底部输入框设计、串流。不加依赖/测试 target。
+- 验证：`xcodebuild build ... -configuration DevDebug`（`generic/platform=iOS`）**BUILD SUCCEEDED，0 error**，
+  构建号 **225**；已装到 iPhone 16 Pro（2.36.0 / 225）。不跑测试、不截图。
+- 关联：C0223a/a2/b、协议见 `/tmp/codync-audit/c0223-protocol.md` #4–#8。
