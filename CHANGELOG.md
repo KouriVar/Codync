@@ -3534,3 +3534,25 @@
 - 验证：`xcodebuild build ... -configuration DevDebug`（`generic/platform=iOS`）**BUILD SUCCEEDED，0 error**，
   构建号 **221**；已装到 iPhone 16 Pro（2.36.0 / 221）。不跑测试、不截图。
 - 关联：C0222e（`f5a96dad`）、C0221 共用底部组件。
+
+### C0223a · 2026-11-05 · chat 页加号 sheet：照片/拍照 → 发图
+
+- 说明：C0223 继续。本组只做**图片附件**（复用 C0218 已有的 `DSHImageProcessor` 与 `message.images` 后端），
+  分块文件上传、命令/技能菜单等放后续提交（C0223a2 起）。
+- 变化（只动 chat 页的加号 sheet 与输入区附件，不碰底部布局/宽度/按钮/箭头/状态行/串流）：
+  - 加号 sheet（`DSHAddSheet`）：把原来的占位换成「照片」「拍照」两个入口；网关 `hello` 没有 `images`
+    capability 时两个入口置灰并提示"不支持发图片"。照片用 `PhotosPicker`（仅图片，最多 20 张），拍照走
+    `\.capturePhoto`。选/拍完的图经 `DSHImageProcessor.prepare`（长边 2000/40MP/3.67MB，HEIC 转 JPEG 等）
+    处理后进入待发。
+  - 待发缩略条：选好的图片在输入框上方显示 64×64 缩略图，每张右上角 ✕ 可移除，准备/压缩中显示进度。它是
+    共用底部组件的 `accessory` 槽（在玻璃上方、属于底部栏，列表为其预留高度，不遮消息）。
+  - 发送：`send()` 改为 `gateway.send(text:images:)`，图片与文字一起发（纯图也可发）；成功后清空草稿与待发图。
+    `canSend`/`showsStop` 已把"有待发图片"计入。
+- 能力开关：无 `images` → 加号 sheet 的图片入口置灰、不报错。
+- 「未确认」/未做：分块文件上传（`file-upload-*`）、视频、命令/技能、模型面板、更多菜单、会话内目标/任务/排队/
+  审批/提问/文件卡/工具结果图/重试/压缩提示——均按后续 C0223 子提交继续。
+- 边界：不改 bot 页；不改底部输入框设计（胶囊/展开、318↔358、按钮 6、箭头 32、状态行 24、C0220 单一
+  TextField）；不改串流。不加依赖/测试 target。
+- 验证：`xcodebuild build ... -configuration DevDebug`（`generic/platform=iOS`）**BUILD SUCCEEDED，0 error**，
+  构建号 **222**；已装到 iPhone 16 Pro（2.36.0 / 222）。不跑测试、不截图。
+- 关联：C0218（图片后端 `DSHImageProcessor`/`message.images`）、C0221 共用底部组件 `accessory` 槽。

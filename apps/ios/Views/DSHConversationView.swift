@@ -1,7 +1,9 @@
 import CodyncKit
 import CodyncUI
 import DSHKit
+import PhotosUI
 import SwiftUI
+import UIKit
 
 /// A DSH conversation, on the same chat page Coe uses: messages as bubbles, and each turn's
 /// stable message identities and the existing running-turn status line.
@@ -226,21 +228,32 @@ struct DSHComposer: View {
     @State private var showAddSheet = false
     @State private var showModelSheet = false
 
+    // Pictures picked but not sent yet: shown as a thumbnail strip above the input.
+    @State private var pendingImages: [DSHPreparedImage] = []
+    @State private var pickingPhotos = false
+    @State private var photoItems: [PhotosPickerItem] = []
+    @State private var preparingImages = false
+    @State private var attachError: String?
+    @Environment(\.capturePhoto) private var capturePhoto
+
     private var trimmed: String { draft.trimmingCharacters(in: .whitespacesAndNewlines) }
     private var isEmpty: Bool { trimmed.isEmpty }
 
     /// `gateway.phase == .ready` means the transport is up and the input can be used at all.
     private var connected: Bool { gateway.phase == .ready }
-    /// A running turn with an empty field: the send slot shows stop instead.
-    private var showsStop: Bool { gateway.isRunning && isEmpty }
-    /// Text may be sent when connected, a session is open, and there is something to send.
-    private var canSend: Bool { connected && gateway.openSessionId != nil && !isEmpty }
+    /// A running turn with an empty field shows stop instead of send.
+    private var showsStop: Bool { gateway.isRunning && isEmpty && pendingImages.isEmpty }
+    /// Text or a picture may be sent when connected, a session is open, and there is something to send.
+    private var canSend: Bool {
+        connected && gateway.openSessionId != nil && (!isEmpty || !pendingImages.isEmpty)
+    }
 
     var body: some View {
         // The same bottom bar the bot page uses; the chat page only adds its own controls through the
         // frame's slots (the model button in `trailing`) and its two-state mode.
         ConversationBottomBar(
             mode: focused ? .expanded : .capsule,
+            accessory: pendingImages.isEmpty ? nil : AnyView(pendingStrip),
             leading: AnyView(addButton),
             field: AnyView(field),
             trailing: AnyView(trailing),
@@ -248,12 +261,95 @@ struct DSHComposer: View {
             focused: focused
         )
         .sheet(isPresented: $showAddSheet) {
-            PlaceholderSheet(title: "添加")
-                .presentationDetents([.medium, .large])
+            DSHAddSheet(
+                canPhoto: gateway.capabilities.contains("images"),
+                onPhotos: { pickingPhotos = true },
+                onCamera: { capturePhoto { image in add(captured: image) } }
+            )
+            .presentationDetents([.medium, .large])
         }
         .sheet(isPresented: $showModelSheet) {
             PlaceholderSheet(title: "模型")
                 .presentationDetents([.medium, .large])
+        }
+        .photosPicker(isPresented: $pickingPhotos, selection: $photoItems,
+                      maxSelectionCount: 20, matching: .images)
+        .onChange(of: photoItems) { _, items in
+            guard !items.isEmpty else { return }
+            photoItems = []
+            Task { await addPhotos(items) }
+        }
+        .alert("图片没加上", isPresented: Binding(get: { attachError != nil },
+                                              set: { if !$0 { attachError = nil } })) {
+            Button("好", role: .cancel) { attachError = nil }
+        } message: {
+            Text(attachError ?? "")
+        }
+    }
+
+    /// The pictures picked but not sent yet, above the input: a thumbnail each with a remove ✕.
+    private var pendingStrip: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(Array(pendingImages.enumerated()), id: \.offset) { index, image in
+                    ZStack(alignment: .topTrailing) {
+                        if let ui = UIImage(data: image.data) {
+                            Image(uiImage: ui).resizable().scaledToFill()
+                                .frame(width: 64, height: 64)
+                                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        } else {
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .fill(Palette.bubbleUser).frame(width: 64, height: 64)
+                        }
+                        Button { pendingImages.remove(at: index) } label: {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundStyle(.white)
+                                .frame(width: 24, height: 24)
+                                .background(.black.opacity(0.55), in: Circle())
+                        }
+                        .buttonStyle(.plain)
+                        .padding(2)
+                        .accessibilityLabel("移除图片")
+                    }
+                }
+                if preparingImages {
+                    ProgressView().frame(width: 64, height: 64)
+                }
+            }
+            .padding(.horizontal, 10)
+            .padding(.top, 8)
+        }
+    }
+
+    /// Photos come in as data, are made gateway-safe by the shared processor, then join the strip.
+    private func addPhotos(_ items: [PhotosPickerItem]) async {
+        preparingImages = true
+        defer { preparingImages = false }
+        var inputs: [DSHImageInput] = []
+        for item in items {
+            guard let data = try? await item.loadTransferable(type: Data.self) else { continue }
+            inputs.append(DSHImageInput(data: data, name: nil))
+        }
+        guard !inputs.isEmpty else { return }
+        do {
+            let prepared = try await DSHImageProcessor.prepare(inputs)
+            pendingImages.append(contentsOf: prepared)
+        } catch {
+            attachError = error.localizedDescription
+        }
+    }
+
+    /// The camera sheet's still, pushed through the same processor.
+    private func add(captured image: UIImage) {
+        guard let jpeg = image.jpegData(compressionQuality: 0.9) else { return }
+        Task {
+            do {
+                let prepared = try await DSHImageProcessor.prepare([DSHImageInput(data: jpeg, name: nil)])
+                pendingImages.append(contentsOf: prepared)
+            } catch {
+                attachError = error.localizedDescription
+            }
         }
     }
 
@@ -317,7 +413,57 @@ struct DSHComposer: View {
 
     private func send() {
         let text = draft
-        if gateway.send(text: text) { draft = "" }
+        let images = pendingImages.map(DSHOutgoingImage.init)
+        if gateway.send(text: text, images: images) {
+            draft = ""
+            pendingImages = []
+        }
+    }
+}
+
+/// The "添加" sheet: the media options the gateway accepts. Photos and camera go through
+/// `message.images`; the rest arrive in later steps.
+private struct DSHAddSheet: View {
+    let canPhoto: Bool
+    let onPhotos: () -> Void
+    let onCamera: () -> Void
+    @Environment(\.dismissModal) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 12) {
+                HStack(spacing: 12) {
+                    tile("照片", icon: "image-line", enabled: canPhoto, action: onPhotos)
+                    tile("拍照", icon: "camera-line", enabled: canPhoto, action: onCamera)
+                }
+                if !canPhoto {
+                    Text("这个网关不支持发图片")
+                        .font(.footnote).foregroundStyle(Palette.secondary)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(16)
+            .navigationTitle("添加")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("关闭") { dismiss() }
+                }
+            }
+        }
+    }
+
+    private func tile(_ title: String, icon: String, enabled: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            VStack(spacing: 8) {
+                RemixIcon(icon, size: 28).foregroundStyle(enabled ? Palette.text : Palette.tertiary)
+                Text(title).font(.footnote).foregroundStyle(enabled ? Palette.text : Palette.tertiary)
+            }
+            .frame(maxWidth: .infinity, minHeight: 84)
+            .background(Palette.surface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .disabled(!enabled)
     }
 }
 
