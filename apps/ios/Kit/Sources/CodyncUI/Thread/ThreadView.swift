@@ -42,6 +42,10 @@ public struct ThreadView: View {
     private var chat: some View {
         transcript
         .background(Palette.background)
+        // The transcript runs to the screen's bottom edge; the composer (in the inset below) then sits
+        // at the home bar's resting position, and the jump arrow and status line — measured from the
+        // content's bottom — keep their exact gap to the input's top.
+        .ignoresSafeArea(.container, edges: .bottom)
         .safeAreaInset(edge: .bottom) {
             VStack(spacing: 6) {
                 if let mismatch = model.mismatch {

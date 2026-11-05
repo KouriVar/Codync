@@ -15,9 +15,10 @@ public enum ConversationBottomMetrics {
     public static let inputHeight: CGFloat = 48
     /// The composer's own top padding — the gap between the frame's glass and what sits above it.
     public static let composerTopPadding: CGFloat = 6
-    /// Below the glass while the keyboard is down.
-    public static let restingBottomPadding: CGFloat = 12
-    /// Below the glass while the keyboard is up.
+    /// Below the glass while the keyboard is down. Read by the home bar too, so the conversation's
+    /// input bottom and the home's search bar sit at the same place above the screen's bottom edge.
+    public static let restingBottomPadding: CGFloat = 28
+    /// Below the glass while the keyboard is up (the conversation pages' own gap).
     public static let keyboardBottomPadding: CGFloat = 8
     /// The jump-to-latest arrow's bottom edge sits this far above the input's top edge.
     public static let jumpGap: CGFloat = 36

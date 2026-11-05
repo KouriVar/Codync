@@ -3380,3 +3380,38 @@
   **不跑测试、不截图、不自测**，观感留穗验收。
 - 关联：组件源头 C0219（`a432069b`）、C0220（`8ff39487`）；备份 tag `backup/before-unified-bottom-c0221`（`e7d10fec`，
   含 C0219/C0220）。回滚可 revert 本次提交，两页恢复各自一套底部间距（箭头高度会再次不一致）。
+
+### C0222 · 2026-11-05 · 底部输入框位置改回和首页对齐
+
+- 原因：C0221 为了统一两页把输入框下方的底部间距从 28 改成 12、并去掉了 bot 页的
+  `.ignoresSafeArea(.bottom)`，输入框整体往上移，和首页底部搜索栏对不齐了。穗没要求移动输入框位置。
+- 首页搜索栏的基准（改动前，`apps/ios/Views/HomeSourcesView.swift`）：底部栏 `bottomBar` 的修饰符在
+  `:542-545`——`.padding(.horizontal,16)`、`.padding(.top,6)`、`.padding(.bottom, keyboardUp ? 12 : 28)`、
+  `.ignoresSafeArea(.container, edges: keyboardUp ? [] : .bottom)`；键盘监听 `:550-556`。即：静止时玻璃底边
+  距屏幕物理底边 **28**，键盘弹起时 12，且忽略底部安全区。
+- 变化：
+  - `ConversationBottomMetrics`：`restingBottomPadding` 由 12 改回 **28**（键盘态的 `keyboardBottomPadding`
+    保持 **8**，按本轮要求不变）。首页底部栏改为读同一组常量——`sideMargin(16)`、`composerTopPadding(6)`、
+    `restingBottomPadding(28)` 不再写字面量（首页键盘态的 12 保持原样）。两页输入框的静止位置因此与首页一致。
+  - **底部安全区的写法**：把 `.ignoresSafeArea(.container, edges: .bottom)` 从「输入框自己」挪到「会话内容的
+    容器」上——`ThreadView.swift` 的 `chat`（transcript）与 `DSHConversationView.swift` 的 body（`ChatTranscriptView`），
+    在 `.safeAreaInset` 之前加这一行；`ConversationBottomBar` 自己的 `.ignoresSafeArea` 去掉。
+    原因：若把 `.ignoresSafeArea(.bottom)` 放在 `safeAreaInset` 里的输入框上，安全区会被「撑大」一个 home
+    indicator 的高度，内容底边被抬高，回到底部箭头和状态行就会离输入框顶过远（这正是 C0221 之前「bot 页箭头
+    很高」的成因）。把忽略安全区放在内容容器上，输入框玻璃底边同样落在「物理底边 −28」，**和首页完全一致**，
+    而内容底边不再被撑大，箭头和状态行按内容底边算就正好是 36 / 24。
+  - 回到底部箭头、状态行不动：仍是 `ConversationBottomMetrics.jumpPadding`（=36−6=30 → 离输入框顶 36）与
+    `statusBottomPadding`（=24−6=18 → 离输入框顶 24）。**没有靠挪输入框来对齐箭头。**
+  - 共用组件结构、胶囊/展开两态、C0220 的单一 TextField 写法、透明底，全部未改。
+- 与任务字面写法的差异：任务说「bot 页恢复 bottomPadding 28 + 在输入框上加 .ignoresSafeArea(.bottom)」。我保留了
+  28 这个数值与「忽略底部安全区」的行为，但把忽略安全区放在**内容容器**而不是**输入框**上——两者得到相同的
+  输入框静止位置（玻璃底边距物理底边 28，与首页重合），差别只在于后者会让 `safeAreaInset` 的保留高度被
+  home indicator 撑大、把箭头/状态行顶高。这样同时满足「输入框和首页重合」「箭头 36」「状态行 24」三条。
+- 边界：只改底部位置与这套常量；不改加号/模型 sheet 内容、不加新功能、不改消息气泡/顶栏；不加依赖、测试 target；
+  不改 Package.swift/project.yml/pbxproj。
+- 验证：`xcodebuild build -project apps/Codync.xcodeproj -scheme 'iOS Dev' -configuration DevDebug`（`generic/platform=iOS`
+  与真机 destination）均 **BUILD SUCCEEDED，0 error**，构建号 **216**；`xcrun devicectl device install app` 装到
+  iPhone 16 Pro（`00008140-000A31311AE3001C`，`com.suiyikou.codync.uipreview`，2.36.0 / 216）成功。按穗要求
+  **不跑测试、不截图、不自测**，观感留穗验收（尤其「首页↔会话页重合」和「箭头 36」两项）。
+- 关联：C0221（`69568869`）、C0219/C0220；备份 tag `backup/before-bottom-align-c0222`（`294b9a85`）。回滚可
+  revert 本次提交，回到 C0221 的「输入偏上」状态。

@@ -539,9 +539,11 @@ struct HomeSourcesView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .trailing)
-        .padding(.horizontal, 16)
-        .padding(.top, 6)
-        .padding(.bottom, keyboardUp ? 12 : 28)
+        .padding(.horizontal, ConversationBottomMetrics.sideMargin)
+        .padding(.top, ConversationBottomMetrics.composerTopPadding)
+        // The resting gap is the shared bottom-area constant, so the home's search bar and the
+        // conversation composers sit at the same place above the screen's bottom edge.
+        .padding(.bottom, keyboardUp ? 12 : ConversationBottomMetrics.restingBottomPadding)
         .ignoresSafeArea(.container, edges: keyboardUp ? [] : .bottom)
         // The row inside the 16pt sides: how wide the capsule grows.
         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width in
