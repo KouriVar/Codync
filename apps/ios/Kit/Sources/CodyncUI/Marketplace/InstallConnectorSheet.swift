@@ -11,8 +11,7 @@ struct InstallConnectorSheet: View {
     let done: () -> Void
     @Environment(BotStore.self) private var model
     @Environment(\.dismissModal) private var dismiss
-    @Environment(\.webAuthenticationSession) private var webAuthenticationSession
-    @Environment(\.openURL) private var openURL
+    private let signInFlow = ConnectorSignInFlow()
     @State private var optionId = ""
     @State private var values: [String: String] = [:]
     @State private var installed: InstalledConnector?
@@ -42,6 +41,7 @@ struct InstallConnectorSheet: View {
             optionId = item.options.first?.id ?? ""
             if addsAtOnce && item.options.count == 1 && item.options[0].inputs.isEmpty { install() }
         }
+        .signInCodeDialog(signInFlow.codePrompt)
         .onDisappear { values.removeAll() }
     }
 
@@ -118,7 +118,7 @@ struct InstallConnectorSheet: View {
                 installed = c
                 values.removeAll()
                 if c.needsSignIn {
-                    try await ConnectorSignInFlow(model: model, webAuthenticationSession: webAuthenticationSession, openURL: openURL).signIn(c.id)
+                    try await signInFlow.signIn(c.id)
                 }
                 if let requestId {
                     try await client.finishConnectionRequest(requestId, connectorId: c.id)

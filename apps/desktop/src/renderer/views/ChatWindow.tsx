@@ -26,6 +26,7 @@ import { NewBotView, NewGroupView } from './bots/NewBotView'
 import { ImportBotsSheet } from './bots/ImportBotsView'
 import { BotEditorView } from './bots/BotEditorView'
 import { MarketplaceView } from './marketplace/MarketplaceView'
+import { SignInCodeDialog } from './marketplace/ConnectorSheets'
 import { SettingsView, type SettingsPage } from './settings/SettingsView'
 import { ApprovalSheet } from './settings/ApprovalSheet'
 import { SearchPalette } from './SearchPalette'
@@ -428,7 +429,7 @@ function ChatSplitView() {
           <SidebarFooter accountOpen={showAccount} showAccount={accountInUse} onAccount={() => setShowAccount((s) => !s)} onExtensions={roster.grouped ? undefined : openMarketplace} onComputers={() => setSettings('computers')} />
         )}
       </aside>
-      <ResizeHandle label="Resize sidebar" width={width} min={76} max={sidebarMax} edge="trailing" onResize={resizeSidebar} onDragging={setResizing} />
+      <ResizeHandle label={tr('Resize sidebar')} width={width} min={76} max={sidebarMax} edge="trailing" onResize={resizeSidebar} onDragging={setResizing} />
       <main className="detail">
         {/* The call bar's settings open this window's Settings at Voice chat. */}
         <OpenVoiceSettings.Provider value={openVoiceSettings}>{detail}</OpenVoiceSettings.Provider>
@@ -490,13 +491,14 @@ function ChatSplitView() {
       </Sheet>
       <Dialog
         open={confirmDelete !== null}
-        title={`Delete ${confirmDelete?.bot.name ?? 'bot'}?`}
+        title={tr('Delete {name}?').replaceAll('{name}', () => confirmDelete?.bot.name ?? 'bot')}
         message={tr('Files it changed on your computer stay as they are.')}
         actions={confirmDelete ? [{ title: 'Delete bot and its conversation', destructive: true, action: () => confirmDelete.store.delete(confirmDelete.bot) }] : []}
         onClose={() => setConfirmDelete(null)}
       />
       <SectionNameDialog naming={naming} onClose={() => setNaming(null)} />
       <Dialog open={errorMessage !== null} title={tr('Something went wrong')} message={errorMessage} actions={[]} cancel="OK" onClose={() => app.clearErrors()} />
+      <SignInCodeDialog />
     </div>
   )
 }

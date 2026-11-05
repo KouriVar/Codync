@@ -1037,3 +1037,26 @@
 - 验证：`npm run typecheck` 通过；`npm test` 350/351（既有 catalogs 项）。重编 arm64 ad-hoc 装真机后 CDP 检查：头像 32×32、`border-radius:50%`、`object-fit:cover`，1279×1279 图片不变形；改名后重启仍生效；设置页本机栏 40px 正圆、含改名框与「选择图片…」；面板首项为「设置」且无 cloud 项；全程无控制台异常。
 - 已知限制：host 不保存 Google 姓名与头像，因此默认显示「本机」；如需真实姓名/头像需改 host 去取 userinfo（本次刻意未做，避免新增网络登录流程）。
 - 关联：C0107、C0115、C0119。
+
+## 2026-11-05
+
+### C0122 · 2026-11-05 · 合并上游 upstream/main e34b319a（保留我方 iOS/桌面定制）
+
+- 原因：上游 `upstream/main` 更新到 `e34b319a`（自共同祖先 `5e6b1c93` 起 81 个提交）。在保留我方全部定制（界面、交互、Google 登录）的前提下同步；冲突文件保留我方，上游在冲突文件里的新功能不移植，非冲突的上游改动（bug/崩溃修复、新增文件）照常合入。
+- 变化：
+  - 从 `ui/ios-customization` 新建 `sync/upstream-20261105-ios-customization`，`git merge upstream/main e34b319a`（merge 提交，未 push）。
+  - 24 个冲突：21 个取我方版本（`AGENTS.md`、`README.md`、桌面 `main.tsx`/`SettingsView.tsx`、iOS `BotRow`/`CallRows`/`CustomConnectorSheet`/`InstallConnectorSheet`/`InstalledView`/`MarketplaceView`/`AccountStore`/`ChatRows`/`Composer`/`RoutineNoticeRow`/`ThreadView`/`TraceView`/`AccessRequestView`/`BotListView`/`RootView`、host 两个测试文件）。
+  - 语言 `zh-Hans.json`/`zh-Hant.json` 按 key 并集（我方值优先），并入上游 299 个新 key；双方都改过的 key 1 个：`Delete {name}?` 保留我方「删除「{name}」？/刪除「{name}」？」。
+  - `apps/Codync.xcodeproj/project.pbxproj` 由 `xcodegen generate` 按并集重新生成：保留我方 bundle id/app group/keychain/`DEVELOPMENT_TEAM=KQQ6SD2P4C`/GoogleSignIn/Remix 资源；并入上游 `ChooseComputerView.swift` 等新文件引用；`MARKETING_VERSION=2.39.1`。
+  - 接口适配（只改我方调用处，不改上游文件）：
+    - `ConnectorSignInFlow` 由三参改为无参：`CustomConnectorSheet.swift`、`InstallConnectorSheet.swift`、`InstalledView.swift` 改用 `signInFlow` 并补 `.signInCodeDialog(signInFlow.codePrompt)`。
+    - `reviewInvitation(blocked:)` 改为无参：`BotListView.swift` 改 `.reviewInvitation()`。
+  - 上游移除了「评审打断/评审阅读」机制（删除 `ReviewCompletion.swift`、`ReviewInterruption.swift`、`ReviewReading.swift`，并从 `ReviewInvitation` 移除 `setInterrupted`/`viewed`/`returned`/`cancel` 等）。这些是上游基线代码、非我方定制，故采用上游删除；移除我方调用处：`Composer.swift`、`ThreadView.swift`、`RootView.swift`。
+  - 锁文件：`host/Cargo.lock` 为 2.39.1 且含 `jsonwebtoken`；`apps/desktop/package-lock.json` 含 `@playwright/test`；`cargo metadata --locked`、`npm ci` 通过。
+- 文件：`apps/project.yml`、`apps/Codync.xcodeproj/project.pbxproj`、`apps/ios/Kit/Sources/CodyncUI/Marketplace/*`、`apps/ios/Kit/Sources/CodyncUI/Thread/{Composer,ThreadView}.swift`、`apps/ios/Views/{BotListView,RootView}.swift`、`apps/ios/Kit/Sources/CodyncKit/Resources/Languages/zh-Hans.json`、`zh-Hant.json`、`CHANGELOG.md`。
+- 验证：iOS `iOS Dev`/`DevDebug`（`generic/platform=iOS Simulator`，`build/dd`）编译通过；桌面 `npm run typecheck`、`npm run build` 通过；`Screen Dev`（macOS，`CODE_SIGNING_ALLOWED=NO`）编译通过。未安装真机、未做功能自测。
+- 限制/待办：
+  - 冲突文件里放弃的上游功能：每 bot 的 agent logo、通话条/通话会话改进、connector 验证码登录入口（共享类型已合入）、手机设置选账户电脑、消息排队入口、GitHub 点星/App Store 评分邀请、routine/trace 的 i18n、桌面崩溃窗口恢复接线、settings 的 tr 翻译、host 账户离开/加入配对测试。
+  - 上游新增文件里因入口被放弃而未接线的代码（仅列出，未删未接）：`apps/ios/Kit/Sources/CodyncKit/Models/Entry+Queue.swift`、`apps/ios/Kit/Sources/CodyncUI/Thread/QueuedMessages.swift`、`apps/ios/Kit/Sources/CodyncUI/Bots/AgentBadge.swift`、`apps/ios/Views/ChooseComputerView.swift`、`apps/desktop/src/renderer/lib/fill.ts`、`apps/desktop/src/renderer/lib/modal-stack.ts`、`apps/desktop/src/renderer/views/RenderBoundary.tsx`。
+  - 未做真机/功能验证；未 push。
+- 关联：无（首次上游同步）。

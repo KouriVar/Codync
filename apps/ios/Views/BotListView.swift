@@ -199,8 +199,7 @@ struct BotListView: View {
             .listRowSeparator(.hidden)
             .listRowBackground(Color.clear)
         }
-        .reviewInvitation(blocked: creating != nil || editing != nil || editingGroup != nil
-                          || confirmDelete != nil || lifted != nil)
+        .reviewInvitation()
         .listStyle(.plain)
         .coordinateSpace(name: "botlist")
         .contentMargins(.top, 12, for: .scrollContent)

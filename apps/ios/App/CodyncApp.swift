@@ -76,7 +76,6 @@ struct CodyncApp: App {
                     app.open(url)
                 }
                 .onChange(of: scenePhase, initial: true) { _, phase in
-                    ReviewInvitation.shared.setActive(phase == .active)
                     switch phase {
                     case .active: Analytics.shared.becameActive()
                     case .background: BackgroundTime.run("Analytics") { await Analytics.shared.enteredBackground() }

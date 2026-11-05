@@ -28,6 +28,7 @@ struct AppearancePage: View {
                 .pickerStyle(.inline)
                 .labelsHidden()
             }
+            AgentLogosToggle()
         }
         .listRowSeparator(.hidden)
     }
