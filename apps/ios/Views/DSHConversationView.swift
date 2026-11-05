@@ -62,13 +62,47 @@ struct DSHConversationView: View {
 
     private var items: [TranscriptItem] {
         DSHConversationAdapter.transcript(from: gateway.messages).compactMap { row in
-            guard !row.text.isEmpty else { return nil }
-            let kind = row.kind == .user ? "user" : "agent"
-            let entry = Entry(id: row.id, seq: row.seq, botId: "dsh", rev: row.revision, kind: kind,
-                              turn: Int64(row.turn), data: EntryData(text: row.text),
-                              createdAt: row.createdAt, updatedAt: row.createdAt)
+            guard let entry = Self.entry(for: row) else { return nil }
             return TranscriptItem(entry: entry, displayRowId: row.displayRowId, scrollToWhenAdded: false)
         }
+    }
+
+    /// One DSH row as Codync's chat model: a message as its bubble, a notice as one neutral line —
+    /// and a context notice never as a user bubble. `NoticeRow` draws only the text, so a context
+    /// line's heading rides in the text; its controlled source name and style travel in `EntryData`
+    /// so the transcript's row revision changes when they do.
+    private static func entry(for row: DSHTranscriptItem) -> Entry? {
+        guard !row.text.isEmpty else { return nil }
+        var data = EntryData(text: row.text)
+        let kind: String
+        switch row.kind {
+        case .user:
+            kind = "user"
+        case .assistant:
+            kind = "agent"
+        case .notice:
+            kind = "notice"
+            if let notice = row.notice {
+                // Not drawn by NoticeRow; the transcript's revision uses it.
+                data.title = notice.source
+                switch notice.style {
+                case .error:
+                    // The turn failed: NoticeRow draws this in Palette.danger.
+                    data.style = "error"
+                case .context:
+                    // Injected context: its heading over its own text, never a user bubble. A
+                    // context line with no heading still names itself.
+                    let heading: String
+                    if let title = notice.title, !title.isEmpty { heading = title } else { heading = "上下文" }
+                    data.text = heading + "\n" + row.text
+                case .info:
+                    break
+                }
+            }
+        }
+        return Entry(id: row.id, seq: row.seq, botId: "dsh", rev: row.revision, kind: kind,
+                     turn: Int64(row.turn), data: data,
+                     createdAt: row.createdAt, updatedAt: row.createdAt)
     }
 
     private var sendingStatus: some View {

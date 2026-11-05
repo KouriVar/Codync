@@ -3086,3 +3086,73 @@
 - 关联：详细设计 `/tmp/codync-audit/streaming-step2.md`；备份 tag
   `backup/before-dsh-transcript-c0216`（`bfaa83df`，包含 C0212–C0215）。回滚可 revert 本次提交，
   不回退状态行和 C0215；无协议或数据库迁移。回滚正文实现会恢复旧覆盖风险。
+
+### C0217 · 2026-11-05 · DSH 串流第三步：事件类型显示正确
+
+- 原因：第二步把正文保真以后，其余事件类型仍不对。工具调用与结果没有准确配对（一条结果会清掉整轮的
+  工具状态；历史先读到结果、往前翻才补到调用时无法回填），非用户来源塞进来的上下文被画成「我发的」
+  气泡，本轮出错/取消/中断在会话里没有任何说明，而正常的轮次反而可能被误报成结束。
+- 变化：
+  - `apps/ios/DSHKit/Sources/DSHKit/DSHWireEvent.swift`：新增工具调用地址 `DSHToolKey`
+    （gatewayId/sessionId/turn/step/callId，turn/step 可空）与松索引 `DSHToolLooseKey`
+    （gatewayId/sessionId/callId）；`DSHToolRecord` 保存参数原样（对象/数组/数字/布尔/null 不转字符串，
+    本身就是 JSON 的字符串保留原字符串）、name、callSeq、按 seq 去重的 resultSeqs、output/preview/
+    isError/error/outputTruncated 与 matchState；`DSHUnmatchedResult` 记孤立与歧义结果；
+    `DSHMessageOrigin`（user/context/legacy + 原样 rawSource + 受控来源名 + confidence）；
+    `DSHTurnTermination`/`DSHTerminationError`。`DSHJSON` 改为 Hashable 并补 `bool`/`number` 取值。
+    tool-result 正文同时接受当前会话格式的扁平 text 块与旧 `tool-result` 包装块。
+  - `apps/ios/DSHKit/Sources/DSHKit/DSHModels.swift`：`DSHTool` 增加 preview、`outputTruncated`、
+    可空 `isError`（不再把「未声明」当成退出码 0）与 `matchState`；`DSHMessage.Role` 增加 `.notice`，
+    新增 `DSHNotice`（info/error/context + 受控来源名 + 标题）与 `DSHMessage.notice`；
+    `DSHTranscriptItem.Kind` 增加 `.notice` 并带 `notice`。正文角色不再被强迫成 user/assistant。
+    C0212 的 `DSHActivityKind`/`DSHActivityState`/白名单定义原样保留。
+  - `apps/ios/DSHKit/Sources/DSHKit/DSHConversationState.swift`：工具配对先按精确 ToolKey；结果缺
+    turn/step 时只接受**唯一**兼容候选，零候选记孤立、多候选记歧义，绝不挑最近一条。历史先读到结果、
+    往前翻才补到调用时只补关系、不追加第二条结果；同一结果 seq 幂等。多个并发工具互不影响，结果只结束
+    它自己那一次调用。新增 context 与 turn/end 投影：只有 `source.kind == user` 画成用户气泡，其他显式
+    来源画成「上下文 · 来源名」中性说明；`turn/end` 按出错/取消/中断/未知各给一条说明，正常结束不加任何
+    说明。同一结束事件按 seq 幂等只显示一条；下一轮开始不删上一轮的说明。上下文/终止说明行 id 由原事件
+    地址派生（context 加固定后缀，终止用 `termination` + endSeq）。
+  - `apps/ios/DSHKit/Sources/DSHKit/DSHGateway.swift`：状态行改为读取与正文同一份解析后的
+    `DSHWireEvent`（callId/toolName/toolArgument 单一来源），不再有第二套字段解析；活动仍只接结构化
+    事件，不接生成的说明文字，白名单未改。`activityEvent` 与 `toolArgument` 改为委托 DSHWireEvent，
+    快照路径与实时路径命名一致。
+  - `apps/ios/Views/DSHConversationView.swift`：三路映射 user/agent/notice；notice 复用既有
+    `NoticeRow`，出错用 `style "error"`（`Palette.danger`），取消/中断/未知用默认次要文字颜色，上下文
+    画成标题 + 原文的中性行，受控来源名放进 `data.title`。不加工具气泡，不恢复展开/summary sheet/轨迹入口。
+  - `apps/ios/Kit/Sources/CodyncUI/Thread/ChatTranscript.swift`：行 revision 从只哈希正文改为把说明
+    文字、来源（`data.title`）、样式（`data.style`）与 `entry.rev` 都计入，来源或样式变化会单独重画该行。
+    CodyncUI 未引入 DSHKit 依赖。
+- 与设计的差异（均为实现取舍，功能范围无差异）：
+  - 终止说明的行身份用 `(gateway, session, "termination", endSeq)`，没有再拼 turn。endSeq 本身唯一且
+    稳定；turn 在真实协议里可选，拼进去反而会让「不知轮号」的说明拿不到稳定 id。
+  - 上下文来源名走**受控映射表**（22 个已知 kind + `plugin:*` → 中文名，未知回退「上下文」），不直接显示
+    raw `source.kind`。源码证据显示真实取值包含 `ptc-mode`、`cordis-host-runner`、
+    `dsh-session-title-llm` 这类不能上屏的内部名；设计原话也是「受控来源名」。映射表本身是本次新增内容。
+  - `aborted` 按 `reasonDetails.reason.kind` 再分：等于 `user` 才是「本轮已取消」，`parent`/`disposed`/
+    `hook` 记「本轮已中断」。设计表格把 aborted/cancelled/canceled 都归取消；源码里网关/DSH 只产出
+    `aborted`，且它同时表示用户取消和宿主中止，所以必须用 cause 区分，否则主动取消与被动中断会混为一谈。
+  - 只有 `reason` **完全缺失**才写「本轮已结束，原因未提供」；`reason` 存在但本版不认识的值按「其他非错误
+    终止」处理，不加说明。真实 reason 全集为 `completed`/`blocked`/`max-tokens`/`aborted`/`error`/
+    `interrupted`/`forked`，其中非 error/取消/中断的三种按设计表格「正常或其他非错误终止」静默。
+  - 真实协议里 `turn/end` 不带 `step`，因此终止说明行的 step 为 nil，不影响排序（按 seq）。
+  - 无 source 字段的老数据仍走旧的「Time sampled…」前缀兼容路径并画成用户气泡；这类行只是「来源未知」，
+    不宣称已确认是用户本人输入。前缀规则**只**用于老数据，来源确认为 user 的消息不再被它隐藏。
+  - `DSHTool` 已按设计补齐结果元信息，但不再挂到每条 assistant 消息上（`DSHWireEvent.tools` 返回空），
+    因此不可能再出现工具气泡或 summary 行。设计要求的「typed arguments」放在 `DSHToolRecord.arguments`
+    上（参数原样、对象不转字符串），没有再在 `DSHTool` 里留一份拷贝：工具已不随消息下发，多一份只会
+    成为永不赋值或与权威记录漂移的死字段。
+  - 当前 iOS 订阅的是 `view: conversation`，网关对 `request/context`、`request/header`、
+    `system/message`、`assistant/chunk` 整体返回 null，这几类在客户端**永远收不到**，所以没有为它们加
+    DTO 或 UI 分支，只在投影里按未知类型忽略。
+- 边界：不改网关、不改 Coe Host、不改协议；不删旧 summary 代码（留给 Q9）；不加测试 target、不加依赖、
+  不改 `Package.swift`/`project.yml`/pbxproj；C0212–C0216 的成果（状态行、正文身份、发送状态）未改动。
+- 验证：`xcodebuild build -project apps/Codync.xcodeproj -scheme 'iOS Dev' -configuration DevDebug`
+  （真机 destination、ui-preview 覆盖、构建号 209）编译通过，0 error；仅剩未改文件 `BotShortcuts.swift`
+  的既有弃用警告。`xcrun devicectl device install app` 装到 iPhone 16 Pro（`00008140-000A31311AE3001C`，
+  `com.suiyikou.codync.uipreview`，2.36.0 / 209）成功。按穗要求**只编译不自测**，七项真机场景留给穗操作。
+  构建与安装记录在 `/tmp/codync-audit/c0217-build-final.log`、`c0217-install.json`。
+- 关联：详细设计 `/tmp/codync-audit/streaming-step3.md`；wire 形状以网关源码与 DSH 源码核对（结论见
+  `/tmp/codync-audit/ws-mobile-protocol.md`）；备份 tag `backup/before-dsh-events-c0217`（`c1f0c529`，
+  含 C0212–C0216）。回滚可 revert 本次提交，只撤事件类型投影与 notice 适配，保留第二步的消息 store 和
+  C0212 状态行；无协议或数据 schema 迁移，原 JSON 事实可保留。

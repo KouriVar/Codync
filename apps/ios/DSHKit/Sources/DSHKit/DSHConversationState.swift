@@ -48,6 +48,14 @@ struct DSHConversationState: Sendable {
     private var aliases: [Int64: DisplayAnchor] = [:]
     private var projectedMessages: [Int64: DSHMessage] = [:]
     private var displaySequences: [Int64] = []
+    /// One record per tool call address. A result closes only the call it names, never the turn.
+    private(set) var toolRecords: [DSHToolKey: DSHToolRecord] = [:]
+    /// session+callId → every call that could be the one a result names. Used only to produce
+    /// candidates: pairing one of several is the ambiguity rule's job to refuse.
+    private var looseCalls: [DSHToolLooseKey: Set<DSHToolKey>] = [:]
+    /// Results that named a call this window never saw, or saw more than once. Kept as facts for
+    /// diagnosis; they close nothing and are never attributed to a turn by guessing.
+    private(set) var unmatchedResults: [Int64: DSHUnmatchedResult] = [:]
     private(set) var needsBaseline = false
     private var counter: Int64 = 0
     private var awaitingSnapshot = true
@@ -81,6 +89,7 @@ struct DSHConversationState: Sendable {
                 || events[event.seq].map { $0.contradicts(event) } == true
         }) {
             events = [:]; loadedRanges = []; projectedMessages = [:]
+            toolRecords = [:]; looseCalls = [:]; unmatchedResults = [:]
         }
         needsBaseline = false
         for event in input.events { merge(event) }
@@ -264,6 +273,7 @@ struct DSHConversationState: Sendable {
             if value == old { return }
         }
         bump(); value.revision = counter; events[value.seq] = value
+        relate(value)
         let hadProjection = projectedMessages[value.seq] != nil
         projectedMessages[value.seq] = project(value)
         if hadProjection != (projectedMessages[value.seq] != nil) { rebuildDisplayOrder() }
@@ -273,13 +283,192 @@ struct DSHConversationState: Sendable {
         }
     }
     private func project(_ event: DSHWireEvent) -> DSHMessage? {
-        guard event.isUser || event.type == "assistant/message" else { return nil }
+        switch event.type {
+        case "user/message":
+            return projectUser(event)
+        case "assistant/message":
+            let text = event.text
+            guard !text.isEmpty else { return nil }
+            // No tool rows are attached: the transcript draws none, and the running status line reads
+            // structured `tool/call` events instead of a per-turn array copied onto every message.
+            return DSHMessage(id: scope.identity([.seq(event.seq)]), role: .assistant, text: text,
+                              reasoning: event.reasoning, turn: event.turn,
+                              createdAt: event.time, seq: event.seq, step: event.step,
+                              revision: event.revision)
+        case "turn/end":
+            return projectTermination(event)
+        default:
+            return nil
+        }
+    }
+
+    /// A `user/message` is only the reader's own when the wire says so. Anything with another explicit
+    /// source is a neutral context line, and old data with no source keeps the old compatibility path.
+    private func projectUser(_ event: DSHWireEvent) -> DSHMessage? {
+        guard let origin = event.origin else { return nil }
         let text = event.text
-        guard !text.isEmpty, !(event.isUser && DSHSystemMessageFilter.isInjected(text)) else { return nil }
-        let id = scope.identity([.seq(event.seq)])
-        return DSHMessage(id: id, role: event.isUser ? .user : .assistant, text: text,
-                          reasoning: event.reasoning, tools: event.tools, turn: event.turn,
-                          createdAt: event.time, seq: event.seq, step: event.step, revision: event.revision)
+        guard !text.isEmpty else { return nil }
+        switch origin.kind {
+        case .user:
+            // Confirmed by the source: the old "Time sampled…" prefix rule no longer deletes it.
+            return DSHMessage(id: scope.identity([.seq(event.seq)]), role: .user, text: text,
+                              turn: event.turn, createdAt: event.time, seq: event.seq,
+                              step: event.step, revision: event.revision)
+        case .context:
+            let source = origin.sourceName
+            let notice = DSHNotice(style: .context, source: source,
+                                   title: source.map { "上下文 · \($0)" } ?? "上下文")
+            // The row's identity comes from the event's own address plus a fixed `context` suffix.
+            return DSHMessage(id: scope.identity([.seq(event.seq), .text("context")]),
+                              role: .notice, text: text, notice: notice, turn: event.turn,
+                              createdAt: event.time, seq: event.seq, step: event.step,
+                              revision: event.revision)
+        case .legacy:
+            // No source field at all: not claimed to be the reader's own input. The old prefix rule
+            // stays here only, so it can never delete a message the source confirmed as the user's.
+            guard !DSHSystemMessageFilter.isInjected(text) else { return nil }
+            return DSHMessage(id: scope.identity([.seq(event.seq)]), role: .user, text: text,
+                              turn: event.turn, createdAt: event.time, seq: event.seq,
+                              step: event.step, revision: event.revision)
+        }
+    }
+
+    /// How the turn ended, as one row at the end event's own position. A normal end adds nothing.
+    private func projectTermination(_ event: DSHWireEvent) -> DSHMessage? {
+        guard let termination = event.termination, let notice = Self.notice(for: termination) else { return nil }
+        return DSHMessage(id: scope.identity([.text("termination"), .seq(termination.endSeq)]),
+                          role: .notice, text: Self.text(for: termination), notice: notice,
+                          turn: termination.turn, createdAt: event.time, seq: event.seq,
+                          step: event.step, revision: event.revision)
+    }
+
+    /// Only these reasons may end a turn. A normal end gets no line; an unstated one is not guessed.
+    private static func notice(for termination: DSHTurnTermination) -> DSHNotice? {
+        switch termination.kind {
+        case .error: return DSHNotice(style: .error, title: "本轮运行出错")
+        case .cancelled: return DSHNotice(style: .info, title: "本轮已取消")
+        case .interrupted: return DSHNotice(style: .info, title: "本轮已中断")
+        case .normal: return nil
+        case .unknown: return DSHNotice(style: .info, title: "本轮已结束，原因未提供")
+        }
+    }
+
+    private static func text(for termination: DSHTurnTermination) -> String {
+        switch termination.kind {
+        case .error:
+            let heading = "本轮运行出错"
+            guard let detail = termination.errorInfo.flatMap({ detail -> String? in
+                let message = detail.message?.trimmingCharacters(in: .whitespacesAndNewlines)
+                if let message, !message.isEmpty { return message }
+                return detail.code
+            }), !detail.isEmpty else { return heading }
+            return "\(heading)：\(detail)"
+        case .cancelled: return "本轮已取消"
+        case .interrupted: return "本轮已中断"
+        case .normal: return ""
+        case .unknown: return "本轮已结束，原因未提供"
+        }
+    }
+
+    // MARK: Tool pairing
+
+    private mutating func relate(_ event: DSHWireEvent) {
+        switch event.type {
+        case "tool/call": registerCall(event)
+        case "tool/result": registerResult(event)
+        default: break
+        }
+    }
+
+    private mutating func registerCall(_ event: DSHWireEvent) {
+        guard let callId = event.callId else { return }
+        let key = DSHToolKey(gatewayId: scope.gatewayId, sessionId: scope.sessionId,
+                             turn: event.turn, step: event.step, callId: callId)
+        let loose = DSHToolLooseKey(gatewayId: scope.gatewayId, sessionId: scope.sessionId, callId: callId)
+        var record = toolRecords[key] ?? DSHToolRecord(key: key, name: event.toolName)
+        if let name = event.toolName, !name.isEmpty { record.name = name }
+        // The arguments are kept exactly as delivered; a richer copy never replaces a complete one
+        // with a partial one.
+        if let arguments = event.toolArguments {
+            record.arguments = arguments
+            record.argumentsText = event.toolArgumentsText
+        }
+        if record.callSeq == nil { record.callSeq = event.seq }
+        toolRecords[key] = record
+        looseCalls[loose, default: []].insert(key)
+        // A result may have arrived first (a history window read backwards): this only completes the
+        // relation, and the result keeps its single row.
+        resolveUnmatched(loose: loose)
+    }
+
+    private mutating func registerResult(_ event: DSHWireEvent) {
+        guard let callId = event.callId else { return }
+        let loose = DSHToolLooseKey(gatewayId: scope.gatewayId, sessionId: scope.sessionId, callId: callId)
+        // The exact address wins: turn and step agree, including "both unknown".
+        let exact = DSHToolKey(gatewayId: scope.gatewayId, sessionId: scope.sessionId,
+                               turn: event.turn, step: event.step, callId: callId)
+        if var record = toolRecords[exact] {
+            attach(event, to: &record)
+            toolRecords[exact] = record
+            unmatchedResults.removeValue(forKey: event.seq)
+            return
+        }
+        // Otherwise only a unique compatible candidate may be paired. Picking the nearest call when
+        // there are several would be a guess, so that case is recorded as ambiguous.
+        let candidates = compatibleCandidates(loose: loose, turn: event.turn, step: event.step)
+        if candidates.count == 1, let key = candidates.first, var record = toolRecords[key] {
+            attach(event, to: &record)
+            toolRecords[key] = record
+            unmatchedResults.removeValue(forKey: event.seq)
+            return
+        }
+        unmatchedResults[event.seq] = DSHUnmatchedResult(
+            seq: event.seq, looseKey: loose, turn: event.turn, step: event.step,
+            output: event.toolOutput, preview: event.toolPreview, isError: event.toolIsError,
+            error: event.toolError, outputTruncated: event.outputTruncated,
+            matchState: candidates.isEmpty ? .orphan : .ambiguous)
+    }
+
+    private func compatibleCandidates(loose: DSHToolLooseKey, turn: Int?, step: Int?) -> Set<DSHToolKey> {
+        (looseCalls[loose] ?? []).filter { key in
+            (turn == nil || key.turn == nil || key.turn == turn)
+                && (step == nil || key.step == nil || key.step == step)
+        }
+    }
+
+    private func attach(_ event: DSHWireEvent, to record: inout DSHToolRecord) {
+        // A replayed or duplicated result never becomes a second fact.
+        guard !record.resultSeqs.contains(event.seq) else { return }
+        record.resultSeqs.append(event.seq)
+        if let output = event.toolOutput { record.output = output }
+        if let preview = event.toolPreview { record.preview = preview }
+        if let isError = event.toolIsError { record.isError = isError }
+        if let error = event.toolError { record.error = error }
+        if event.outputTruncated { record.outputTruncated = true }
+        record.matchState = .exact
+    }
+
+    /// A call that arrived after its result completes the relation only: the result keeps its single
+    /// row and is never appended again, and other calls are unaffected.
+    private mutating func resolveUnmatched(loose: DSHToolLooseKey) {
+        for (seq, result) in unmatchedResults where result.looseKey == loose {
+            let candidates = compatibleCandidates(loose: loose, turn: result.turn, step: result.step)
+            guard candidates.count == 1, let key = candidates.first, var record = toolRecords[key] else {
+                if candidates.count > 1 { unmatchedResults[seq]?.matchState = .ambiguous }
+                continue
+            }
+            guard !record.resultSeqs.contains(seq) else {
+                unmatchedResults.removeValue(forKey: seq); continue
+            }
+            record.resultSeqs.append(seq)
+            if let output = result.output { record.output = output }
+            if let preview = result.preview { record.preview = preview }
+            if let isError = result.isError { record.isError = isError }
+            if let error = result.error { record.error = error }
+            if result.outputTruncated { record.outputTruncated = true }
+            toolRecords[key] = record
+            unmatchedResults.removeValue(forKey: seq)
+        }
     }
     private mutating func rebuildDisplayOrder() {
         displaySequences = projectedMessages.keys.sorted { a, b in

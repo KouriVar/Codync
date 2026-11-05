@@ -48,26 +48,80 @@ public struct DSHSession: Identifiable, Codable, Hashable, Sendable {
     }
 }
 
-/// A tool the assistant ran inside one message: what it called, and the result's short preview.
+/// How a tool result was paired with its call. Only `.exact` may be attributed to a turn: an
+/// `orphan` or `ambiguous` result is kept as a fact but closes nothing.
+public enum DSHToolMatchState: String, Sendable, Hashable {
+    case exact, orphan, ambiguous
+}
+
+/// A tool the assistant ran inside one message: what it called, the arguments exactly as the wire
+/// delivered them, and the result's metadata. The transcript draws no row for these — the running
+/// status line reads structured `tool/call` events instead — but the facts are kept faithfully so a
+/// truncated preview is never mistaken for a whole result.
+///
+/// The call's *typed* arguments (an object kept as an object, a JSON string kept as a string) live on
+/// `DSHToolRecord`, the state's authoritative store: tools are no longer attached to assistant
+/// messages, so there is no per-message copy that could drift from it.
 public struct DSHTool: Identifiable, Hashable, Sendable {
     public let id: String
     public let name: String
+    /// The arguments' display text. A JSON string argument keeps its original text.
     public let arguments: String
     public var output: String?
-    public var isError: Bool
+    /// The short preview the server sent next to a long output.
+    public var preview: String?
+    /// `nil` when the wire said nothing: an unstated failure is not the same as "exited 0".
+    public var isError: Bool?
+    /// The output was cut server-side; the preview is not the whole result.
+    public var outputTruncated: Bool
+    public var matchState: DSHToolMatchState
 
-    public init(id: String, name: String, arguments: String = "", output: String? = nil, isError: Bool = false) {
+    public init(id: String, name: String, arguments: String = "", output: String? = nil,
+                isError: Bool? = nil, preview: String? = nil, outputTruncated: Bool = false,
+                matchState: DSHToolMatchState = .exact) {
         self.id = id
         self.name = name
         self.arguments = arguments
         self.output = output
+        self.preview = preview
         self.isError = isError
+        self.outputTruncated = outputTruncated
+        self.matchState = matchState
+    }
+}
+
+/// A neutral line in the conversation that is neither the reader nor the model: injected context, or
+/// how a turn ended.
+public struct DSHNotice: Hashable, Sendable {
+    public enum Style: String, Sendable {
+        /// A neutral line in the secondary colour: a cancellation, an interruption, an unknown end.
+        case info
+        /// A failed turn, drawn in the danger colour.
+        case error
+        /// Injected context from another source: "上下文 · 来源名" over its own text.
+        case context
+    }
+    public let style: Style
+    /// The controlled source name for a context line ("schedule", …); nil for a turn notice.
+    public let source: String?
+    /// The heading line; nil when the notice is one sentence.
+    public let title: String?
+
+    public init(style: Style, source: String? = nil, title: String? = nil) {
+        self.style = style
+        self.source = source
+        self.title = title
     }
 }
 
 /// A conversation row shown in the DSH chat screen.
 public struct DSHMessage: Identifiable, Hashable, Sendable {
-    public enum Role: String, Sendable { case user, assistant }
+    public enum Role: String, Sendable {
+        case user, assistant
+        /// A neutral line. Never forced into `user` or `assistant`: an injected context must not look
+        /// like the reader's own message, and a turn's end is not something the model said.
+        case notice
+    }
     public let id: String
     public let role: Role
     public let seq: Int64
@@ -80,6 +134,8 @@ public struct DSHMessage: Identifiable, Hashable, Sendable {
     public var reasoning: String
     /// Tools called in this step, in order.
     public var tools: [DSHTool]
+    /// What a `.notice` row is: its style, and the controlled source name when it is a context line.
+    public var notice: DSHNotice?
     /// The turn this message belongs to.
     public var turn: Int?
     /// Time from the turn's start to this message.
@@ -88,7 +144,8 @@ public struct DSHMessage: Identifiable, Hashable, Sendable {
     public var createdAt: Int64
 
     public init(id: String, role: Role, text: String, streaming: Bool = false,
-                reasoning: String = "", tools: [DSHTool] = [], turn: Int? = nil, durationSeconds: Int? = nil,
+                reasoning: String = "", tools: [DSHTool] = [], notice: DSHNotice? = nil,
+                turn: Int? = nil, durationSeconds: Int? = nil,
                 createdAt: Int64 = 0, seq: Int64 = 0, step: Int? = nil,
                 displayRowId: String? = nil, revision: Int64 = 0) {
         self.id = id
@@ -101,6 +158,7 @@ public struct DSHMessage: Identifiable, Hashable, Sendable {
         self.streaming = streaming
         self.reasoning = reasoning
         self.tools = tools
+        self.notice = notice
         self.turn = turn
         self.durationSeconds = durationSeconds
         self.createdAt = createdAt
@@ -127,7 +185,7 @@ public struct DSHSummary: Identifiable, Hashable, Sendable {
 /// One row of a DSH conversation, already shaped for Codync's chat page: a user/assistant message,
 /// with an optional folded summary for the thinking + tools that came with it.
 public struct DSHTranscriptItem: Identifiable, Sendable {
-    public enum Kind: Sendable { case user, assistant }
+    public enum Kind: Sendable { case user, assistant, notice }
     public let id: String
     public let kind: Kind
     public var seq: Int64 = 0
@@ -136,14 +194,18 @@ public struct DSHTranscriptItem: Identifiable, Sendable {
     public var displayRowId: String = ""
     public let text: String
     public let summary: DSHSummary?
+    /// What a `.notice` row is: its style and, for a context line, its controlled source name.
+    public let notice: DSHNotice?
     /// When the message was written (ms since epoch), for the page's time separators.
     public let createdAt: Int64
 
-    public init(id: String, kind: Kind, text: String, summary: DSHSummary?, createdAt: Int64) {
+    public init(id: String, kind: Kind, text: String, summary: DSHSummary?, createdAt: Int64,
+                notice: DSHNotice? = nil) {
         self.id = id
         self.kind = kind
         self.text = text
         self.summary = summary
+        self.notice = notice
         self.createdAt = createdAt
     }
 }
@@ -161,10 +223,14 @@ public enum DSHConversationAdapter {
     }
 
     private static func transcriptItem(from message: DSHMessage) -> DSHTranscriptItem {
-            if message.role == .user {
-                return DSHTranscriptItem(id: message.id, kind: .user, text: message.text,
-                                         summary: nil, createdAt: message.createdAt)
-            }
+        switch message.role {
+        case .notice:
+            return DSHTranscriptItem(id: message.id, kind: .notice, text: message.text,
+                                     summary: nil, createdAt: message.createdAt, notice: message.notice)
+        case .user:
+            return DSHTranscriptItem(id: message.id, kind: .user, text: message.text,
+                                     summary: nil, createdAt: message.createdAt)
+        case .assistant:
             let hasDetail = !message.reasoning.isEmpty || !message.tools.isEmpty
             let summary = hasDetail
                 ? DSHSummary(id: message.id, title: title(for: message),
@@ -172,6 +238,7 @@ public enum DSHConversationAdapter {
                 : nil
             return DSHTranscriptItem(id: message.id, kind: .assistant, text: message.text,
                                      summary: summary, createdAt: message.createdAt)
+        }
     }
 
     /// "思考了 12 秒 · 运行了 3 个命令".

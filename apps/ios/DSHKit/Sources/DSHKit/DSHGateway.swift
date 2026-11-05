@@ -371,8 +371,9 @@ public final class DSHGateway: ObservableObject {
     private func handleEvent(_ frame: DSHFrame) {
         guard conversation?.owns(frame) == true, let event = DSHWireEvent.live(frame) else { return }
         guard conversation?.event(event) == true else { resubscribe(); return }
-        // Both projections pass the very same session/subscription/stream gate.
-        if let payload = frame.dict("event") { applyActivityEvent(frame, payload: payload, type: event.type) }
+        // Both projections pass the very same session/subscription/stream gate, and the status line
+        // reads the same parsed event as the transcript: one callId, one tool name, one argument.
+        applyActivityEvent(frame, event: event)
         if event.isUser, !event.text.isEmpty, let sid = openSessionId { rememberFirstMessage(event.text, for: sid) }
         if event.type == "assistant/message" { send(["type": "sessions"]) }
         publishConversation()
@@ -452,10 +453,14 @@ public final class DSHGateway: ObservableObject {
         syncActivity()
     }
 
-    /// One persistent event: the status line's state, folded before the body's own handling.
-    private func applyActivityEvent(_ frame: DSHFrame, payload: [String: Any], type: String) {
-        let event = Self.activityEvent(type: type, from: payload, seq: frame.int("seq"))
-        if activity.apply(event, in: activityEnvelope(frame)) { syncActivity() }
+    /// One persistent event: the status line's state, folded before the body's own handling. It is fed
+    /// the structured event only — never a notice the transcript generated — so the tool whitelist and
+    /// the running state can't be driven by an invented message.
+    private func applyActivityEvent(_ frame: DSHFrame, event: DSHWireEvent) {
+        let input = DSHActivityEvent(type: event.type, turn: event.turn, step: event.step,
+                                     callId: event.callId, toolName: event.toolName,
+                                     toolArgument: event.toolArgument, seq: Int(event.seq))
+        if activity.apply(input, in: activityEnvelope(frame)) { syncActivity() }
     }
 
     /// One temporary attempt frame. Its `revision`/`index` clock is checked here and never mixed
@@ -526,20 +531,18 @@ public final class DSHGateway: ObservableObject {
     }
 
     /// One event, reduced to what the activity needs. A history `tool/result` carries its id in
-    /// `message.toolCallId` (or `source.callId`), a live one in `callId`.
+    /// `message.toolCallId` (or `source.callId`), a live one in `callId`. Both this path and the live
+    /// path read `DSHWireEvent`, so a call is named the same way in both.
     static func activityEvent(type: String, from payload: [String: Any], seq: Int?) -> DSHActivityEvent {
-        let message = payload["message"] as? [String: Any]
-        let source = payload["source"] as? [String: Any]
-        let toolName = payload["name"] as? String
+        let value = DSHJSON(payload)
+        let name = DSHWireEvent.toolName(in: value)
         return DSHActivityEvent(
             type: type,
-            turn: (payload["turn"] as? NSNumber)?.intValue,
-            step: (payload["step"] as? NSNumber)?.intValue,
-            callId: payload["callId"] as? String
-                ?? message?["toolCallId"] as? String
-                ?? source?["callId"] as? String,
-            toolName: toolName,
-            toolArgument: toolArgument(payload["arguments"], toolName: toolName),
+            turn: value["turn"].integer.map(Int.init),
+            step: value["step"].integer.map(Int.init),
+            callId: DSHWireEvent.callId(in: value, history: true),
+            toolName: name,
+            toolArgument: DSHWireEvent.toolArgument(DSHWireEvent.toolArguments(in: value), toolName: name),
             seq: seq)
     }
 
@@ -547,32 +550,7 @@ public final class DSHGateway: ObservableObject {
     /// JSON and not guaranteed to be a string, so it is read as an object (a JSON string is parsed
     /// too). Which key matters depends on the tool's own kind; nothing else is read from it.
     static func toolArgument(_ raw: Any?, toolName: String?) -> String? {
-        let object: [String: Any]
-        switch raw {
-        case let dict as [String: Any]:
-            object = dict
-        case let text as String:
-            guard let data = text.data(using: .utf8),
-                  let parsed = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
-            else { return nil }
-            object = parsed
-        default:
-            return nil
-        }
-        switch DSHActivityKind.forTool(named: toolName ?? "") {
-        case .reading, .editing:
-            for key in ["path", "file_path", "filePath", "filename", "file", "target_file", "targetFile"] {
-                if let path = object[key] as? String, !path.isEmpty { return path }
-            }
-            return nil
-        case .executing:
-            for key in ["command", "cmd", "script"] {
-                if let command = object[key] as? String, !command.isEmpty { return command }
-            }
-            return nil
-        default:
-            return nil
-        }
+        DSHWireEvent.toolArgument(DSHJSON(raw ?? NSNull()), toolName: toolName)
     }
 
     /// The compact records a baseline's attempt stream is made of (`text-chunks`,

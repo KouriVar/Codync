@@ -151,10 +151,17 @@ public struct ChatTranscriptView: View {
 
     private var accessoryRevision: Int { items.count &+ sendingRevision }
 
-    /// What counts as "this row changed": the entry's own revision plus the text it now holds, so a
-    /// growing streaming reply re-renders alone while the rest of the transcript stays put.
+    /// What counts as "this row changed": the entry's own revision plus everything the row draws —
+    /// its text, and for a notice its heading/source and style — so a growing streaming reply, or a
+    /// notice whose source or style changed, re-renders alone while the rest of the transcript stays
+    /// put. This is an in-memory row version, never persisted, so `Hasher` is fine here.
     private static func revision(of entry: Entry) -> Int {
-        (entry.data.text ?? "").hashValue &* 31 &+ Int(truncatingIfNeeded: entry.rev)
+        var hasher = Hasher()
+        hasher.combine(entry.data.text ?? "")
+        hasher.combine(entry.data.title ?? "")
+        hasher.combine(entry.data.style ?? "")
+        hasher.combine(entry.rev)
+        return hasher.finalize()
     }
 
     private var typing: some View {
