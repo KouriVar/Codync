@@ -3887,3 +3887,24 @@
 - 边界：不改输入框结构/宽度/箭头/状态行/串流。
 - 验证：`xcodebuild build ... -configuration DevDebug`（`generic/platform=iOS`）**BUILD SUCCEEDED，0 error**，构建号 **241**；
   已装 iPhone 16 Pro（2.36.0 / 241）。不跑测试、不截图。
+
+### C0224 · 2026-11-05 · 收尾：DSH 会话级功能（C0223）与修复汇总
+
+- 原因：按用户要求把本轮 DSH（chat 页）会话级功能与修复做一次收尾记录并本地提交（不推送）。
+- 变化：本轮在 `ui/voice-morph` 上完成、并已分别本地提交的改动汇总（详见各自记录）：
+  - 功能：C0223a 加号发图；C0223b 命令/技能；C0223a2 文件分块上传；C0223c 模型 sheet；
+    C0223d1 更多·用量/统计/重命名/分叉/归档；C0223d2 更多·工作区文件/定时任务/团队；C0223d2b 定时任务编辑；
+    C0223e1 目标面板+任务清单；C0223e2 排队消息；C0223f 审批/提问卡；C0223e3 压缩/重试提示；
+    C0223g 交付文件提示；C0223g2 交付文件可点卡片；C0223d3 轮次导航（只读）。
+  - 修复：C0223fix1 命令请求串行化+上下文/统计汉化；C0223fix2 附件↔气泡间距 12；
+    C0223fix3/fix4 加号 sheet 关闭与照片/拍照/文件 picker；C0223fix5 命令/技能图标+中文名+说明。
+  - 本提交本身**只更新本文件**（无代码 diff）；代码改动均已在上述提交中。
+- 文件：`CHANGELOG.md`（本记录）；功能代码见
+  `apps/ios/DSHKit/Sources/DSHKit/{DSHModels,DSHGateway,DSHConversationState}.swift`、
+  `apps/ios/Views/DSHConversationView.swift`、
+  `apps/ios/Kit/Sources/CodyncUI/Thread/{ChatTranscript,ChatRows,Attachments}.swift`。
+- 验证：`xcodebuild build -configuration DevDebug -destination generic/platform=iOS` **BUILD SUCCEEDED，0 error**；
+  已装 iPhone 16 Pro（2.36.0 / 242）。未跑测试、未截图（按要求）。
+- 限制/待办：未确认/未做——工具结果图（网关无数据）、步骤/轨迹（网关无专用请求）、轮次导航精确跳转（无 scroll API）、
+  团队进子会话、正文本地路径预览、重试放状态行（受“不改状态行”约束）；命令中文名为客户端映射，未知命令回落原名。
+- 关联：C0223 系列（C0223a/a2/b/c/d1/d2/d2b/e1/e2/e3/f/g/g2/d3/fix1–fix5）。
