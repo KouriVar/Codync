@@ -14,6 +14,7 @@ struct AppearanceSettings: View {
                 RemixIcon("palette-line", size: 18).frame(width: 22).foregroundStyle(.primary)
                 Text(L10n.tr("Theme"))
             }
+            AgentLogosToggle()
         }
         .pickerStyle(.navigationLink)
     }

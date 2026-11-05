@@ -900,3 +900,25 @@ iOS 定制分支：`ui/ios-customization`；当前 Mac 工作分支：`ui/macos-
   本地开发签名仍未公证，官方应用更新继续禁用。上一版与数据备份在 `Codync Backups/20261103-215810-C0090/`，安装包为被忽略的 `build/releases/Codync-2.34.2-local-C0090.dmg`。
   没有提交、推送、合并或公开发布。
 - 关联：C0075、C0088、C0089。
+
+## 2026-11-05
+
+### C0091 · 2026-11-05 · 合并上游 upstream/main e34b319a（保留我方 Mac/iOS 定制）
+
+- 原因：上游 `upstream/main` 更新到 `e34b319a`（自共同祖先 `5e6b1c93` 起 81 个提交）。在保留我方全部定制的前提下同步；冲突文件保留我方，非冲突的上游改动照常合入。
+- 变化：
+  - 从 `ui/macos-customization` 新建 `sync/upstream-20261105-macos-customization`，`git merge upstream/main e34b319a`（merge 提交，未 push）。
+  - 20 个冲突：17 个取我方版本（`AGENTS.md`、`README.md`、iOS `BotRow`/`CallRows`/`CustomConnectorSheet`/`InstallConnectorSheet`/`InstalledView`/`MarketplaceView`/`AccountStore`/`ChatRows`/`Composer`/`RoutineNoticeRow`/`ThreadView`/`TraceView`/`AccessRequestView`/`BotListView`/`RootView`）。
+  - 语言 `zh-Hans.json`/`zh-Hant.json` 按 key 并集（我方值优先），并入上游 299 个新 key；双方都改过的 key 1 个：`Delete {name}?` 保留我方「删除「{name}」？/刪除「{name}」？」。
+  - `apps/Codync.xcodeproj/project.pbxproj` 由 `xcodegen generate` 按并集重新生成：保留我方工程身份（本分支仍为 Clerk/`DEVELOPMENT_TEAM=7FUM8A8H72`，因其基线早于 Google 登录改动，属我方既有状态）；并入上游 `ChooseComputerView.swift` 等新文件引用；`MARKETING_VERSION=2.39.1`。
+  - 接口适配（只改我方调用处，不改上游文件）：`ConnectorSignInFlow` 改无参并补 `.signInCodeDialog`（`CustomConnectorSheet`/`InstallConnectorSheet`/`InstalledView`）；`reviewInvitation(blocked:)` 改 `.reviewInvitation()`（`BotListView`）。
+  - 上游移除了「评审打断/评审阅读」机制（删除 `ReviewCompletion.swift`/`ReviewInterruption.swift`/`ReviewReading.swift`，并从 `ReviewInvitation` 移除 `setInterrupted`/`viewed`/`returned`/`cancel` 等）。这些是上游基线代码、非我方定制，故采用上游删除；移除我方调用处：`Composer.swift`、`ThreadView.swift`、`RootView.swift`。
+  - 锁文件：`host/Cargo.lock` 为 2.39.1；`apps/desktop/package-lock.json` 含 `@playwright/test`；`npm ci` 通过。
+- 文件：`apps/project.yml`、`apps/Codync.xcodeproj/project.pbxproj`、`apps/ios/Kit/Sources/CodyncUI/Marketplace/*`、`apps/ios/Kit/Sources/CodyncUI/Thread/{Composer,ThreadView}.swift`、`apps/ios/Views/{BotListView,RootView}.swift`、`apps/ios/Kit/Sources/CodyncKit/Resources/Languages/zh-Hans.json`、`zh-Hant.json`、`CHANGELOG.md`。
+- 验证：iOS `iOS Dev`/`DevDebug`（模拟器）编译通过；桌面 `npm run typecheck`、`npm run build` 通过；`Screen Dev`（macOS，`CODE_SIGNING_ALLOWED=NO`）编译通过。未安装真机、未做功能自测。
+- 限制/待办：
+  - 冲突文件里放弃的上游功能（同 C0122）：每 bot 的 agent logo、通话条/通话会话改进、connector 验证码登录入口（共享类型已合入）、手机设置选账户电脑、消息排队入口、GitHub 点星/App Store 评分邀请、routine/trace 的 i18n 等。
+  - 上游新增文件里因入口被放弃而未接线的代码（仅列出，未删未接）：`apps/ios/Kit/Sources/CodyncKit/Models/Entry+Queue.swift`、`apps/ios/Kit/Sources/CodyncUI/Thread/QueuedMessages.swift`、`apps/ios/Kit/Sources/CodyncUI/Bots/AgentBadge.swift`、`apps/ios/Views/ChooseComputerView.swift`（本分支无桌面 Electron 改动，故不含桌面三项）。
+  - 本分支我方基线仍为 Clerk 登录（早于 Google ID token 改动），本次按「保留我方」未改动；如需同步 Google 登录需另行移植。
+  - 未做真机/功能验证；未 push。
+- 关联：C0122（同批上游同步）。

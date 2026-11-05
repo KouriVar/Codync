@@ -4,8 +4,7 @@ import SwiftUI
 
 struct InstalledView: View {
     @Environment(BotStore.self) private var model
-    @Environment(\.webAuthenticationSession) private var webAuthenticationSession
-    @Environment(\.openURL) private var openURL
+    private let signInFlow = ConnectorSignInFlow()
     @State private var removing: Removal?
     @State private var signingIn: String?
     @State private var viewingSkill: SkillRef?
@@ -22,6 +21,7 @@ struct InstalledView: View {
         .navigationBarTitleDisplayMode(.inline)
         .background(Palette.background)
         .codyncSheet(item: $viewingSkill) { SkillSheet(skill: $0) }
+        .signInCodeDialog(signInFlow.codePrompt)
     }
 
     private var list: some View {
@@ -86,7 +86,7 @@ struct InstalledView: View {
         signingIn = id
         Task {
             do {
-                try await ConnectorSignInFlow(model: model, webAuthenticationSession: webAuthenticationSession, openURL: openURL).signIn(id)
+                try await signInFlow.signIn(id)
             } catch {
                 model.lastError = error.localizedDescription
             }
