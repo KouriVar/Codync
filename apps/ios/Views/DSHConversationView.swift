@@ -423,7 +423,8 @@ struct DSHComposer: View {
                 onPhotos: { pendingAttach = .photos },
                 onCamera: { pendingAttach = .camera },
                 onFiles: { pendingAttach = .files },
-                onCommand: runCommand
+                onCommand: runCommand,
+                onClose: { showAddSheet = false }
             )
             .presentationDetents([.medium, .large])
         }
@@ -862,7 +863,8 @@ private struct DSHAddSheet: View {
     let onCamera: () -> Void
     let onFiles: () -> Void
     let onCommand: (DSHCommand) -> Void
-    @Environment(\.dismissModal) private var dismiss
+    /// Closes the add sheet by clearing the parent's `showAddSheet` (dismissModal is a no-op here).
+    let onClose: () -> Void
 
     var body: some View {
         NavigationStack {
@@ -885,7 +887,7 @@ private struct DSHAddSheet: View {
                             Text(group.title == "skills" ? "技能" : "命令")
                                 .font(.footnote.weight(.semibold)).foregroundStyle(Palette.secondary)
                             ForEach(group.commands) { command in
-                                Button { onCommand(command); dismiss() } label: {
+                                Button { onCommand(command); onClose() } label: {
                                     HStack(spacing: 8) {
                                         VStack(alignment: .leading, spacing: 1) {
                                             Text("/" + command.name).font(.subheadline).foregroundStyle(Palette.text)
@@ -915,14 +917,14 @@ private struct DSHAddSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("关闭") { dismiss() }
+                    Button("关闭") { onClose() }
                 }
             }
         }
     }
 
     private func tile(_ title: String, icon: String, enabled: Bool, action: @escaping () -> Void) -> some View {
-        Button { action(); dismiss() } label: {
+        Button { action(); onClose() } label: {
             VStack(spacing: 8) {
                 RemixIcon(icon, size: 28).foregroundStyle(enabled ? Palette.text : Palette.tertiary)
                 Text(title).font(.footnote).foregroundStyle(enabled ? Palette.text : Palette.tertiary)
@@ -979,7 +981,7 @@ private struct DSHCommandOptionsSheet: View {
 /// session has started) and the permission level. Every write is a gateway request; "设为默认" asks first.
 private struct DSHModelSheet: View {
     @ObservedObject var gateway: DSHGateway
-    @Environment(\.dismissModal) private var dismiss
+    @Environment(\.dismiss) private var dismiss
     @State private var confirmDefault = false
 
     private var currentModelInfo: DSHModel? {
@@ -1150,7 +1152,7 @@ private struct DSHModelSheet: View {
 /// Context usage: `context-usage` rendered in Chinese, main metrics first, plus a 立即压缩 button.
 private struct DSHContextUsageSheet: View {
     @ObservedObject var gateway: DSHGateway
-    @Environment(\.dismissModal) private var dismiss
+    @Environment(\.dismiss) private var dismiss
     @State private var tokenRows: [(String, String)] = []
     @State private var pressureRows: [(String, String)] = []
     @State private var loaded = false
@@ -1195,7 +1197,7 @@ private struct DSHContextUsageSheet: View {
 /// Token usage and execution stats from `session-stats`, in Chinese with main metrics first.
 private struct DSHStatsSheet: View {
     @ObservedObject var gateway: DSHGateway
-    @Environment(\.dismissModal) private var dismiss
+    @Environment(\.dismiss) private var dismiss
     @State private var statRows: [(String, String)] = []
     @State private var tokenRows: [(String, String)] = []
     @State private var pressureRows: [(String, String)] = []
@@ -1324,7 +1326,7 @@ private enum DSHMetrics {
 /// Browse the session's workspace (`file-list`) and preview a file (`file-download-open/read`).
 private struct DSHFilesSheet: View {
     @ObservedObject var gateway: DSHGateway
-    @Environment(\.dismissModal) private var dismiss
+    @Environment(\.dismiss) private var dismiss
     @State private var stack: [String] = ["."]
     @State private var entries: [DSHFileEntry] = []
     @State private var loading = false
@@ -1386,7 +1388,7 @@ private struct DSHFilePreview: Identifiable {
 
 private struct DSHFilePreviewSheet: View {
     let preview: DSHFilePreview
-    @Environment(\.dismissModal) private var dismiss
+    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         NavigationStack {
@@ -1411,7 +1413,7 @@ private struct DSHFilePreviewSheet: View {
 /// This session's scheduled tasks (`schedule-list`), with delete + confirm.
 private struct DSHScheduleSheet: View {
     @ObservedObject var gateway: DSHGateway
-    @Environment(\.dismissModal) private var dismiss
+    @Environment(\.dismiss) private var dismiss
     @State private var items: [DSHSchedule] = []
     @State private var deleteTarget: DSHSchedule?
     @State private var editTarget: DSHSchedule?
@@ -1484,7 +1486,7 @@ private struct DSHScheduleSheet: View {
 /// The team's members (`agent-team`), read-only.
 private struct DSHTeamSheet: View {
     @ObservedObject var gateway: DSHGateway
-    @Environment(\.dismissModal) private var dismiss
+    @Environment(\.dismiss) private var dismiss
     @State private var members: [DSHTeamMember] = []
 
     var body: some View {
@@ -1645,7 +1647,7 @@ private struct DSHQuestionCard: View {
 /// each turn's prompt/response excerpt for scanning.
 private struct DSHTurnOutlineSheet: View {
     @ObservedObject var gateway: DSHGateway
-    @Environment(\.dismissModal) private var dismiss
+    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         NavigationStack {

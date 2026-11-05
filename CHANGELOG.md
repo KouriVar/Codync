@@ -3857,3 +3857,17 @@
 - 边界：不改输入框结构/宽度/箭头/状态行/串流。
 - 验证：`xcodebuild build ... -configuration DevDebug`（`generic/platform=iOS`）**BUILD SUCCEEDED，0 error**，构建号 **238**；已装 iPhone 16 Pro（2.36.0 / 238）。不跑测试、不截图。
 - 说明：体验上是“加号收起→选择器弹出”，不是两个 sheet 叠一起（相机根弹无法叠加）；若你更想要“选择器直接盖在加号上”，照片/文件可改成 sheet 内再弹，相机仍需先关。
+
+### C0223fix4 · 2026-11-05 · 修加号 sheet 不会自动关闭（dismissModal 对标准 .sheet 是空操作）
+
+- 复测：上一版点「照片/拍照/文件」仍不自动收，必须手动关，关了才弹 picker。说明 sheet 根本没被程序关闭，`onDismiss` 直到手动关才触发。
+- 根因：`dismissModal` 的默认值是 `DismissModalAction {}`（空实现），只有 `codyncSheet/codyncOverlay` 才会注入真实关闭动作；
+  而 DSH 这些面板用的是**标准 `.sheet`**，所以里面所有 `dismiss()`/「关闭」都是空操作（此前靠下滑手势关）。
+- 修法：
+  - `DSHAddSheet` 改为传入 `onClose`（父视图置 `showAddSheet=false`）关闭；三个媒体 tile 与命令行、关闭按钮都走 `onClose`。
+  - 本文件其余 DSH sheet（模型/上下文/统计/文件/定时/团队/轮次/命令选项等）的 `@Environment(\.dismissModal)` 统一换成
+    标准 `@Environment(\.dismiss)`，关闭/取消按钮从此真正生效。
+- 效果：点「照片/拍照/文件」→ 加号自动收起 → `onDismiss` 里弹对应 picker（相机根弹也走这套）。
+- 边界：不改输入框结构/宽度/箭头/状态行/串流。
+- 验证：`xcodebuild build ... -configuration DevDebug`（`generic/platform=iOS`）**BUILD SUCCEEDED，0 error**，构建号 **240**；
+  已装 iPhone 16 Pro（2.36.0 / 240）。不跑测试、不截图。
