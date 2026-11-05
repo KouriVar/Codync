@@ -52,7 +52,8 @@ public struct ThreadView: View {
                         .transition(.opacity)
                 } else {
                     Composer(botId: botId, replyingTo: $replyingTo,
-                             onInterrupt: callSpeaking ? interruptCall : nil)
+                             onInterrupt: callSpeaking ? interruptCall : nil,
+                             status: statusLine)
                 }
             }
             .animation(Motion.reduced(Motion.layout, reduceMotion), value: model.mismatch)
@@ -347,18 +348,21 @@ extension ThreadView {
                 row(item)
             }
         }
-        // The running-turn line ("working") is handed to the list as its status row, so the list can
-        // keep the exact gap to the input's top with its measured bottom inset. Offline, it is only
-        // what the computer last said; don't show it as live.
-        let status = (working ? bot : nil).map { bot in
-            AnyView(ConversationStatusLine(bot: bot, title: workingTitle))
-        }
+        // The running-turn line is handed to the composer bar, which draws it just above the input's
+        // glass (and reserves its height) so it is never covered and its gap stays exact. Offline it is
+        // only what the computer last said; don't show it as live.
         // Pull to refresh reconnects, like Reconnect in the computer menu, until the link is back.
         return ChatTranscriptList(rows: rows, following: $following, nearTop: { showEarlier() },
                                   refresh: {
             model.restartStream()
             _ = try? await model.ready()
-        }, status: status)
+        })
+    }
+
+    /// The bar's status line, when a turn is working and the bot is known.
+    private var statusLine: AnyView? {
+        guard working, let bot else { return nil }
+        return AnyView(ConversationStatusLine(bot: bot, title: workingTitle))
     }
 
     private var moreOnComputer: Bool {

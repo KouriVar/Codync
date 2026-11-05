@@ -54,13 +54,11 @@ struct ChatTranscriptList: View {
     @Binding var following: Bool
     var nearTop: (() -> Void)?
     var refresh: (() async -> Void)?
-    /// The running-turn status line, placed by the list so it can use the measured bottom inset.
-    var status: AnyView?
 
     var body: some View {
         // The collection view asks iOS 26 for its own soft top edge effect (`ConversationList`), so
         // nothing is drawn on top of it.
-        ConversationList(rows: rows, following: $following, nearTop: nearTop, refresh: refresh, status: status)
+        ConversationList(rows: rows, following: $following, nearTop: nearTop, refresh: refresh)
     }
 }
 
@@ -105,19 +103,7 @@ public struct ChatTranscriptView: View {
     }
 
     public var body: some View {
-        ChatTranscriptList(rows: rows, following: $following, nearTop: nearTop, refresh: refresh,
-                           status: status)
-    }
-
-    /// The running-turn line, handed to the list so it can keep the exact gap to the input's top.
-    private var status: AnyView? {
-        guard working else { return nil }
-        return AnyView(
-            ConversationStatusLine(title: workingTitle) {
-                // A DSH gateway has no bot: the source's own face, dot and all.
-                SourceAvatar(.dsh, size: 24)
-            }
-        )
+        ChatTranscriptList(rows: rows, following: $following, nearTop: nearTop, refresh: refresh)
     }
 
     private var rows: [ConversationRow] {

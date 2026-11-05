@@ -47,29 +47,45 @@ public struct ConversationBottomBar: View {
     let leading: AnyView
     let field: AnyView
     let trailing: AnyView
+    /// The running-turn status line. It sits just above the input's glass, inside the bar so the
+    /// transcript reserves its height (it can never be covered) and its gap stays exact.
+    let status: AnyView?
 
     @State private var keyboardUp = false
 
     public init(mode: ConversationComposer.Mode = .capsule, accessory: AnyView? = nil,
-                leading: AnyView, field: AnyView, trailing: AnyView) {
+                leading: AnyView, field: AnyView, trailing: AnyView, status: AnyView? = nil) {
         self.mode = mode
         self.accessory = accessory
         self.leading = leading
         self.field = field
         self.trailing = trailing
+        self.status = status
     }
 
     public var body: some View {
-        ConversationComposer(
-            accessory: accessory,
-            leading: leading,
-            field: field,
-            trailing: trailing,
-            mode: mode,
-            topPadding: ConversationBottomMetrics.composerTopPadding,
-            bottomPadding: keyboardUp ? ConversationBottomMetrics.keyboardBottomPadding
-                                      : ConversationBottomMetrics.restingBottomPadding
-        )
+        VStack(spacing: 0) {
+            if let status {
+                status
+                    // The bar's own sides, then the status line's 8 gives 24 from the screen edge.
+                    .padding(.horizontal, ConversationBottomMetrics.sideMargin)
+                    // Gap to the glass: this padding plus the composer's own top padding = 24.
+                    .padding(.bottom, ConversationBottomMetrics.statusInputGap
+                             - ConversationBottomMetrics.composerTopPadding)
+                    .transition(.opacity)
+            }
+            ConversationComposer(
+                accessory: accessory,
+                leading: leading,
+                field: field,
+                trailing: trailing,
+                mode: mode,
+                topPadding: ConversationBottomMetrics.composerTopPadding,
+                bottomPadding: keyboardUp ? ConversationBottomMetrics.keyboardBottomPadding
+                                          : ConversationBottomMetrics.restingBottomPadding
+            )
+        }
+        .animation(Motion.layout, value: status != nil)
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
             keyboardUp = true
         }

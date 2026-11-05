@@ -34,10 +34,6 @@ struct ConversationList: View {
     var nearTop: (() -> Void)?
     /// Letting go of a full pull past the top: the force refresh, its indicator held until it returns.
     var refresh: (() async -> Void)?
-    /// The running-turn status line, drawn as the last row. It is placed here rather than by the page
-    /// so its gap to the input's top can use the list's measured bottom inset (the composer escapes the
-    /// bottom safe area, so a fixed padding would sit too high).
-    var status: AnyView?
     @State private var pull = PullToRefresh()
     /// The safe area (under the bars, above the composer and the keyboard) and the whole screen.
     @State private var safeFrame = CGRect.zero
@@ -51,7 +47,7 @@ struct ConversationList: View {
             .ignoresSafeArea()
             // The list itself stays inside the safe area (so its rows never see one) and
             // reaches out past it.
-            ConversationCollection(rows: rows + statusRows, following: $following, nearTop: nearTop, refresh: refresh, pull: pull,
+            ConversationCollection(rows: rows, following: $following, nearTop: nearTop, refresh: refresh, pull: pull,
                                    outsets: UIEdgeInsets(top: max(0, safeFrame.minY - fullFrame.minY), left: 0,
                                                          bottom: max(0, fullFrame.maxY - safeFrame.maxY), right: 0))
                 .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { safeFrame = $0 }
@@ -78,25 +74,6 @@ struct ConversationList: View {
             - inset
     }
 
-    /// The running-turn status line as the list's last row. Its bottom gap to the input's top is fixed
-    /// the same way as the arrow, from the measured inset, so it stays `statusInputGap` (24) whatever
-    /// the device's bottom inset.
-    private var statusRows: [ConversationRow] {
-        guard let status else { return [] }
-        let inset = max(0, fullFrame.maxY - safeFrame.maxY)
-        let bottom = inset > 0
-            ? ConversationBottomMetrics.statusInputGap
-                + ConversationBottomMetrics.restingBottomPadding
-                + ConversationBottomMetrics.inputHeight
-                - inset
-            : ConversationBottomMetrics.statusBottomPadding
-        return [ConversationRow("status") {
-            status
-                .padding(.top, ConversationBottomMetrics.statusTopPadding)
-                .padding(.bottom, bottom)
-                .transition(.opacity)
-        }]
-    }
 }
 
 private struct ConversationCollection: UIViewRepresentable {

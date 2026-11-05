@@ -28,7 +28,7 @@ struct DSHConversationView: View {
         // comes up with the keyboard. It has no backing of its own — only the field's glass — so the
         // messages stay visible behind it, exactly as on Coe's page.
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            DSHComposer(gateway: gateway, draft: $draft)
+            DSHComposer(gateway: gateway, draft: $draft, status: statusLine)
         }
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
@@ -160,6 +160,16 @@ struct DSHConversationView: View {
         WorkingPhrase.line(name: "DeepSeek", phrase: phrase(for: activity))
     }
 
+    /// The running-turn line, drawn by the shared bottom bar just above the input.
+    private var statusLine: AnyView? {
+        guard gateway.isRunning else { return nil }
+        return AnyView(
+            ConversationStatusLine(title: Self.workingTitle(for: gateway.currentActivity)) {
+                SourceAvatar(.dsh, size: 24)
+            }
+        )
+    }
+
     /// The line's description, built from what the reducer already has: the thinking's first
     /// sentence, the tool and its file or command, or the fixed fallback.
     private static func phrase(for activity: DSHActivityDetail?) -> String {
@@ -209,6 +219,8 @@ struct DSHConversationView: View {
 struct DSHComposer: View {
     @ObservedObject var gateway: DSHGateway
     @Binding var draft: String
+    /// The running-turn status line, drawn by the shared bar above the input.
+    var status: AnyView?
 
     @FocusState private var focused: Bool
     @State private var showAddSheet = false
@@ -231,7 +243,8 @@ struct DSHComposer: View {
             mode: focused ? .expanded : .capsule,
             leading: AnyView(addButton),
             field: AnyView(field),
-            trailing: AnyView(trailing)
+            trailing: AnyView(trailing),
+            status: status
         )
         .sheet(isPresented: $showAddSheet) {
             PlaceholderSheet(title: "添加")

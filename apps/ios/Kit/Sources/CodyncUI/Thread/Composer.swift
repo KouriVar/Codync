@@ -14,6 +14,8 @@ struct Composer: View {
     var onInterrupt: (() -> Void)?
     /// An artifact's viewer: every message is about the artifact (a reply to its card), from a draft of its own.
     var artifact: Artifact?
+    /// The running-turn status line, drawn just above the input by the shared bottom bar.
+    var status: AnyView?
     @Environment(BotStore.self) private var model
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// The field owns its text; the store only keeps a copy. A field bound straight to the
@@ -122,7 +124,8 @@ struct Composer: View {
             accessory: accessoryBar,
             leading: canAttach ? AnyView(addButton) : AnyView(EmptyView()),
             field: AnyView(box),
-            trailing: AnyView(trailingButton)
+            trailing: AnyView(trailingButton),
+            status: status
         )
         // Lines, not the text: an animated transaction on every keystroke breaks IME composition.
         .animation(Motion.layout, value: draft.count(where: \.isNewline))

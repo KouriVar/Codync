@@ -3497,3 +3497,24 @@
 - 验证：`xcodebuild build ... -configuration DevDebug`（`generic/platform=iOS`）**BUILD SUCCEEDED，0 error**，
   构建号 **219**；已装到 iPhone 16 Pro（2.36.0 / 219）。不跑测试、不截图。
 - 关联：C0222c（`97bcfe26`）、C0222b（`d930dd6d`）。
+
+### C0222e · 2026-11-05 · 状态行改为放在底部栏、输入框正上方（修正 C0222d）
+
+- 现象（穗截图）：C0222d 之后，状态行（头像 + 「正在处理…」）被输入框盖住一大截，头像也丢了，「24 像 -24」。
+- 原因：C0222d 把状态行做成列表最后一行、用一个**负的 bottom padding** 想把它推进「内容底边与玻璃之间的空隙」。
+  负 padding 会压缩 cell 高度、让内容溢出并被裁掉，而且那段空隙（约 40pt）本来就不够放 24 高的状态行——于是
+  被推进输入框、头像被裁。
+- 修法（正确的位置）：状态行不再当列表行，而是放进 `ConversationBottomBar` 的 VStack、**输入框玻璃正上方**：
+  - `ConversationBottomBar` 增加 `status:` 参数，body 变成 `VStack { status.padding(.bottom, statusInputGap −
+    composerTopPadding).padding(.horizontal, sideMargin); ConversationComposer(...) }`。
+  - 因为它是在 `safeAreaInset` 里、属于底部栏的一部分，列表会**为它预留高度**：最后一条消息停在状态行上方，
+    状态行不可能被输入框盖住；状态行底边离玻璃顶 = (24−6) + 玻璃自身 topPadding(6) = **24**；头像完整不裁。
+  - `Composer`（bot 页）与 `DSHComposer`（chat 页）各增加 `status:` 透传；`ThreadView`、`DSHConversationView`
+    把 `ConversationStatusLine` 作为 status 传入（`working` 时才有）。
+  - `ConversationList` / `ChatTranscriptList` / `ChatTranscriptView` 撤销 C0222d 那套「把状态行塞进列表」的
+    临时改动（回到不渲染状态行）。
+- 不变：箭头 32（C0222c）、按钮四边 6（C0222c）、层级、外观、胶囊/展开两态、C0220 单一 TextField、串流。
+- 边界：只调整状态行的位置与归属，不加新功能。
+- 验证：`xcodebuild build ... -configuration DevDebug`（`generic/platform=iOS`）**BUILD SUCCEEDED，0 error**，
+  构建号 **220**；已装到 iPhone 16 Pro（2.36.0 / 220）。不跑测试、不截图。
+- 关联：C0222d（`8ea744aa`，本次取代其做法）、C0222c（`97bcfe26`）。
