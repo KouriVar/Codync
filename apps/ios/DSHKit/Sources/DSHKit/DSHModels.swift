@@ -70,6 +70,10 @@ public struct DSHMessage: Identifiable, Hashable, Sendable {
     public enum Role: String, Sendable { case user, assistant }
     public let id: String
     public let role: Role
+    public let seq: Int64
+    public let step: Int?
+    public var displayRowId: String
+    public let revision: Int64
     public var text: String
     public var streaming: Bool
     /// The assistant's reasoning for this message (the `reasoning` field of `assistant/message`).
@@ -83,11 +87,16 @@ public struct DSHMessage: Identifiable, Hashable, Sendable {
     /// When it was written (ms since epoch).
     public var createdAt: Int64
 
-    public init(id: String = UUID().uuidString, role: Role, text: String, streaming: Bool = false,
+    public init(id: String, role: Role, text: String, streaming: Bool = false,
                 reasoning: String = "", tools: [DSHTool] = [], turn: Int? = nil, durationSeconds: Int? = nil,
-                createdAt: Int64 = Int64(Date().timeIntervalSince1970 * 1000)) {
+                createdAt: Int64 = 0, seq: Int64 = 0, step: Int? = nil,
+                displayRowId: String? = nil, revision: Int64 = 0) {
         self.id = id
         self.role = role
+        self.seq = seq
+        self.step = step
+        self.displayRowId = displayRowId ?? id
+        self.revision = revision
         self.text = text
         self.streaming = streaming
         self.reasoning = reasoning
@@ -121,6 +130,10 @@ public struct DSHTranscriptItem: Identifiable, Sendable {
     public enum Kind: Sendable { case user, assistant }
     public let id: String
     public let kind: Kind
+    public var seq: Int64 = 0
+    public var turn: Int = 0
+    public var revision: Int64 = 0
+    public var displayRowId: String = ""
     public let text: String
     public let summary: DSHSummary?
     /// When the message was written (ms since epoch), for the page's time separators.
@@ -140,6 +153,14 @@ public struct DSHTranscriptItem: Identifiable, Sendable {
 public enum DSHConversationAdapter {
     public static func transcript(from messages: [DSHMessage]) -> [DSHTranscriptItem] {
         messages.map { message in
+            var row = transcriptItem(from: message)
+            row.seq = message.seq; row.turn = message.turn ?? 0
+            row.revision = message.revision; row.displayRowId = message.displayRowId
+            return row
+        }
+    }
+
+    private static func transcriptItem(from message: DSHMessage) -> DSHTranscriptItem {
             if message.role == .user {
                 return DSHTranscriptItem(id: message.id, kind: .user, text: message.text,
                                          summary: nil, createdAt: message.createdAt)
@@ -151,7 +172,6 @@ public enum DSHConversationAdapter {
                 : nil
             return DSHTranscriptItem(id: message.id, kind: .assistant, text: message.text,
                                      summary: summary, createdAt: message.createdAt)
-        }
     }
 
     /// "思考了 12 秒 · 运行了 3 个命令".

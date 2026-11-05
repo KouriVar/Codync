@@ -29,10 +29,10 @@ public struct TranscriptItem: Identifiable, Sendable {
     public let content: Content
     public let isUserMessage: Bool
 
-    public init(entry: Entry) {
-        id = entry.id
+    public init(entry: Entry, displayRowId: String? = nil, scrollToWhenAdded: Bool? = nil) {
+        id = displayRowId ?? entry.id
         content = .entry(entry)
-        isUserMessage = entry.kind == "user"
+        isUserMessage = scrollToWhenAdded ?? (entry.kind == "user")
     }
 
     public init(summary: TranscriptSummary) {
@@ -65,23 +65,52 @@ public struct ChatTranscriptView: View {
     let working: Bool
     let workingTitle: String
     let onOpenSummary: (TranscriptSummary) -> Void
+    let nearTop: (() -> Void)?
+    let refresh: (() async -> Void)?
+    let hasMore: Bool
+    let loadingEarlier: Bool
+    let historyError: String?
+    let accessory: AnyView?
+    let sendingRevision: Int
 
     public init(items: [TranscriptItem], following: Binding<Bool>, working: Bool = false,
                 workingTitle: String = WorkingPhrase.processing,
-                onOpenSummary: @escaping (TranscriptSummary) -> Void) {
+                nearTop: (() -> Void)? = nil, refresh: (() async -> Void)? = nil,
+                hasMore: Bool = false, loadingEarlier: Bool = false, historyError: String? = nil,
+                accessory: AnyView? = nil, sendingRevision: Int = 0,
+                onOpenSummary: @escaping (TranscriptSummary) -> Void = { _ in }) {
         self.items = items
         _following = following
         self.working = working
         self.workingTitle = workingTitle
         self.onOpenSummary = onOpenSummary
+        self.nearTop = nearTop; self.refresh = refresh
+        self.hasMore = hasMore; self.loadingEarlier = loadingEarlier
+        self.historyError = historyError; self.accessory = accessory
+        self.sendingRevision = sendingRevision
     }
 
     public var body: some View {
-        ChatTranscriptList(rows: rows, following: $following)
+        ChatTranscriptList(rows: rows, following: $following, nearTop: nearTop, refresh: refresh)
     }
 
     private var rows: [ConversationRow] {
         var out: [ConversationRow] = []
+        if hasMore || loadingEarlier || historyError != nil {
+            out.append(ConversationRow("earlier", revision: (historyError ?? "").hashValue &+ (loadingEarlier ? 1 : 0)) {
+                Button {
+                    if historyError != nil { Task { await refresh?() } }
+                    else { nearTop?() }
+                } label: {
+                    Text(historyError ?? (loadingEarlier ? "正在加载较早消息…" : "加载较早消息"))
+                        .font(.footnote).foregroundStyle(Palette.secondary)
+                        .frame(maxWidth: .infinity).padding(.vertical, 12)
+                }
+                .buttonStyle(.plain)
+                .disabled(loadingEarlier)
+                .onAppear { if historyError == nil { nearTop?() } }
+            })
+        }
         var lastDate: Date?
         for item in items {
             switch item.content {
@@ -114,8 +143,13 @@ public struct ChatTranscriptView: View {
                 .transition(.opacity)
             })
         }
+        if let accessory {
+            out.append(ConversationRow("sending-status", revision: accessoryRevision) { accessory })
+        }
         return out
     }
+
+    private var accessoryRevision: Int { items.count &+ sendingRevision }
 
     /// What counts as "this row changed": the entry's own revision plus the text it now holds, so a
     /// growing streaming reply re-renders alone while the rest of the transcript stays put.

@@ -4,19 +4,23 @@ import DSHKit
 import SwiftUI
 
 /// A DSH conversation, on the same chat page Coe uses: messages as bubbles, and each turn's
-/// thinking + tool calls folded into one tappable line that opens its full content.
+/// stable message identities and the existing running-turn status line.
 struct DSHConversationView: View {
     @ObservedObject var gateway: DSHGateway
     @State private var following = true
-    @State private var details: TranscriptSummary?
+    @State private var confirmResend: DSHSubmission?
     @State private var draft = ""
 
     var body: some View {
         ChatTranscriptView(items: items, following: $following,
                            working: gateway.isRunning,
-                           workingTitle: Self.workingTitle(for: gateway.currentActivity)) { summary in
-            details = summary
-        }
+                           workingTitle: Self.workingTitle(for: gateway.currentActivity),
+                           nearTop: { Task { await gateway.loadEarlier() } },
+                           refresh: { await gateway.refreshConversation() },
+                           hasMore: gateway.hasMore, loadingEarlier: gateway.loadingEarlier,
+                           historyError: gateway.historyError,
+                           accessory: gateway.submissions.isEmpty ? nil : AnyView(sendingStatus),
+                           sendingRevision: gateway.submissions.hashValue &+ gateway.queueHints.hashValue &+ (gateway.queueIsKnown ? 1 : 0))
         .background(Palette.background)
         // The input bar is an inset rather than a stacked row: the transcript runs under it and
         // comes up with the keyboard. It has no backing of its own — only the field's glass — so the
@@ -36,22 +40,15 @@ struct DSHConversationView: View {
                     .accessibilityLabel("新建会话")
             }
         }
-        .sheet(item: $details) { summary in
-                NavigationStack {
-                    ScrollView {
-                        Text(summary.detail.isEmpty ? summary.title : summary.detail)
-                            .font(.callout)
-                            .textSelection(.enabled)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(16)
-                    }
-                    .background(Palette.background)
-                    .navigationTitle(summary.title)
-                    .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) { Button("关闭") { details = nil } }
-                }
+        .alert("可能重复发送", isPresented: Binding(get: { confirmResend != nil },
+                                                    set: { if !$0 { confirmResend = nil } })) {
+            Button("仍要发送") {
+                if let item = confirmResend { gateway.resendUnknownSubmission(item.id) }
+                confirmResend = nil
             }
+            Button("取消", role: .cancel) { confirmResend = nil }
+        } message: {
+            Text("历史中没有看到不等于服务端未接收。再次发送可能重复执行，请确认后再发。")
         }
         .onDisappear { gateway.closeConversation() }
     }
@@ -63,42 +60,55 @@ struct DSHConversationView: View {
         return gateway.displayTitle(for: session)
     }
 
-    /// The adapter's rows (user/assistant + a folded summary) become Codync's chat entries; the
-    /// summary keeps its own row so the message text reads as usual.
     private var items: [TranscriptItem] {
-        var out: [TranscriptItem] = []
-        for row in DSHConversationAdapter.transcript(from: gateway.messages) {
-            if let summary = row.summary {
-                out.append(TranscriptItem(summary: TranscriptSummary(
-                    id: summary.id + "-summary",
-                    title: summary.title,
-                    detail: Self.detailText(for: summary))))
-            }
-            guard !row.text.isEmpty else { continue }
+        DSHConversationAdapter.transcript(from: gateway.messages).compactMap { row in
+            guard !row.text.isEmpty else { return nil }
             let kind = row.kind == .user ? "user" : "agent"
-            let entry = Entry(id: row.id, seq: 0, botId: "dsh", rev: 0, kind: kind,
-                              turn: 0, data: EntryData(text: row.text),
+            let entry = Entry(id: row.id, seq: row.seq, botId: "dsh", rev: row.revision, kind: kind,
+                              turn: Int64(row.turn), data: EntryData(text: row.text),
                               createdAt: row.createdAt, updatedAt: row.createdAt)
-            out.append(TranscriptItem(entry: entry))
+            return TranscriptItem(entry: entry, displayRowId: row.displayRowId, scrollToWhenAdded: false)
         }
-        return out
     }
 
-    private static func detailText(for summary: DSHSummary) -> String {
-        var sections: [String] = []
-        if !summary.reasoning.isEmpty {
-            sections.append("思考\n\(summary.reasoning)")
-        }
-        if !summary.tools.isEmpty {
-            let rows = summary.tools.map { tool -> String in
-                var parts = ["• \(tool.name)\(tool.isError ? "（失败）" : "")"]
-                if !tool.arguments.isEmpty { parts.append(tool.arguments) }
-                if let output = tool.output, !output.isEmpty { parts.append("→ \(output)") }
-                return parts.joined(separator: "\n  ")
+    private var sendingStatus: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            ForEach(gateway.submissions) { item in
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(item.detail).font(.footnote).foregroundStyle(Palette.secondary)
+                    Text(item.text).font(.callout).lineLimit(3).textSelection(.enabled)
+                    if item.status == .unknown && item.historyChecked {
+                        Text(gateway.queueIsKnown ? "服务器队列待处理：\(gateway.queueHints.count) 条（仅供核对）"
+                             : "服务器队列尚未同步，不能据此认为未接收")
+                            .font(.footnote).foregroundStyle(Palette.secondary)
+                        ForEach(gateway.queueHints) { hint in
+                            Text(hint.text).font(.footnote).lineLimit(3)
+                        }
+                    }
+                    HStack(spacing: 14) {
+                        if item.status == .failed {
+                            Button("重试") { gateway.retrySubmission(item.id) }
+                        }
+                        if item.status == .unknown {
+                            Button("查历史") { Task { await gateway.reconcileSubmission(item.id) } }
+                            if item.historyChecked {
+                                Button("已看到，不重发") { gateway.dismissSubmission(item.id) }
+                                Button("确认未看到，重发") { confirmResend = item }
+                            }
+                        }
+                        if item.status == .failed || item.historyChecked {
+                            Button(draft.isEmpty ? "恢复编辑" : "追加到草稿") {
+                                draft = draft.isEmpty ? item.text : draft + "\n" + item.text
+                            }
+                            Button("移除状态") { gateway.dismissSubmission(item.id) }
+                        }
+                    }
+                    .font(.footnote)
+                }
             }
-            sections.append("工具\n" + rows.joined(separator: "\n\n"))
         }
-        return sections.joined(separator: "\n\n")
+        .padding(.vertical, 10)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     /// A DSH conversation has no bot of its own, so the line names the model: "DeepSeek 正在看 README.md".
@@ -149,7 +159,6 @@ struct DSHConversationView: View {
 
     private func send() {
         let text = draft
-        draft = ""
-        gateway.send(text: text)
+        if gateway.send(text: text) { draft = "" }
     }
 }

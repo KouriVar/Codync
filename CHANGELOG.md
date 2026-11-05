@@ -3043,3 +3043,46 @@
   另：C0212–C0214 的构建命令多传了 `CODYNC_APP_NAME=Codync UI 测试`（抄自 `docs/guides/ios-ui-preview.md` 的示例），
   它覆盖了 `DevDebug` 配置里的 App 名；这次起不再传，安装后的显示名回到 `project.yml` 里 `DevDebug` 的名字。
 - 关联：C0211（来源点）、备份 tag `backup/before-remove-lead-star-c0215`（`485f865f`）。
+
+### C0216 · 2026-11-05 · DSH 串流第二步：消息正文
+
+- 原因：正文使用随机消息 ID、按相同文字去重、回填最后一条 assistant，以及 history 整体替换列表，
+  会合并合法的相同消息、覆盖上一轮回复，或在重进会话时冲掉实时内容。
+- 变化：
+  - 新增 `apps/ios/DSHKit/Sources/DSHKit/DSHWireEvent.swift`：区分 live 与 history 的数据结构，保留原始
+    JSON、完整度、真实 seq/turn/step，归一时间；正式身份编码为 `[gatewayId, sessionId, seq]`。
+    紧凑 snapshot 前缀和实时 chunk 分开解析，reasoning 永远不进入正文。
+  - 新增 `apps/ios/DSHKit/Sources/DSHKit/DSHConversationState.swift`：每个网关/会话/历史格式独立保存内存
+    canonical events、实时游标、分页覆盖范围、请求登记和冻结的发送意图；history 只合并，不能改实时游标或清理 attempt。
+    临时回复只按 `end.outcome.seq` 结算；显示别名和起始游标锚点保住当前行的位置，不按 turn 或数组末尾覆盖。
+    同 seq 幂等补齐，两个相同文字但不同 seq 的消息各自保留；矛盾事件或时钟缺口重新订阅基线。
+  - `apps/ios/DSHKit/Sources/DSHKit/DSHModels.swift`：消息 ID 改为必须明确传入；桥接真实 seq/turn/step、
+    displayRowId 和 revision，保留 C0212 的活动类型和 reducer。
+  - `apps/ios/DSHKit/Sources/DSHKit/DSHGateway.swift`：校验 hello 的 gatewayId/历史格式；连接和会话切换退休
+    旧 stream/请求；订阅单飞，正文与活动共用 session/subscription/stream 准入链。首屏使用原子 snapshot；
+    history 使用唯一请求 ID，按 hasMore/nextBeforeSeq 向前补页，空页最多连续读取三页。
+    已知离线和本地编码失败保留明确失败状态；socket 错误、断线或回执超时标为「送达待核对」。
+    sent 仅表示已接收；未知送达先查历史并展示已有服务端队列提示，再由用户确认是否重发，绝不自动重发。
+    退休的旧请求 ID 留存以吸收迟到回执，accepted 不倒退。
+  - `apps/ios/Views/DSHConversationView.swift`：连接分页、刷新和本地发送状态行；正式用户气泡只来自服务端
+    user/message。点发送冻结内容，失败可人工重试或恢复编辑；已有新草稿时追加旧内容，不覆盖新输入。
+    不生成工具/思考展开与 summary sheet；C0213/C0214 的状态行标题和尺寸不变。
+  - `apps/ios/Kit/Sources/CodyncUI/Thread/ChatTranscript.swift`：新增带默认值的分页/刷新/发送状态桥接参数，
+    支持显示行别名与是否跟随新增用户消息；复用原 ConversationList 的 applyKeepingPlace，DSH 服务端新增消息
+    不触发强制跟随。Coe 继续使用原默认行为。
+- 删除旧逻辑：最后相同文字去重、随机正式消息 UUID、upsertFinishedAssistant/最后 assistant 回填、
+  旧流式 append/finalize 与 turnTools 聚合、history 整体覆盖、打开会话并行拉 history、乐观复制用户气泡。
+- 与设计的差异：无功能范围差异。内部采用单个活动 attempt（对应当前协议的 activeAttempt），保留行别名并以
+  startedAfterSeq 作显示锚点；缓存正文投影与排序索引，避免每个 token 重解整段历史。发送状态独立于正式气泡，
+  因而不在 canonical 消息上增加 delivery 字段；这些是设计所述职责的具体实现。
+- 边界：ConversationList、ConversationStatusLine、Coe Host、网关协议、Package.swift、pbxproj 均未改；
+  无新依赖、测试 target、磁盘聊天缓存、离线队列。发送状态仅存内存，进程退出后不恢复，也不自动补发。
+- 验证：`xcodebuild build -project apps/Codync.xcodeproj -scheme 'iOS Dev' -configuration DevDebug`（真机
+  destination、ui-preview 覆盖、构建号 205）编译通过；最终增量构建 0 error、0 warning，前一次构建仅有
+  未改文件 BotShortcuts.swift 的既有弃用警告。先关闭设备上的旧 App，再用 `xcrun devicectl device install app`
+  装到 iPhone 16 Pro（`00008140-000A31311AE3001C`，`com.suiyikou.codync.uipreview`，2.36.0 / 205）成功。
+  执行正确性、完整性和结构三项只读代码审查并修复发现的问题；按穗要求不运行测试、不启动 App 自测，
+  七项真机场景留给穗操作。构建和安装记录位于 `/tmp/codync-audit/c0216-build-final.log`、`c0216-install.json`。
+- 关联：详细设计 `/tmp/codync-audit/streaming-step2.md`；备份 tag
+  `backup/before-dsh-transcript-c0216`（`bfaa83df`，包含 C0212–C0215）。回滚可 revert 本次提交，
+  不回退状态行和 C0215；无协议或数据库迁移。回滚正文实现会恢复旧覆盖风险。

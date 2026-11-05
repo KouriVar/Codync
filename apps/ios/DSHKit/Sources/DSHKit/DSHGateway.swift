@@ -1,5 +1,6 @@
 import Foundation
 import os
+import Network
 
 private let log = Logger(subsystem: "com.suiyikou.codync.dsh-gateway", category: "gateway")
 
@@ -41,14 +42,30 @@ public final class DSHGateway: ObservableObject {
     private var reconnectTask: Task<Void, Never>?
     private var heartbeatTask: Task<Void, Never>?
     private var shouldReconnect = false
-    /// assistant-stream attempts being written, so a stale chunk from an earlier attempt is ignored.
-    private var streamingAttempts = Set<String>()
-    /// The requestId of the one history page an open conversation asks for.
-    private var openHistoryRequestId: String?
-    /// The open turn's start, number and tools, folded into the assistant message it produces.
-    private var turnStartedAt: Date?
-    private var turnNumber: Int?
-    private var turnTools: [DSHTool] = []
+    @Published public private(set) var hasMore = false
+    @Published public private(set) var loadingEarlier = false
+    @Published public private(set) var historyError: String?
+    @Published public private(set) var submissions: [DSHSubmission] = []
+    @Published public private(set) var queueHints: [DSHQueueHint] = []
+    @Published public private(set) var queueIsKnown = false
+    private var gatewayQueues: [String: [DSHQueueHint]] = [:]
+    private var hasQueueBaseline = false
+    private var conversations: [DSHSessionScope: DSHConversationState] = [:]
+    private var selectedScope: DSHSessionScope?
+    private var conversation: DSHConversationState? {
+        get { selectedScope.flatMap { conversations[$0] } }
+        set { if let scope = selectedScope { conversations[scope] = newValue } }
+    }
+    private var connectionGeneration: UInt64 = 0
+    private var selectionGeneration: UInt64 = 0
+    private var validatedGatewayId: String?
+    private var inFlightSubscription: (sessionId: String?, generation: UInt64)?
+    private var operationTimeouts: [String: Task<Void, Never>] = [:]
+    private var historyOutcomes: [String: Bool] = [:]
+    private var creationRequests: [String: UInt64] = [:]
+    private let networkMonitor = NWPathMonitor()
+    private var networkAvailable = true
+
     /// The running-turn state behind the status line. Its own generation, seq watermark and attempt
     /// bookkeeping; it never touches `messages` or the body's own handling.
     private var activity = DSHActivityState()
@@ -65,7 +82,13 @@ public final class DSHGateway: ObservableObject {
         config.waitsForConnectivity = false
         config.timeoutIntervalForRequest = 30
         session = URLSession(configuration: config)
+        networkMonitor.pathUpdateHandler = { [weak self] path in
+            Task { @MainActor in self?.networkAvailable = path.status == .satisfied }
+        }
+        networkMonitor.start(queue: DispatchQueue(label: "com.suiyikou.codync.dsh-network"))
     }
+
+    deinit { networkMonitor.cancel() }
 
     // MARK: - Connect
 
@@ -86,6 +109,7 @@ public final class DSHGateway: ObservableObject {
     }
 
     public func connect(_ profile: DSHGatewayProfile) {
+        if self.profile?.id != profile.id { closeConversation() }
         self.profile = profile
         gatewayName = profile.name
         start()
@@ -99,6 +123,7 @@ public final class DSHGateway: ObservableObject {
         heartbeatTask = nil
         task?.cancel(with: .goingAway, reason: nil)
         task = nil
+        retireConnection()
         phase = .idle
         isStreaming = false
         activity.endSession()
@@ -183,14 +208,15 @@ public final class DSHGateway: ObservableObject {
         // ("已取消"); during pairing, the socket we are about to replace IS the pairing socket,
         // so leave it alone unless it is already finished.
         if pendingPairing == nil { task?.cancel(with: .goingAway, reason: nil) }
+        retireConnection()
         let socket = session.webSocketTask(with: request)
+        socket.maximumMessageSize = 64 * 1024 * 1024
         task = socket
         if pairing == nil { phase = .connecting }
         socket.resume()
         receiveLoop(on: socket)
         if pairing == nil {
             startHeartbeat()
-            send(["type": "sessions"])
         }
     }
 
@@ -215,10 +241,19 @@ public final class DSHGateway: ObservableObject {
         }
     }
 
-    private func send(_ object: [String: Any]) {
-        guard let task, let data = try? JSONSerialization.data(withJSONObject: object),
-              let text = String(data: data, encoding: .utf8) else { return }
-        task.send(.string(text)) { _ in }
+    @discardableResult
+    private func send(_ object: [String: Any], completion: ((Error?) -> Void)? = nil) -> Bool {
+        guard let socket = task, let data = try? JSONSerialization.data(withJSONObject: object),
+              let text = String(data: data, encoding: .utf8) else { return false }
+        let generation = connectionGeneration
+        socket.send(.string(text)) { [weak self] error in
+            Task { @MainActor in
+                guard let self, socket === self.task, generation == self.connectionGeneration else { return }
+                if let completion { completion(error) }
+                else if let error { log.error("DSH control frame send failed: \(error.localizedDescription, privacy: .public)") }
+            }
+        }
+        return true
     }
 
     // MARK: - Frames
@@ -249,10 +284,21 @@ public final class DSHGateway: ObservableObject {
             handleProjectionBaseline(frame)
         case "turn-outline-updated":
             handleTurnOutline(frame)
+        case "session-queues":
+            guard validatedGatewayId != nil, let queues = frame.dict("queues") as? [String: [[String: Any]]] else { return }
+            gatewayQueues = queues.mapValues(DSHQueueHint.decode)
+            hasQueueBaseline = true
+            publishConversation()
+        case "session-queue":
+            guard validatedGatewayId != nil, let sid = frame.string("sessionId"), let rows = frame.array("items") else { return }
+            gatewayQueues[sid] = DSHQueueHint.decode(rows)
+            publishConversation()
         case "sent":
+            if let id = frame.string("requestId") { updateDelivery(id, status: .accepted, detail: "已接收") }
             reconnectAttempt = 0
         case "session-created":
-            if let id = frame.string("sessionId") { open(sessionId: id) }
+            if let request = frame.string("requestId"), creationRequests.removeValue(forKey: request) == selectionGeneration,
+               let id = frame.string("sessionId") { open(sessionId: id) }
         case "event":
             handleEvent(frame)
         case "assistant-stream":
@@ -260,14 +306,13 @@ public final class DSHGateway: ObservableObject {
         case "session-snapshot":
             handleSnapshot(frame)
         case "session-stream-reset":
-            isStreaming = false
-            streamingAttempts.removeAll()
+            guard conversation?.owns(frame) == true else { return }
+            conversation?.resetStream()
             activity.applyStreamReset(in: activityEnvelope(frame))
-            syncActivity()
+            syncActivity(); publishConversation()
+            if frame.bool("retrying") == false { historyError = frame.string("message") ?? "会话暂时不能同步" }
         case "error":
-            let message = frame.string("message") ?? "未知错误"
-            if frame.string("code") == "authentication-required" { requirePairingAgain() }
-            else if phase != .ready { phase = .failed(message) }
+            handleProtocolError(frame)
         default:
             break
         }
@@ -275,22 +320,27 @@ public final class DSHGateway: ObservableObject {
 
     private func handleHello(_ frame: DSHFrame) {
         let version = frame.int("protocolVersion") ?? frame.int("protocol") ?? 0
-        if let name = frame.string("gatewayName"), !name.isEmpty { gatewayName = name }
-        if version < 3, pendingPairing != nil {
-            pendingPairing?.resume(throwing: DSHError.unsupportedProtocol(version))
+        guard version >= 3, frame.int("historyFormatVersion") == 4,
+              let gatewayId = frame.string("gatewayId"), !gatewayId.isEmpty,
+              profile == nil || profile?.id == gatewayId else {
+            pendingPairing?.resume(throwing: DSHError.transport("网关身份或历史格式不匹配，请重新配对。"))
             pendingPairing = nil
+            shouldReconnect = false
+            task?.cancel(with: .policyViolation, reason: nil)
+            task = nil
+            retireConnection()
+            fail(DSHError.transport("网关身份或历史格式不匹配，请重新配对。"))
             return
         }
+        validatedGatewayId = gatewayId
+        if let name = frame.string("gatewayName"), !name.isEmpty { gatewayName = name }
         reconnectAttempt = 0
         if pendingPairing == nil { phase = .ready }
         send(["type": "sessions"])
-        // A reconnect while a conversation is open restores that one session only (never a batch).
         if let sessionId = openSessionId {
-            send(["type": "subscribe", "sessionId": sessionId, "assistantStream": true])
-            let requestId = "reopen-history-\(sessionId)"
-            openHistoryRequestId = requestId
-            send(["type": "history", "sessionId": sessionId, "maxMessages": 30, "maxBytes": 262_144,
-                  "view": "conversation", "requestId": requestId])
+            selectScope(gatewayId: gatewayId, sessionId: sessionId)
+            activity.beginSession(sessionId)
+            requestSubscription()
         }
     }
 
@@ -299,8 +349,10 @@ public final class DSHGateway: ObservableObject {
         pendingPairing = nil
         pairingTimeoutTask?.cancel()
         pairingTimeoutTask = nil
-        let device = frame.dict("device")
-        let gatewayId = frame.string("gatewayId") ?? device?["id"] as? String ?? UUID().uuidString
+        guard let gatewayId = frame.string("gatewayId"), !gatewayId.isEmpty else {
+            continuation.resume(throwing: DSHError.transport("网关没有提供稳定身份，请更新网关后重新配对。"))
+            return
+        }
         let name = frame.string("gatewayName") ?? "DSH"
         let endpoint = task?.currentRequest?.url?.absoluteString ?? profile?.endpoint ?? ""
         let saved = DSHGatewayProfile(id: gatewayId, name: name, endpoint: endpoint, token: token)
@@ -316,175 +368,51 @@ public final class DSHGateway: ObservableObject {
         }
     }
 
-    /// Persistent messages only (never the streamed tokens).
     private func handleEvent(_ frame: DSHFrame) {
-        guard let sid = frame.string("sessionId"), sid == openSessionId,
-              let event = frame.dict("event"), let type = event["type"] as? String else { return }
-        // The status line's state is folded first, before the body's own handling below; the two
-        // never share a watermark, and nothing here returns early into the body's branches.
-        applyActivityEvent(frame, payload: event, type: type)
-        switch type {
-        case "turn/start":
-            turnNumber = event["turn"] as? Int
-            turnStartedAt = Date()
-            turnTools = []
-        case "tool/call":
-            let callId = event["callId"] as? String ?? UUID().uuidString
-            if !turnTools.contains(where: { $0.id == callId }) {
-                turnTools.append(DSHTool(id: callId,
-                                         name: event["name"] as? String ?? "tool",
-                                         arguments: event["arguments"] as? String ?? ""))
-            }
-        case "tool/result":
-            guard let callId = event["callId"] as? String,
-                  let index = turnTools.firstIndex(where: { $0.id == callId }) else { return }
-            turnTools[index].output = event["preview"] as? String
-            turnTools[index].isError = event["isError"] as? Bool ?? false
-        case "assistant/message":
-            let text = (event["text"] as? String) ?? Self.text(of: event)
-            let reasoning = event["reasoning"] as? String ?? ""
-            for raw in (event["toolCalls"] as? [[String: Any]] ?? []) {
-                guard let callId = raw["id"] as? String, !turnTools.contains(where: { $0.id == callId }) else { continue }
-                turnTools.append(DSHTool(id: callId,
-                                         name: raw["name"] as? String ?? "tool",
-                                         arguments: raw["arguments"] as? String ?? ""))
-            }
-            guard !text.isEmpty || !reasoning.isEmpty || !turnTools.isEmpty else { return }
-            isStreaming = false
-            streamingAttempts.removeAll()
-            let duration = turnStartedAt.map { max(1, Int(Date().timeIntervalSince($0))) }
-            upsertFinishedAssistant(text, reasoning: reasoning, tools: turnTools,
-                                    turn: turnNumber, duration: duration)
-            refreshSession(sid)
-        case "user/message":
-            let text = Self.text(of: event)
-            // Skip DSH's injected sampled-time line: it is not the user's own message.
-            if !text.isEmpty, !DSHSystemMessageFilter.isInjected(text), messages.last?.text != text {
-                messages.append(DSHMessage(role: .user, text: text))
-                rememberFirstMessage(text, for: sid)
-            }
-        case "turn/end":
-            isStreaming = false
-            turnStartedAt = nil
-            turnTools = []
-        default:
-            break
-        }
+        guard conversation?.owns(frame) == true, let event = DSHWireEvent.live(frame) else { return }
+        guard conversation?.event(event) == true else { resubscribe(); return }
+        // Both projections pass the very same session/subscription/stream gate.
+        if let payload = frame.dict("event") { applyActivityEvent(frame, payload: payload, type: event.type) }
+        if event.isUser, !event.text.isEmpty, let sid = openSessionId { rememberFirstMessage(event.text, for: sid) }
+        if event.type == "assistant/message" { send(["type": "sessions"]) }
+        publishConversation()
     }
 
-    /// The opening baseline after `subscribe`: a window of recent events. Decoded exactly like a
-    /// `history` page so both paths produce the same messages (thinking + tools included).
     private func handleSnapshot(_ frame: DSHFrame) {
-        guard let sid = frame.string("sessionId"), sid == openSessionId else { return }
-        applyActivitySnapshot(frame)
-        let events = frame.array("events") ?? []
-        let decoded = Self.decodeHistory(events)
-        if !decoded.isEmpty, messages.isEmpty { messages = decoded }
-    }
-
-    /// One history page for the session just opened. Ignored if another session is open by now.
-    private func handleHistory(_ frame: DSHFrame) {
-        guard let sid = frame.string("sessionId"), sid == openSessionId else { return }
-        if let requestId = frame.string("requestId"), let expected = openHistoryRequestId, requestId != expected {
+        guard frame.string("sessionId") == openSessionId,
+              frame.string("subscriptionId") == conversation?.subscriptionId,
+              let scope = selectedScope, let snapshot = DSHWireSnapshot(frame, format: scope.format) else { return }
+        if conversation?.hasBaseline == true {
+            if conversation?.streamId != snapshot.streamId { resubscribe() }
             return
         }
-        let events = frame.array("events") ?? []
-        messages = Self.decodeHistory(events)
-        if let first = messages.first(where: { $0.role == .user })?.text {
-            rememberFirstMessage(first, for: sid)
-        }
+        guard conversation?.snapshot(snapshot) == true else { resubscribe(); return }
+        operationTimeouts.removeValue(forKey: "snapshot")?.cancel()
+        applyActivitySnapshot(frame)
+        publishConversation()
     }
 
-    /// Raw host events (`{type, time, data}`) to the messages the chat page shows. `assistant/message`
-    /// carries the text, the reasoning and (in history records) the tool calls; `tool/call` and
-    /// `tool/result` fill in the tools and their previews.
-    /// One session's first user message, kept for the rows that have no title of their own.
-    private func rememberFirstMessage(_ text: String, for sessionId: String) {
-        guard firstUserMessages[sessionId] == nil else { return }
-        firstUserMessages[sessionId] = text
-    }
-
-    static func decodeHistory(_ events: [[String: Any]]) -> [DSHMessage] {
-        var out: [DSHMessage] = []
-        var tools: [DSHTool] = []
-        var turn = 0
-        var turnStartedAt: Int64?
-        for event in events {
-            let type = event["type"] as? String ?? ""
-            let data = event["data"] as? [String: Any] ?? event
-            let time = (event["time"] as? NSNumber)?.int64Value ?? 0
-            switch type {
-            case "turn/start":
-                turn = (data["turn"] as? NSNumber)?.intValue ?? turn
-                turnStartedAt = time
-                tools = []
-            case "tool/call":
-                let callId = data["callId"] as? String ?? UUID().uuidString
-                if !tools.contains(where: { $0.id == callId }) {
-                    tools.append(DSHTool(id: callId,
-                                         name: data["name"] as? String ?? "tool",
-                                         arguments: data["arguments"] as? String ?? ""))
-                }
-            case "tool/result":
-                guard let callId = data["callId"] as? String,
-                      let index = tools.firstIndex(where: { $0.id == callId }) else { continue }
-                tools[index].output = data["preview"] as? String
-                tools[index].isError = data["isError"] as? Bool ?? false
-            case "user/message":
-                let text = Self.text(of: data)
-                if !text.isEmpty, !DSHSystemMessageFilter.isInjected(text) {
-                    out.append(DSHMessage(role: .user, text: text, createdAt: time))
-                }
-            case "assistant/message":
-                let message = data["message"] as? [String: Any]
-                var text = ""
-                var reasoning = ""
-                for block in (message?["content"] as? [[String: Any]] ?? []) {
-                    switch block["type"] as? String {
-                    case "text": text += block["text"] as? String ?? ""
-                    case "reasoning": reasoning += block["text"] as? String ?? ""
-                    default: break
-                    }
-                }
-                if text.isEmpty, reasoning.isEmpty, tools.isEmpty { continue }
-                let duration = turnStartedAt.map { max(1, Int((time - $0) / 1000)) }
-                out.append(DSHMessage(role: .assistant, text: text, reasoning: reasoning,
-                                      tools: tools, turn: turn, durationSeconds: duration,
-                                      createdAt: time))
-                tools = []
-            case "turn/end":
-                tools = []
-                turnStartedAt = nil
-            default:
-                break
-            }
-        }
-        return out
+    private func handleHistory(_ frame: DSHFrame) {
+        guard let id = frame.string("requestId"), let request = conversation?.requests[id],
+              request.generation == selectionGeneration, frame.string("sessionId") == openSessionId else { return }
+        let accepted = conversation?.history(frame, generation: selectionGeneration) == true
+        historyOutcomes[id] = accepted
+        operationTimeouts.removeValue(forKey: id)?.cancel()
+        publishConversation()
+        if conversation?.needsBaseline == true { historyOutcomes[id] = false; resubscribe() }
+        else if !accepted, frame.int("historyFormatVersion") != selectedScope?.format { resubscribe() }
     }
 
     private func handleStream(_ frame: DSHFrame) {
-        guard frame.string("sessionId") == openSessionId, let payload = frame.dict("frame") else { return }
+        guard conversation?.owns(frame) == true, let payload = frame.dict("frame") else { return }
+        guard conversation?.stream(DSHJSON(payload)) == true else { resubscribe(); return }
         applyActivityStream(frame, payload: payload)
-        switch payload["type"] as? String {
-        case "start":
-            if let attempt = payload["attemptId"] as? String { streamingAttempts.insert(attempt) }
-            isStreaming = true
-            if messages.last?.streaming != true {
-                messages.append(DSHMessage(role: .assistant, text: "", streaming: true))
-            }
-        case "chunk":
-            guard let attempt = payload["attemptId"] as? String, streamingAttempts.contains(attempt) else { return }
-            guard let text = Self.text(ofChunk: payload), !text.isEmpty else { return }
-            appendStreaming(text)
-        case "end":
-            if let attempt = payload["attemptId"] as? String { streamingAttempts.remove(attempt) }
-            if streamingAttempts.isEmpty {
-                isStreaming = false
-                finalizeStreaming()
-            }
-        default:
-            break
-        }
+        publishConversation()
+    }
+
+    private func rememberFirstMessage(_ text: String, for sessionId: String) {
+        guard firstUserMessages[sessionId] == nil else { return }
+        firstUserMessages[sessionId] = text
     }
 
     // MARK: - Current activity (the status line's state)
@@ -492,9 +420,18 @@ public final class DSHGateway: ObservableObject {
     /// The subscription is confirmed: a new generation. No stream is known until a snapshot names
     /// one, and nothing from the previous subscription survives.
     private func handleSubscribed(_ frame: DSHFrame) {
-        guard let sid = frame.string("sessionId"), sid == openSessionId,
-              let subscriptionId = frame.string("subscriptionId") else { return }
-        activity.applySubscribed(subscriptionId: subscriptionId, streamId: frame.string("streamId"))
+        guard let pending = inFlightSubscription, frame.string("sessionId") == pending.sessionId else { return }
+        inFlightSubscription = nil
+        operationTimeouts.removeValue(forKey: "subscribe")?.cancel()
+        guard pending.generation == selectionGeneration, pending.sessionId == openSessionId else {
+            requestSubscription(); return
+        }
+        guard let subscriptionId = frame.string("subscriptionId"), openSessionId != nil else { return }
+        conversation?.subscribed(subscriptionId)
+        activity.applySubscribed(subscriptionId: subscriptionId)
+        scheduleTimeout("snapshot", seconds: 15) { [weak self] in
+            self?.handleDrop(DSHError.transport("等待会话快照超时"))
+        }
         syncActivity()
     }
 
@@ -661,77 +598,199 @@ public final class DSHGateway: ObservableObject {
     // MARK: - Conversation
 
     public func open(sessionId: String) {
+        selectionGeneration &+= 1
+        conversation?.retireStream()
         openSessionId = sessionId
-        messages = []
-        isStreaming = false
-        streamingAttempts.removeAll()
+        if let gatewayId = validatedGatewayId { selectScope(gatewayId: gatewayId, sessionId: sessionId) }
+        else { selectedScope = nil }
         activity.beginSession(sessionId)
-        syncActivity()
-        send(["type": "subscribe", "sessionId": sessionId, "assistantStream": true])
-        // One page of history for this session, so the transcript is not empty when it opens
-        // (the live snapshot only covers what happens after subscribing).
-        let requestId = "open-history-\(sessionId)"
-        openHistoryRequestId = requestId
-        send(["type": "history", "sessionId": sessionId, "maxMessages": 30, "maxBytes": 262_144,
-              "view": "conversation", "requestId": requestId])
+        syncActivity(); publishConversation()
+        requestSubscription()
     }
 
     public func closeConversation() {
-        if let openSessionId { send(["type": "unsubscribe"]) }
-        openSessionId = nil
-        openHistoryRequestId = nil
-        messages = []
-        isStreaming = false
+        selectionGeneration &+= 1
+        conversation?.retireStream()
+        openSessionId = nil; selectedScope = nil
         activity.endSession()
-        syncActivity()
+        syncActivity(); publishConversation()
+        requestSubscription()
     }
 
-    public func send(text: String) {
+    /// Returns whether the local intent was saved; only then may the caller clear its draft.
+    @discardableResult public func send(text: String) -> Bool {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
-        guard let sessionId = openSessionId else { return }
-        messages.append(DSHMessage(role: .user, text: trimmed))
-        send(["type": "message", "sessionId": sessionId, "text": trimmed])
+        guard !trimmed.isEmpty, openSessionId != nil, conversation != nil else { return false }
+        let available = phase == .ready && task != nil && networkAvailable && validatedGatewayId != nil
+        guard let id = conversation?.submit(text: trimmed, connection: connectionGeneration, available: available) else { return false }
+        publishConversation()
+        guard available else { return true }
+        let payload: [String: Any] = ["type": "message", "sessionId": openSessionId!, "text": trimmed, "requestId": id]
+        if !send(payload, completion: { [weak self] error in
+            if let error { self?.updateDelivery(id, status: .unknown, detail: "送达待核对：" + error.localizedDescription) }
+        }) {
+            updateDelivery(id, status: .failed, detail: "没有发出去：无法编码发送内容")
+            return true
+        }
+        scheduleTimeout(id, seconds: 30) { [weak self] in
+            self?.updateDelivery(id, status: .unknown, detail: "送达待核对：等待回执超时，请先查历史")
+        }
+        return true
+    }
+
+    public func retrySubmission(_ id: String) {
+        guard let submission = conversation?.submissions.first(where: { $0.id == id }), submission.status == .failed else { return }
+        if send(text: submission.text) { conversation?.dismissSubmission(id); publishConversation() }
+    }
+
+    public func resendUnknownSubmission(_ id: String) {
+        guard let submission = conversation?.submissions.first(where: { $0.id == id }),
+              submission.status == .unknown, submission.historyChecked else { return }
+        if send(text: submission.text) { conversation?.dismissSubmission(id); publishConversation() }
+    }
+
+    public func dismissSubmission(_ id: String) {
+        guard conversation?.submissions.first(where: { $0.id == id })?.status != .writing else { return }
+        conversation?.dismissSubmission(id); publishConversation()
+    }
+
+    public func reconcileSubmission(_ id: String) async {
+        guard conversation?.submissions.contains(where: { $0.id == id && $0.status == .unknown }) == true else { return }
+        if await requestHistory(.reconcile) {
+            conversation?.markReconciled(id)
+            publishConversation()
+        }
+    }
+
+    public func loadEarlier() async {
+        guard conversation?.pageError == nil else { return }
+        for _ in 0..<3 {
+            guard conversation?.hasMore == true, conversation?.loadingEarlier == false else { return }
+            let beforeCount = messages.count
+            await requestHistory(.older)
+            if historyError != nil || messages.count != beforeCount { return }
+        }
+    }
+
+    public func refreshConversation() async {
+        conversation?.clearPageError()
+        if hasMore { await loadEarlier() } else { await requestHistory(.reconcile) }
     }
 
     public func newSession() {
-        send(["type": "session-create", "requestId": UUID().uuidString])
+        let id = UUID().uuidString
+        creationRequests[id] = selectionGeneration
+        send(["type": "session-create", "requestId": id])
     }
 
-    // MARK: - Helpers
+    private func selectScope(gatewayId: String, sessionId: String) {
+        let scope = DSHSessionScope(gatewayId: gatewayId, sessionId: sessionId, format: 4)
+        selectedScope = scope
+        if conversations[scope] == nil { conversations[scope] = DSHConversationState(scope: scope) }
+    }
 
-    private func appendStreaming(_ text: String) {
-        if let index = messages.lastIndex(where: { $0.streaming }) {
-            messages[index].text += text
-        } else {
-            messages.append(DSHMessage(role: .assistant, text: text, streaming: true))
+    private func publishConversation() {
+        messages = conversation?.messages ?? []
+        submissions = conversation?.submissions.filter { !$0.isRetired && $0.status != .accepted } ?? []
+        queueHints = openSessionId.flatMap { gatewayQueues[$0] } ?? []
+        queueIsKnown = hasQueueBaseline || openSessionId.map { gatewayQueues[$0] != nil } == true
+        hasMore = conversation?.hasMore ?? false
+        loadingEarlier = conversation?.loadingEarlier ?? false
+        historyError = conversation?.pageError
+        isStreaming = conversation?.attempt != nil
+        if let sid = openSessionId, let first = messages.first(where: { $0.role == .user })?.text {
+            rememberFirstMessage(first, for: sid)
         }
     }
 
-    private func finalizeStreaming() {
-        guard let index = messages.lastIndex(where: { $0.streaming }) else { return }
-        if messages[index].text.isEmpty { messages.remove(at: index) }
-        else { messages[index].streaming = false }
-    }
-
-    /// The stream usually commits as an `assistant/message`; replace the temporary bubble with it.
-    private func upsertFinishedAssistant(_ text: String, reasoning: String, tools: [DSHTool],
-                                         turn: Int?, duration: Int?) {
-        if let index = messages.lastIndex(where: { $0.role == .assistant }) {
-            messages[index].text = text
-            messages[index].streaming = false
-            messages[index].reasoning = reasoning
-            messages[index].tools = tools
-            messages[index].turn = turn
-            messages[index].durationSeconds = duration
-        } else {
-            messages.append(DSHMessage(role: .assistant, text: text, reasoning: reasoning,
-                                       tools: tools, turn: turn, durationSeconds: duration))
+    private func requestSubscription() {
+        guard phase == .ready, validatedGatewayId != nil, inFlightSubscription == nil else { return }
+        inFlightSubscription = (openSessionId, selectionGeneration)
+        let frame: [String: Any] = openSessionId.map { ["type": "subscribe", "sessionId": $0, "assistantStream": true] }
+            ?? ["type": "unsubscribe"]
+        send(frame)
+        scheduleTimeout("subscribe", seconds: 15) { [weak self] in
+            self?.handleDrop(DSHError.transport("订阅确认超时"))
         }
     }
 
-    private func refreshSession(_ sessionId: String) {
-        send(["type": "sessions"])
+    private func resubscribe() {
+        conversation?.retireStream()
+        activity.endSession()
+        if let sid = openSessionId { activity.beginSession(sid) }
+        syncActivity(); publishConversation(); requestSubscription()
+    }
+
+    @discardableResult private func requestHistory(_ kind: DSHConversationState.RequestKind) async -> Bool {
+        guard phase == .ready, conversation?.hasBaseline == true else { return false }
+        guard let id = conversation?.register(kind, generation: selectionGeneration), let scope = selectedScope,
+              let request = conversation?.requests[id] else {
+            publishConversation()
+            return false
+        }
+        var payload: [String: Any] = ["type": "history", "requestId": id, "sessionId": scope.sessionId,
+                                      "historyFormatVersion": scope.format, "maxMessages": 30,
+                                      "maxBytes": 262_144, "view": "conversation"]
+        if let before = request.before { payload["beforeSeq"] = before }
+        publishConversation()
+        if !send(payload) { conversation?.failRequest(id, message: "历史请求未发出"); publishConversation(); return false }
+        scheduleTimeout(id, seconds: 20) { [weak self] in
+            self?.historyOutcomes[id] = false
+            self?.conversation?.failRequest(id, message: "历史同步超时，请下拉重试")
+            self?.publishConversation()
+        }
+        let generation = selectionGeneration
+        let connection = connectionGeneration
+        while generation == selectionGeneration, conversation?.requests[id] != nil {
+            try? await Task.sleep(nanoseconds: 50_000_000)
+            if Task.isCancelled { return false }
+        }
+        let accepted = historyOutcomes.removeValue(forKey: id) == true
+        return accepted && generation == selectionGeneration && connection == connectionGeneration && phase == .ready
+    }
+
+    private func scheduleTimeout(_ id: String, seconds: UInt64, action: @escaping () -> Void) {
+        operationTimeouts.removeValue(forKey: id)?.cancel()
+        operationTimeouts[id] = Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: seconds * 1_000_000_000)
+            guard !Task.isCancelled else { return }
+            self?.operationTimeouts.removeValue(forKey: id)
+            action()
+        }
+    }
+
+    private func retireConnection() {
+        let previous = connectionGeneration
+        connectionGeneration &+= 1
+        validatedGatewayId = nil; inFlightSubscription = nil; creationRequests = [:]
+        gatewayQueues = [:]; hasQueueBaseline = false
+        for timeout in operationTimeouts.values { timeout.cancel() }
+        operationTimeouts = [:]
+        for scope in Array(conversations.keys) {
+            conversations[scope]?.interruptSending(connection: previous)
+            conversations[scope]?.retireStream()
+        }
+        publishConversation()
+    }
+
+    private func updateDelivery(_ id: String, status: DSHSubmission.Status, detail: String) {
+        operationTimeouts.removeValue(forKey: id)?.cancel()
+        for scope in Array(conversations.keys) { conversations[scope]?.delivery(id, status: status, detail: detail) }
+        publishConversation()
+    }
+
+    private func handleProtocolError(_ frame: DSHFrame) {
+        let message = frame.string("message") ?? "未知错误"
+        if frame.string("code") == "authentication-required" { requirePairingAgain(); return }
+        if let id = frame.string("requestId") {
+            let definite = ["bad-request", "permission-denied", "subagent/not-resumable"].contains(frame.string("code") ?? "")
+            updateDelivery(id, status: definite ? .failed : .unknown,
+                           detail: definite ? "没有发出去：" + message : "送达待核对：" + message)
+            if conversation?.requests[id] != nil { historyOutcomes[id] = false }
+            conversation?.failRequest(id, message: message)
+            publishConversation()
+        }
+        if phase != .ready { phase = .failed(message) }
     }
 
     /// What a session is called: its own title, or — when the gateway hasn't named it yet — the
@@ -807,6 +866,9 @@ public final class DSHGateway: ObservableObject {
             pairingTimeoutTask?.cancel()
             pairingTimeoutTask = nil
         }
+        task?.cancel(with: .goingAway, reason: nil)
+        task = nil
+        retireConnection()
         phase = .failed(message)
         // A dropped socket must not leave the status line claiming that a tool is still running.
         activity.endSession()
@@ -837,6 +899,9 @@ public final class DSHGateway: ObservableObject {
         phase = .failed(DSHError.authenticationRequired.localizedDescription)
         if let id = profile?.id { DSHCredentialStore.delete(id: id) }
         profile = nil
+        task?.cancel(with: .policyViolation, reason: nil)
+        task = nil
+        retireConnection()
         activity.endSession()
         syncActivity()
     }
