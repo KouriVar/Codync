@@ -68,6 +68,9 @@ public final class DSHGateway: ObservableObject {
 
     // Cards that replace the input while a tool needs approval or the user is asked a question.
     @Published public private(set) var pendingApproval: DSHApprovalRequest?
+    /// The open session's turn outline (turn-outline-v1), for the read-only turn navigator.
+    @Published public private(set) var turnOutline: [DSHTurnOutline] = []
+    public var supportsTurnOutline: Bool { capabilities.contains("turn-outline-v1") }
     @Published public private(set) var pendingQuestion: DSHQuestionRequest?
 
     /// The single outstanding request/reply (commands, options, …). The UI serialises them.
@@ -1529,7 +1532,17 @@ public final class DSHGateway: ObservableObject {
     }
 
     private func applyTurnOutline(_ raw: Any?, sessionId: String) {
-        guard let outline = raw as? [[String: Any]], let last = outline.last else { return }
+        let outline = raw as? [[String: Any]] ?? []
+        if sessionId == openSessionId {
+            turnOutline = outline.compactMap { item in
+                guard let turn = (item["turn"] as? NSNumber)?.intValue,
+                      let seq = (item["seq"] as? NSNumber)?.int64Value else { return nil }
+                return DSHTurnOutline(turn: turn, seq: seq,
+                                      prompt: item["prompt"] as? String ?? "",
+                                      response: item["response"] as? String ?? "")
+            }
+        }
+        guard let last = outline.last else { return }
         let response = (last["response"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         let prompt = (last["prompt"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         let text = response.isEmpty ? prompt : response

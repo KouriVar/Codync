@@ -21,6 +21,7 @@ struct DSHConversationView: View {
     @State private var showFiles = false
     @State private var showSchedules = false
     @State private var showTeam = false
+    @State private var showTurnOutline = false
 
     var body: some View {
         ChatTranscriptView(items: items, following: $following,
@@ -72,6 +73,7 @@ struct DSHConversationView: View {
         .sheet(isPresented: $showFiles) { DSHFilesSheet(gateway: gateway) }
         .sheet(isPresented: $showSchedules) { DSHScheduleSheet(gateway: gateway) }
         .sheet(isPresented: $showTeam) { DSHTeamSheet(gateway: gateway) }
+        .sheet(isPresented: $showTurnOutline) { DSHTurnOutlineSheet(gateway: gateway) }
         .alert("重命名", isPresented: $showingRename) {
             TextField("会话名", text: $renameText)
             Button("确定") { Task { _ = await gateway.renameSession(renameText) } }
@@ -105,6 +107,9 @@ struct DSHConversationView: View {
             }
             if gateway.supportsTeam {
                 Button { showTeam = true } label: { Label("团队", systemImage: "person.2") }
+            }
+            if gateway.supportsTurnOutline {
+                Button { showTurnOutline = true } label: { Label("轮次导航", systemImage: "list.number") }
             }
             if gateway.capabilities.contains("session-rename") {
                 Button {
@@ -1490,6 +1495,37 @@ private struct DSHQuestionCard: View {
             answers.append(answer)
         }
         gateway.answerQuestion(request, answers: answers)
+    }
+}
+
+/// A read-only list of the session's turns from the turn outline (turn-outline-v1). Precise
+/// scroll-to-position is not wired (the shared transcript has no scroll-to-seq API), so this lists
+/// each turn's prompt/response excerpt for scanning.
+private struct DSHTurnOutlineSheet: View {
+    @ObservedObject var gateway: DSHGateway
+    @Environment(\.dismissModal) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            List {
+                if gateway.turnOutline.isEmpty {
+                    Text("没有轮次数据").foregroundStyle(Palette.secondary)
+                }
+                ForEach(gateway.turnOutline) { turn in
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("第 \(turn.turn) 轮").font(.caption.weight(.semibold)).foregroundStyle(Palette.secondary)
+                        let preview = (turn.response.isEmpty ? turn.prompt : turn.response)
+                            .trimmingCharacters(in: .whitespacesAndNewlines)
+                        if !preview.isEmpty {
+                            Text(preview).font(.footnote).foregroundStyle(Palette.text).lineLimit(2)
+                        }
+                    }
+                }
+            }
+            .navigationTitle("轮次导航")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("关闭") { dismiss() } } }
+        }
     }
 }
 

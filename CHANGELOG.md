@@ -3767,3 +3767,21 @@
 - 验证：`xcodebuild build ... -configuration DevDebug`（`generic/platform=iOS`）**BUILD SUCCEEDED，0 error**，
   构建号 **232**；已装到 iPhone 16 Pro（2.36.0 / 232）。不跑测试、不截图。
 - 关联：C0223e3、协议见 `/tmp/codync-audit/c0223-protocol.md` #23/#28。
+
+### C0223d3 · 2026-11-05 · chat 页轮次导航（turn-outline，只读）
+
+- 说明：C0223 第十二组，收尾。
+- 变化：
+  - `DSHGateway`：`supportsTurnOutline`(`turn-outline-v1`)；在既有 `applyTurnOutline`（原用于首页副标题）里，
+    当 `sessionId == openSessionId` 时把整份大纲存进 `turnOutline: [DSHTurnOutline]`（项 `{turn,seq,prompt,response}`，
+    来自 `turn-outline-updated` 推送与 `projection-baseline.values.turnOutline`）。
+  - `DSHModels`：`DSHTurnOutline`。
+  - 「更多」增「轮次导航」（capability `turn-outline-v1`）→ `DSHTurnOutlineSheet`：只读列出每轮「第 N 轮」+ prompt/response 摘要。
+- 「未确认」/未做：
+  - **点一轮精确跳到消息流对应位置**：共用 transcript 没有 scroll-to-seq API，本轮只做只读列表，未接跳转（标未确认）。
+  - **步骤/轨迹页**：网关**无 `turn-outline`/trajectory 专用请求**，逐步骤 LLM 请求/工具耗时需客户端自行从 history+流聚合，
+    本轮未做（隐藏，未编造）。
+- 边界：不改 bot 页、底部输入框设计、串流。不加依赖/测试 target。
+- 验证：`xcodebuild build ... -configuration DevDebug`（`generic/platform=iOS`）**BUILD SUCCEEDED，0 error**，
+  构建号 **233**；已装到 iPhone 16 Pro（2.36.0 / 233）。不跑测试、不截图。
+- 关联：C0223d2、协议见 `/tmp/codync-audit/c0223-protocol.md` #9。

@@ -226,6 +226,15 @@ public struct DSHQuestionRequest: Identifiable, Hashable, Sendable {
     public let questions: [DSHQuestion]
 }
 
+/// One turn of a session's turn outline (`turnOutline[]{turn,seq,prompt,response}`).
+public struct DSHTurnOutline: Identifiable, Hashable, Sendable {
+    public var id: Int64 { seq }
+    public let turn: Int
+    public let seq: Int64
+    public let prompt: String
+    public let response: String
+}
+
 /// One item of a `schedule-list` reply (read-only display + delete).
 public struct DSHSchedule: Identifiable, Hashable, Sendable {
     public let id: String
