@@ -1379,4 +1379,16 @@ iOS 定制分支：`ui/ios-customization`；当前 Mac 工作分支：`ui/macos-
 - **限制/待办** 多层 backdrop-filter 有 GPU 开销（64px 高、4 层，实测再调）；若某些 GPU 掉帧可减到 3 层或降 blur。
 - **关联** C0100、C0101、C0106。
 
+### C0124 · 2026-11-06 · 底部输入框背景：贴底的渐进模糊层
+
+- **原因** 用户反馈输入框后面没有像顶部那样的渐进模糊、且“没贴底”。现状 `.composer-fade` 只有单层 `blur(20px)+不透明渐变`，且它在 `composer-dock`（darwin `bottom:8px`）内，底部还差 8px 且带硬边。
+- **变化**
+  - `views/thread/ThreadView.tsx`：`Transcript` 与 `composer-dock` 之间新增独立 `<div class="bottom-fade" aria-hidden><i/>×4</div>`。
+  - `views/thread/thread.css`：`.bottom-fade` 贴底（left/right/bottom:0）、高 `calc(var(--composer-height,70px)+56px)`、`z-index:3`（**消息流(自动)之上、输入框 dock(z4) 之下**，即消息在模糊层后面滚、输入框在模糊层前面保持清晰）、`pointer-events:none`；四层 backdrop-filter（2/6/12/24px）**镜像顶部**——越靠底越糊、往上渐清晰；`prefers-reduced-transparency` 下退回一条渐变底。并隐藏线程内旧的 `.composer-fade`（`.conversation > .composer-dock > .composer-fade{display:none}`）避免双底/硬边；ArtifactView 的 `.composer-fade` 保留。
+- **文件** `apps/desktop/src/renderer/views/thread/ThreadView.tsx`、`apps/desktop/src/renderer/views/thread/thread.css`、`CHANGELOG.md`。
+- **token 入口** 仍只有 `styles/tokens.css`；无底色、无新增硬编码色值。
+- **验证** `npm run typecheck` 通过；随后重打 `dist:mac:local` 并替换正式 App，用户真机亮/暗复核。
+- **关联** C0123。
+
+
 

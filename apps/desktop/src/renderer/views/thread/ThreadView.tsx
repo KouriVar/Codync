@@ -248,6 +248,8 @@ export const ThreadView = memo(function ThreadView({ botId }: { botId: string })
         {isMac ? <MemoryNotice botId={botId} /> : null}
         {/* An update card takes the composer's place, so there's nothing to reply with. */}
         <Transcript botId={botId} openTrace={openTrace} onReply={store.mismatch ? undefined : setReplyTo} openRoutine={presentRoutine} openAgent={presentAgent} openBotChat={(peerId) => setBotChat({ id: peerId, name: store.authorName(peerId) })} openArtifact={openArtifact} openCall={setCallLine} />
+        {/* Lower progressive blur: sits above the message flow but below the floating composer. */}
+        <div className="bottom-fade" aria-hidden><i /><i /><i /><i /></div>
         <div className="composer-dock" ref={dock}>
           <div className="composer-fade" />
           {store.mismatch ? (

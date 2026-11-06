@@ -194,6 +194,62 @@
 .composer-dock {
   flex: none;
 }
+/* The thread's own composer now blurs via .bottom-fade; hide its old single-gradient fade so it
+   can't paint a hard band. (ArtifactView keeps its own .composer-fade — different parent.) */
+.conversation > .composer-dock > .composer-fade {
+  display: none;
+}
+/* Lower progressive blur, mirror of .top-fade: strongest at the bottom, clearing upward.
+   Full-bleed to the window edge; above the transcript but below the floating composer (z 4),
+   so messages blur under the input box. */
+.bottom-fade {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: calc(var(--composer-height, 70px) + 56px);
+  z-index: 3;
+  pointer-events: none;
+  overflow: hidden;
+}
+.bottom-fade > i {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.bottom-fade > i:nth-child(1) {
+  backdrop-filter: blur(2px) saturate(1.15);
+  -webkit-backdrop-filter: blur(2px) saturate(1.15);
+  -webkit-mask-image: linear-gradient(to top, #000 0%, transparent 100%);
+  mask-image: linear-gradient(to top, #000 0%, transparent 100%);
+}
+.bottom-fade > i:nth-child(2) {
+  backdrop-filter: blur(6px) saturate(1.15);
+  -webkit-backdrop-filter: blur(6px) saturate(1.15);
+  -webkit-mask-image: linear-gradient(to top, #000 0%, transparent 72%);
+  mask-image: linear-gradient(to top, #000 0%, transparent 72%);
+}
+.bottom-fade > i:nth-child(3) {
+  backdrop-filter: blur(12px) saturate(1.15);
+  -webkit-backdrop-filter: blur(12px) saturate(1.15);
+  -webkit-mask-image: linear-gradient(to top, #000 0%, transparent 48%);
+  mask-image: linear-gradient(to top, #000 0%, transparent 48%);
+}
+.bottom-fade > i:nth-child(4) {
+  backdrop-filter: blur(24px) saturate(1.15);
+  -webkit-backdrop-filter: blur(24px) saturate(1.15);
+  -webkit-mask-image: linear-gradient(to top, #000 0%, transparent 26%);
+  mask-image: linear-gradient(to top, #000 0%, transparent 26%);
+}
+@media (prefers-reduced-transparency: reduce) {
+  .bottom-fade {
+    background: linear-gradient(to top, var(--background) 0%, transparent 100%);
+  }
+  .bottom-fade > i {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
 .composer-update-needed {
   padding: 0 16px 8px;
 }
