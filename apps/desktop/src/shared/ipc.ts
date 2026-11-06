@@ -259,6 +259,9 @@ export interface CodyncBridge {
     setTraySummary(summary: TraySummary): void
     /** Brings the chat window forward (a phone waits for this computer to let it in). */
     showWindow(): void
+    /** A 320 column opened beside the chat (C0136): the window grows by that much when it is too
+     * narrow for both, and goes back to where it was when the column closes. */
+    panelRoom(open: boolean): void
     onCommand(cb: (command: WindowCommand) => void): () => void
     resetAllData(): Promise<void>
     setLaunchAtLogin(on: boolean): Promise<boolean>

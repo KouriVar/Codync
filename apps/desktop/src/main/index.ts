@@ -3,7 +3,7 @@ import { registerAppearance } from './appearance'
 import { execFileSync } from 'node:child_process'
 import { hostname } from 'node:os'
 import { join } from 'node:path'
-import { app, autoUpdater, BrowserWindow, clipboard, dialog, ipcMain, Menu, nativeTheme, session, shell, type IpcMainInvokeEvent, type OpenDialogOptions } from 'electron'
+import { app, autoUpdater, BrowserWindow, clipboard, dialog, ipcMain, Menu, nativeTheme, screen, session, shell, type IpcMainInvokeEvent, type OpenDialogOptions } from 'electron'
 import type { HostSnapshot, WindowCommand } from '../shared/ipc'
 import { devPort, HostController } from './host-controller'
 import { registerFileSaves } from './file-saves'
@@ -95,6 +95,51 @@ function openChat() {
   keepArtifactsInFrame(chat.webContents)
   void chat.loadURL(rendererURL('chat'))
   return chat
+}
+
+/** The narrowest window that holds the chat (600) and a 320 column beside it — Figma 105:11442. */
+const PANEL_ROOM = 920
+/** The width to put back after a column grew the window; null while no column did. */
+let roomBeforePanel: number | null = null
+
+/** cubic-bezier(0, 0, 0.58, 1) — the curve the chip card and the panels move on, so the window and
+ * the column arriving read as one motion. */
+function smartEase(t: number) {
+  const x = (u: number) => 3 * (1 - u) * u * u * 0.58 + u * u * u
+  const y = (u: number) => 3 * (1 - u) * u * u + u * u * u
+  let low = 0
+  let high = 1
+  let u = t
+  for (let i = 0; i < 14; i++) {
+    u = (low + high) / 2
+    if (x(u) < t) low = u
+    else high = u
+  }
+  return y(u)
+}
+
+/** Grows or shrinks a window's width over 300ms, keeping it on the display it is on. */
+function animateWindowWidth(win: BrowserWindow, wanted: number) {
+  const from = win.getBounds()
+  const area = screen.getDisplayMatching(from).workArea
+  const width = Math.max(360, Math.min(wanted, area.width))
+  if (Math.abs(width - from.width) < 1) return
+  // There is no room to grow to the right at the edge of the display, so the window slides left.
+  const x = Math.max(area.x, Math.min(from.x, area.x + area.width - width))
+  const start = Date.now()
+  const step = () => {
+    if (win.isDestroyed()) return
+    const p = Math.min(1, (Date.now() - start) / 300)
+    const e = smartEase(p)
+    win.setBounds({
+      x: Math.round(from.x + (x - from.x) * e),
+      y: from.y,
+      width: Math.round(from.width + (width - from.width) * e),
+      height: from.height,
+    })
+    if (p < 1) setTimeout(step, 16)
+  }
+  step()
 }
 
 function openPairing() {
@@ -192,6 +237,19 @@ function registerIPC(tray: Tray) {
   ipcMain.on('app:showWindow', () => {
     openChat()
     if (isMac) app.focus({ steal: true })
+  })
+  // C0136: a column beside the chat needs 320 more than the minimised window has.
+  ipcMain.on('app:panelRoom', (_e, open: boolean) => {
+    if (!chat) return
+    if (open) {
+      if (chat.getBounds().width >= PANEL_ROOM) return
+      if (roomBeforePanel === null) roomBeforePanel = chat.getBounds().width
+      animateWindowWidth(chat, PANEL_ROOM)
+    } else if (roomBeforePanel !== null) {
+      const back = roomBeforePanel
+      roomBeforePanel = null
+      animateWindowWidth(chat, back)
+    }
   })
   ipcMain.handle('app:showInDock', () => showInDock())
   ipcMain.handle('app:setShowInDock', (_e, on: boolean) => {

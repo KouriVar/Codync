@@ -1532,3 +1532,14 @@ iOS 定制分支：`ui/ios-customization`；当前 Mac 工作分支：`ui/macos-
 - **另**：删掉 `.bot-chip:hover` 的 6% 文字色底——图里 hover 名字不给背景（计数行的描边高亮保留）。
 - **文件** `views/thread/bot-chips.css`、`CHANGELOG.md`。
 - **验证** 最小页 + 2x 实测（数值同上）；`npm run typecheck` 通过。
+
+### C0136 · 2026-11-06 · 窄窗开右栏时窗口自动 +320，开关都带动效（Figma `105:11442`）
+
+- **原因** 最小化窗口（600–800）没有空间同时放会话和 320 右栏；设计要求展开后是 **920×800 = 600 + 320**。
+- **变化**
+  - 新增桥方法 `window.codync.app.panelRoom(open)`（`shared/ipc.ts` + `preload`）→ 主进程 `app:panelRoom`。
+  - 主进程 `PANEL_ROOM = 920`：开栏时若窗口 < 920，记住原宽并**动画加宽到 920**（贴屏幕右缘时同时左移，保证不出屏）；关栏时**动画回到原宽**。
+  - 动效用 **300ms `cubic-bezier(0, 0, 0.58, 1)`**（与 chip 卡同一曲线，主进程逐帧 `setBounds`），右栏自身 300ms 从右侧 14px 淡入（`column-in`，`prefers-reduced-motion` 下关闭）。
+  - 断点从 899 改到 **919**：920 起右栏**贴边占列**，再窄才退化为浮层（屏幕放不下 920 时的兜底）。
+- **文件** `src/{shared/ipc.ts,preload/index.ts,main/index.ts}`、`src/renderer/views/{thread/ThreadView.tsx,thread/thread.css,chat-window.css}`、`src/renderer/demo/bridge.ts`、`CHANGELOG.md`。
+- **验证** `npm run typecheck`；真机：600 宽开栏→窗口涨到 920 且右栏占列，关闭→回 600。

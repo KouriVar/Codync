@@ -577,8 +577,8 @@ html[data-platform="darwin"] .bot-chat-dock {
   /* C0131: flush — the frame puts the 1px hairline on the panel's own left edge. */
   margin-left: 0;
 }
-/* C0134: the same width rule as the roster — under 900 the peer column floats over the chat. */
-@media (max-width: 899px) {
+/* C0134: the same width rule as the roster — under 920 the peer column floats over the chat. */
+@media (max-width: 919px) {
   .bot-chat-dock {
     position: absolute;
     top: 0;

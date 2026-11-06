@@ -105,6 +105,8 @@ const bridge: CodyncBridge = {
     readClipboardFiles: async () => [],
     setTraySummary() {},
     showWindow() {},
+    // The demo has no window to grow (C0136).
+    panelRoom() {},
     onCommand: none,
     resetAllData: async () => {},
     setLaunchAtLogin: async () => false,

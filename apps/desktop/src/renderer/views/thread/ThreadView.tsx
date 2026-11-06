@@ -163,6 +163,12 @@ export const ThreadView = memo(function ThreadView({ botId }: { botId: string })
   })
   // C0129: the top-right person button shows and hides the Mac's right-hand bot list.
   const menuActions = useMainMenuActions()
+  // C0136: whichever column stands (the bot list or a peer conversation), the window makes room for
+  // it — main grows it by 320 when it is narrower than the minimised chat needs, and puts it back.
+  const columnOpen = !!menuActions?.botsPanel.open || botChat !== null
+  useEffect(() => {
+    window.codync?.app?.panelRoom?.(columnOpen)
+  }, [columnOpen])
   // C0131: the right side holds either the bot list or one peer conversation — never both.
   const openPeer = (id: string, name: string) => {
     menuActions?.botsPanel.close()

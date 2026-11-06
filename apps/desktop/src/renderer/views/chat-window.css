@@ -81,7 +81,7 @@
 }
 /* C0134: the minimised window (600–800) has no room to dock a 320 column beside the chat — docking
    one would push it under its 550 floor. So the roster floats over the chat instead. */
-@media (max-width: 899px) {
+@media (max-width: 919px) {
   .detail {
     min-width: 0;
   }
@@ -326,6 +326,27 @@ html[data-platform="darwin"] .sidebar-header {
   min-width: 320px;
   margin-left: 12px;
   position: relative;
+}
+/* C0136: a column arrives with the window's own 300ms motion, so the two read as one move. */
+@keyframes column-in {
+  from {
+    opacity: 0;
+    transform: translateX(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.right-panel,
+.bot-chat-dock {
+  animation: column-in 300ms cubic-bezier(0, 0, 0.58, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  .right-panel,
+  .bot-chat-dock {
+    animation: none;
+  }
 }
 .right-panel::before {
   content: '';
