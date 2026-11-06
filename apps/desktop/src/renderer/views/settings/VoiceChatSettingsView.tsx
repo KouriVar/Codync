@@ -1,7 +1,7 @@
 import { onDeviceUnavailableReason, voiceSettingsClosed } from '../call/voice'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { LoopbackTransport, type HostClient } from '../../client/host-client'
-import { Button, CardForm, CardSection, ChoicePicker, IconButton, Reveal, Spinner, ValueRow } from '../../components/Controls'
+import { Button, CardForm, CardSection, IconButton, Reveal, Spinner, ValueRow } from '../../components/Controls'
 import { Icon } from '../../components/Icon'
 import { ModalHeader, SheetPage } from '../../components/Overlay'
 import { HStack, Spacer, VStack } from '../../components/Stack'
@@ -10,7 +10,7 @@ import { Input } from '../../components/ui/input'
 import { usePref } from '../../lib/prefs'
 import { useStore } from '../../store/context'
 import { useScreenViewed } from '../../store/analytics'
-import { errorText, liveClient } from './parts'
+import { ChoiceSelect, errorText, liveClient } from './parts'
 import * as voice from './voice-settings'
 import type { VoiceModels, VoiceProvider } from './voice-settings'
 import { useTr } from '../../lib/use-language'
@@ -49,26 +49,22 @@ export function VoiceChatSettingsView({ showsHeader = true }: { showsHeader?: bo
           <CardSection title="Voice" footer={footer}>
             {[
               <ValueRow key="engine" label="Engine">
-                <ChoicePicker
-                  selection={engine}
-                  options={voice.engineOptions()}
-                  onChange={setEngine}
-                />
+                <ChoiceSelect value={engine} options={voice.engineOptions()} onChange={setEngine} />
               </ValueRow>,
               ...(provider
                 ? [
                     <ValueRow key="mode" label="Mode" detail={mode === 'speech' ? 'Sent when you pause, replies read aloud.' : 'A live conversation. Talk over replies.'}>
-                      <ChoicePicker selection={mode} options={[{ id: 'realtime', label: 'Realtime' }, { id: 'speech', label: 'Speech' }]} onChange={setMode} />
+                      <ChoiceSelect value={mode} options={[{ id: 'realtime', label: 'Realtime' }, { id: 'speech', label: 'Speech' }]} onChange={setMode} />
                     </ValueRow>,
                     ...(mode === 'speech' ? [<PauseRow key="pause" />] : []),
                   ]
                 : [
                     <ValueRow key="language" label="Language" detail="The language you speak in calls.">
-                      <ChoicePicker selection={language} options={languages} onChange={setLanguage} />
+                      <ChoiceSelect value={language} options={languages} onChange={setLanguage} />
                     </ValueRow>,
                     <ValueRow key="rate" label="Reading speed">
-                      <ChoicePicker
-                        selection={rate}
+                      <ChoiceSelect
+                        value={rate}
                         options={[{ id: 0.42, label: 'Slower' }, { id: voice.DEFAULT_RATE, label: 'Normal' }, { id: 0.56, label: 'Faster' }]}
                         onChange={setRate}
                       />
@@ -91,7 +87,7 @@ function PauseRow() {
   return (
     <div className="settings-appear">
       <ValueRow label="Send after a pause of" detail="Longer leaves time to think mid-sentence.">
-      <ChoicePicker selection={pause} options={[{ id: 1, label: '1 s' }, { id: 1.5, label: '1.5 s' }, { id: 2.5, label: '2.5 s' }]} onChange={setPause} />
+      <ChoiceSelect value={pause} options={[{ id: 1, label: '1 s' }, { id: 1.5, label: '1.5 s' }, { id: 2.5, label: '2.5 s' }]} onChange={setPause} />
       </ValueRow>
     </div>
   )
@@ -216,7 +212,7 @@ function ProviderVoiceSettings({ provider, dictationOnly = false }: { provider: 
   const picker = (selection: string, list: string[], onChange: (m: string) => void) => {
     // The current choice stays listed before the provider's list arrives.
     const options = list.includes(selection) ? list : [selection, ...list]
-    return <ChoicePicker selection={selection} options={options.map((m) => ({ id: m, label: m }))} onChange={onChange} />
+    return <ChoiceSelect value={selection} options={options.map((m) => ({ id: m, label: m }))} onChange={onChange} />
   }
 
   const dimmed = hasKey ? 'settings-dimmable' : 'settings-dimmable dimmed'
@@ -312,8 +308,8 @@ function ProviderVoiceSettings({ provider, dictationOnly = false }: { provider: 
                 : <div key="model" className={dimmed}><ValueRow label="Model">{picker(model, models.models, pick('realtime', setModel))}</ValueRow></div>,
               <div key="voice" className={dimmed}>
                 <ValueRow label="Voice">
-                  <ChoicePicker
-                    selection={chosenVoice}
+                  <ChoiceSelect
+                    value={chosenVoice}
                     options={info.voices.map((v) => ({ id: v, label: v }))}
                     onChange={(v) => {
                       setChosenVoice(v)

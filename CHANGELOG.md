@@ -1279,6 +1279,18 @@ iOS 定制分支：`ui/ios-customization`；当前 Mac 工作分支：`ui/macos-
 - **限制/待办** 实验分支；Tooltip 依赖 Radix Portal，模态内提示的层级由 Radix 处理，未做像素走查。
 - **关联** C0106、C0114。
 
+### C0116 · 2026-11-06 · 语音设置页的选择器全部换成 shadcn Select（实验分支续）
+
+- **原因** 承接 C0115：`VoiceChatSettingsView`（设置 → Voice chat）里 Engine / Mode / Language / Reading speed / Send after a pause / 语音模型 / Voice 共 7 处仍是自绘 `ChoicePicker`，且都是纯 `{id,label}` 选项（无图标），正是 shadcn `Select` 的清洁映射。
+- **变化**：`views/settings/VoiceChatSettingsView.tsx` 的 7 处 `ChoicePicker` → `ChoiceSelect`（来自 `settings/parts`，shadcn `Select`）。`selection/onChange` 改为 `value/onChange`，选项构造不变；`picker()` 辅助函数与 `PauseRow` 同步替换。移除 `ChoicePicker` 导入。
+- **文件** `apps/desktop/src/renderer/views/settings/VoiceChatSettingsView.tsx`、`CHANGELOG.md`。
+- **token 入口** 仍只有 `apps/desktop/src/renderer/styles/tokens.css`；`Select` 用 `bg-popover`/`border-border`/`bg-background`/`border-input`/`ring-ring`，经 `styles/tailwind.css` 映射，无新增硬编码色值；宽度由 `ChoiceSelect` 的 `168`（运行期尺寸）。
+- **验证** `apps/desktop` 下 `npm run typecheck` 与 `npm run build` 通过（CSS 205.31 kB 不变，JS 4,453.42→4,453.33 kB）。按规则只编译，未启动应用；亮/暗色人工走查仍未执行。
+- **未换（保留）** `ChoicePicker` 仍用于 ApprovalRow / NewBotView（选项带 `leading` 图标或锚定定位）与 RoutineScheduleFields；`IconButton` 仍自绘；`ScrollArea`/`Popover`/`Checkbox`/`Avatar` 入库未接；`Overlay.tsx` 的 Dialog/Sheet 保留自绘（焦点/叠层）；主会话消息区图标按钮、设置 Computers/Network 主列表未覆盖；原生桌面 chrome 不动（红绿灯仍左 16/顶 16）。
+- **限制/待办** 实验分支；Select 弹层位置由 Radix 接管，与原锚定菜单略有差异（可接受）。
+- **关联** C0106、C0115。
+
+
 
 
 
