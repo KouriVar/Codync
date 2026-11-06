@@ -14,6 +14,7 @@ pub mod node;
 pub mod own_memory;
 pub mod registry;
 pub mod term;
+pub mod upgrade;
 pub mod workspace;
 
 mod process;
