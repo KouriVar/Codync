@@ -1180,3 +1180,20 @@ iOS 定制分支：`ui/ios-customization`；当前 Mac 工作分支：`ui/macos-
 - **验证** `apps/desktop` 下 `npm run typecheck` 与 `npm run build`（electron-vite build）通过。按规则只编译、未启动应用实测红绿灯像素。
 - **限制/待办** 圆间距 9 由 macOS 原生 14pt 控件布局决定；Electron 只提供整组位置（`trafficLightPosition` / `setWindowButtonPosition`），无法逐颗设定。若系统实际起点间距不是 23pt，黄/绿会随之偏移。坐标为点单位，Retina 下不变。
 - **关联** C0088、C0089、C0106。
+
+### C0109 · 2026-11-06 · 补齐 shadcn 官方原语 + 连接/设置弹层接入（实验分支续）
+
+- **原因** 承接 C0106/C0107：目标要求「缺什么先按官方默认装进仓库源码」，此前 `components/ui/` 只有 9 个原语，Dialog/Sheet/DropdownMenu/Popover/Tooltip/ScrollArea/Checkbox/Select/Avatar 都还没有；同时「设置/连接相关弹层」尚未接入 shadcn 表单件。本条把缺的原语按官方默认补进仓库，并把网络/连接类弹层的输入框与开关换成官方件。
+- **变化**
+  - **补齐官方原语**：`components/ui/` 新增 `dialog`、`sheet`、`dropdown-menu`、`popover`、`tooltip`、`scroll-area`、`checkbox`、`select`、`avatar`（全部 Radix 官方实现，风格照 shadcn new-york，改用仓库 `cn()` 与 token 语义类；图标用内联 SVG，避免再引 `lucide-react`）。依赖新增 `@radix-ui/react-dialog/-dropdown-menu/-popover/-tooltip/-scroll-area/-checkbox/-select/-avatar/-label/-separator`。为不改既有行为，`components/Overlay.tsx` 的 `Dialog`/`Sheet` 包装与 `AnchoredMenu`/`PanelRows` 自定义菜单系统保持不动（见「未换」）。
+  - **网络设置弹层（`NetworkSheets`）**：建网/加入/恢复三处的 `Field` 由原生 `<input>` 换成 shadcn `Input` + `Label`；保留 `.settings-row` 行布局，输入框边框/背景/圆角由原语默认样式给出。
+  - **中继地址/令牌行（`RelayFields`）**：`CommitField` 的 `<input>` 换成 `Input` + `Label`（非受控、失焦提交、Enter 失焦行为不变）。
+  - **网络规则弹层（`RuleSheet`）**：「Put it first」由自绘 `Controls.Switch` 换成 shadcn `Switch`（Radix）+ `Label`；`ChoiceList`/`ChoicePicker` 仍需自绘菜单定位，暂留。
+  - **设备访问审批弹层（`ApprovalSheet`）**：Deny/Approve 由 `Controls.Button` 换成 shadcn `Button`（`variant=secondary`/default），并补 `tr()` 包裹。
+- **文件** `apps/desktop/src/renderer/components/ui/{dialog,sheet,dropdown-menu,popover,tooltip,scroll-area,checkbox,select,avatar}.tsx`（新）、`apps/desktop/src/renderer/views/settings/{NetworkSheets,RelayFields,RuleSheet,ApprovalSheet}.tsx`、`apps/desktop/package.json`、`apps/desktop/package-lock.json`、`docs/guides/desktop-styles.md`、`CHANGELOG.md`。
+- **token 入口** 颜色/圆角/间距/字号/阴影仍全部来自 `apps/desktop/src/renderer/styles/tokens.css`（唯一来源）；新原语的 Tailwind 类经 `styles/tailwind.css` 的 `@theme inline` 映射到同一批 token（`bg-background`、`text-foreground`、`border-input`、`ring-ring`、`rounded-md`、`text-sm` 等），无新增硬编码色值。
+- **验证** `apps/desktop` 下 `npm run typecheck` 与 `npm run build`（electron-vite build）通过；构建 CSS 由 198.63 kB 增至 204.81 kB，说明新原语的 Tailwind 工具类已进入产物。按用户规则只编译、未启动应用。**计划中的亮/暗色人工走查**（本轮未执行）：主会话、主 bot 菜单、网络建网弹层/设备审批弹层各看亮色与暗色一遍。
+- **未换（保留）** 自定义标题栏与红绿灯区、托盘、系统原生菜单、Codync Screen（同 C0106/C0107）；`components/Overlay.tsx` 的模态与锚定菜单（`Dialog`/`Sheet`/`AnchoredMenu`/`PanelRows`/`DesktopActionMenu`）保留自绘——它们自带焦点陷阱、inert 叠层、Escape 栈与子菜单悬停计时，直接换 Radix 会改交互行为，违反「交互先保持现有可用」；本轮只把 `Dialog` 内容里的按钮/原语换掉。`Controls.tsx` 的共享 `Button`/`Switch`/`ChoicePicker` 未整体替换，避免一次性改动全局尺寸与形状（留待逐视图核对）。
+- **限制/待办** 实验分支；`dialog`/`sheet`/`dropdown-menu`/`popover`/`tooltip`/`scroll-area`/`checkbox`/`select`/`avatar` 已入库但尚未逐面接入（后续轮次推进主会话、右侧栏、主 bot 菜单、设置主页）。`avatar` 暂未替换带状态点的 `AvatarWithStatus`（状态角标逻辑尚需保留）。
+- **关联** C0106、C0107、C0108。
+

@@ -3,6 +3,8 @@ import { Button, CardSection, ChoiceList, IconButton, Reveal, Spinner } from '..
 import { ModalHeader, useDismiss } from '../../components/Overlay'
 import { HStack, VStack } from '../../components/Stack'
 import { Text } from '../../components/Text'
+import { Input } from '../../components/ui/input'
+import { Label } from '../../components/ui/label'
 import { connectorChoices, connectorFor, expiryTime, type ConnectorChoice } from '../../lib/network-copy'
 import { useTr } from '../../lib/use-language'
 import { fill } from '../../lib/fill.ts'
@@ -17,8 +19,8 @@ function Field({ label, value, set, placeholder, mono = false }: { label: string
   const tr = useTr()
   return (
     <HStack gap={12} className="settings-row">
-      <Text tone="text">{tr(label)}</Text>
-      <input
+      <Label className="shrink-0">{tr(label)}</Label>
+      <Input
         className={`settings-field${mono ? ' settings-mono' : ''}`}
         aria-label={tr(label)}
         placeholder={tr(placeholder)}

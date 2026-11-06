@@ -1,4 +1,5 @@
-import { Text } from '../../components/Text'
+import { Input } from '../../components/ui/input'
+import { Label } from '../../components/ui/label'
 import { useTr } from '../../lib/use-language'
 
 /**
@@ -9,8 +10,8 @@ function CommitField(props: { label: string; placeholder: string; defaultValue: 
   const tr = useTr()
   return (
     <div className="settings-row settings-appear">
-      <Text tone="text">{tr(props.label)}</Text>
-      <input
+      <Label className="shrink-0">{tr(props.label)}</Label>
+      <Input
         className="settings-field"
         aria-label={tr(props.label)}
         type={props.password ? 'password' : undefined}

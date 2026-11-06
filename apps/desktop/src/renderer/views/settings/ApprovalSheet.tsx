@@ -1,9 +1,10 @@
 import { useState } from 'react'
-import { Button, Reveal, Spinner } from '../../components/Controls'
+import { Reveal, Spinner } from '../../components/Controls'
 import { Icon } from '../../components/Icon'
 import { ModalHeader } from '../../components/Overlay'
 import { HStack, VStack } from '../../components/Stack'
 import { Text } from '../../components/Text'
+import { Button } from '../../components/ui/button'
 import type { Approval } from '../../store/app-model'
 import { useApp } from '../../store/context'
 import { deviceIcon, errorText } from './parts'
@@ -67,11 +68,11 @@ export function ApprovalSheet({ approval }: { approval: Approval }) {
           <Text as="div" size="caption" tone="danger" className="settings-centered">{error}</Text>
         </Reveal>
         <HStack align="stretch" gap={12}>
-          <Button kind="secondary" onClick={() => void decide(false)} disabled={busy}>
-            Deny
+          <Button variant="secondary" onClick={() => void decide(false)} disabled={busy}>
+            {tr('Deny')}
           </Button>
           <Button onClick={() => void decide(true)} disabled={busy || !request.code}>
-            Approve
+            {tr('Approve')}
           </Button>
         </HStack>
       </VStack>

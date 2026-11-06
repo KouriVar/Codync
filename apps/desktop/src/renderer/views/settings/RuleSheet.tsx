@@ -1,10 +1,13 @@
 import { useState } from 'react'
 import type { Network, NetworkRule } from '@shared/network'
-import { CardSection, ChoiceList, ChoicePicker, IconButton, Reveal, Spinner, Switch, ValueRow } from '../../components/Controls'
+import { CardSection, ChoiceList, ChoicePicker, IconButton, Reveal, Spinner, ValueRow } from '../../components/Controls'
 import { ModalHeader, useDismiss } from '../../components/Overlay'
-import { VStack } from '../../components/Stack'
+import { HStack, Spacer, VStack } from '../../components/Stack'
 import { Text } from '../../components/Text'
+import { Label } from '../../components/ui/label'
+import { Switch } from '../../components/ui/switch'
 import { ANY } from '../../lib/network-copy'
+import { useTr } from '../../lib/use-language'
 import type { BotStore } from '../../store/bot-store'
 import { network } from '../../store/network'
 import { errorText } from './parts'
@@ -16,6 +19,7 @@ const ACCESS: { id: NetworkRule['access']; label: string }[] = [
 
 /** A new rule for `net`: who on its other computers may message which bot here. Saves the whole list. */
 export function RuleSheet({ store, net }: { store: BotStore; net: Network }) {
+  const tr = useTr()
   const dismiss = useDismiss()
   const [access, setAccess] = useState<NetworkRule['access']>('deny')
   const [fromComputer, setFromComputer] = useState(ANY)
@@ -71,7 +75,11 @@ export function RuleSheet({ store, net }: { store: BotStore; net: Network }) {
           <ValueRow label="To bot">
             <ChoicePicker selection={toAgent} options={[{ id: ANY, label: 'Any bot here' }, ...(me?.agents ?? []).map((a) => ({ id: a.id, label: a.name }))]} onChange={setToAgent} />
           </ValueRow>
-          <Switch on={first} onChange={setFirst}>Put it first</Switch>
+          <HStack gap={12} className="settings-row">
+            <Label>{tr('Put it first')}</Label>
+            <Spacer />
+            <Switch id="rule-first" checked={first} onCheckedChange={setFirst} />
+          </HStack>
         </CardSection>
         <Reveal show={problem !== null}>
           <Text size="caption" tone="danger">{problem}</Text>
