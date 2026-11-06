@@ -1,10 +1,13 @@
-/* The bots a chat has worked with, over its message box (C0095), aligned to the Figma frame
-   (C0100): a status row 28 tall, then a row of 30-tall tags. Each tag and its “N messages” summary
-   share one rounded container, 62 tall — summary on top, tag below — so the text no longer floats
-   loose above the tag. One row each, scrolled sideways, flush with the box's column. */
+/* The bots a chat has worked with, above its message box (C0095 / C0125), matching the Figma
+   design (51:101 / 54:328):
+   - a status row 28 tall (whoever is running right now);
+   - a row of 30-tall chips (avatar + name + a status dot whose colour says what it's doing);
+   - hovering a chip floats the "N messages · name" card up above it (the up-grow animation);
+   - that card highlights its outline on hover and opens the docked conversation on click.
+   Chip: h30, radius 16, fill ≈ #1F1F1F, 1px stroke ≈ #353535, 13px name (all via tokens). */
 .bot-chip-bar-wrap {
   /* The four delegation status dots (red broke · orange running · blue awaiting you · green done)
-     now live in tokens.css as --status-problem / -working / -asking / -idle; only referenced below. */
+     live in tokens.css as --status-problem / -working / -asking / -idle; only referenced below. */
   max-width: var(--column);
   margin: 0 auto;
   padding: 0;
@@ -13,8 +16,7 @@
   gap: var(--space-4);
   min-width: 0;
 }
-/* The row of running bots, above the tags: 28 tall, one strip each, scrolled sideways when they
-   don't fit. */
+/* The row of running bots, above the chips: one strip each. */
 .bot-chip-running {
   display: flex;
   flex-wrap: nowrap;
@@ -38,61 +40,44 @@
   border-radius: var(--radius-pill);
   background: var(--surface);
 }
+/* The chip row. Wrap rather than clip, so a chip's hover card can float above the row. */
 .bot-chip-bar {
   display: flex;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   align-items: flex-end;
-  gap: var(--space-2);
-  overflow-x: auto;
-  scrollbar-width: none;
+  gap: 4px;
+  overflow: visible;
 }
-.bot-chip-bar::-webkit-scrollbar {
-  display: none;
-}
-/* One tag with its summary: a single rounded container, 62 tall. The tag (30) sits at the bottom,
-   the summary fills the rest above it. */
-.bot-chip-col {
+.bot-chip-item {
+  position: relative;
+  flex: none;
   display: flex;
   flex-direction: column;
-  align-items: stretch;
-  flex: none;
-  height: 62px;
-  max-width: 220px;
-  border-radius: var(--radius-l);
-  background: var(--surface);
-  overflow: hidden;
+  align-items: flex-start;
 }
-.bot-chip-count {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  min-height: 0;
-  padding: 0 10px;
-  text-align: left;
-  font-size: var(--text-caption);
-  color: var(--secondary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.bot-chip-count:hover {
-  color: var(--text);
-}
+/* One chip: avatar 20 + name, 30 tall, radius 16, 1px outline. */
 .bot-chip {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
+  gap: 6px;
   flex: none;
   height: 30px;
   max-width: 220px;
-  padding: 0 var(--space-4) 0 var(--space-2);
-  border-radius: 0;
-  background: transparent;
+  padding: 4px 8px 4px 4px;
+  border-radius: 16px;
+  background: var(--bubble-agent);
+  border: 1px solid color-mix(in srgb, var(--text) 12%, transparent);
+  color: var(--text);
+  transition: background-color var(--hover), border-color var(--hover);
+}
+.bot-chip:hover {
+  background: color-mix(in srgb, var(--bubble-agent) 86%, var(--text) 14%);
 }
 .bot-chip.chosen {
-  background: color-mix(in srgb, var(--text) 8%, transparent);
+  background: color-mix(in srgb, var(--text) 10%, transparent);
+  border-color: color-mix(in srgb, var(--text) 26%, transparent);
 }
-/* The avatar with its status dot on its bottom-right corner. */
+/* The avatar with its status dot on the bottom-right corner. */
 .bot-chip-avatar {
   position: relative;
   display: inline-flex;
@@ -106,8 +91,8 @@
   height: 8px;
   border-radius: 50%;
   box-sizing: border-box;
-  /* A ring of the container's fill, so the dot reads on the avatar's edge. */
-  box-shadow: 0 0 0 1.5px var(--surface);
+  /* A ring of the chip's fill, so the dot reads on the avatar's edge. */
+  box-shadow: 0 0 0 1.5px var(--bubble-agent);
 }
 .bot-chip-status.problem {
   background: var(--status-problem);
@@ -120,4 +105,49 @@
 }
 .bot-chip-status.idle {
   background: var(--status-idle);
+}
+/* The "N messages · name" card: hidden below the chip, floats up on hover (up-grow), then
+   highlights its outline on hover and opens the docked conversation on click. */
+.bot-chip-count-card {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% - 1px);
+  z-index: 2;
+  max-width: 260px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 8px 12px;
+  border-radius: 16px;
+  background: var(--bubble-agent);
+  border: 1px solid color-mix(in srgb, var(--text) 12%, transparent);
+  color: var(--text);
+  font-size: var(--text-body);
+  font-weight: 500;
+  line-height: 1.2;
+  box-shadow: var(--shadow-m);
+  opacity: 0;
+  transform: translateY(8px);
+  pointer-events: none;
+  cursor: default;
+  transition: opacity var(--morph), transform var(--morph), border-color var(--hover), background-color var(--hover);
+}
+.bot-chip-item:hover .bot-chip-count-card,
+.bot-chip-item:focus-within .bot-chip-count-card {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+  cursor: pointer;
+}
+.bot-chip-count-card:hover,
+.bot-chip-count-card:focus-visible {
+  border-color: color-mix(in srgb, var(--text) 42%, transparent);
+  background: color-mix(in srgb, var(--bubble-agent) 88%, var(--text) 12%);
+  outline: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .bot-chip,
+  .bot-chip-count-card {
+    transition: none;
+  }
 }

@@ -48,18 +48,22 @@ export function BotChipBar({ botId, mention, pick, openChat }: {
           const chosen = mention?.id === peerId
           const dot = DELEGATE_STATUS_DOTS[state]
           const label = `@${name} · ${tr(DELEGATE_STATUS_LABELS[state])}`
-          // C0100: the summary and the tag share one container — “N messages · name” on top.
+          // C0125: default is a 30-tall chip; hovering it floats the "N messages · name" card up.
           const summary = `${tr('{count} messages').replaceAll('{count}', () => String(exchanges.length))} ${name}`
           return (
-            <div key={peerId} className="bot-chip-col">
+            <div key={peerId} className="bot-chip-item">
+              {exchanges.length > 0 ? (
+                <button
+                  type="button"
+                  className="bot-chip-count-card"
+                  title={summary}
+                  onClick={() => openChat(peerId, name)}
+                >
+                  {summary}
+                </button>
+              ) : null}
               <button
-                className="press bot-chip-count"
-                title={summary}
-                onClick={() => openChat(peerId, name)}
-              >
-                {summary}
-              </button>
-              <button
+                type="button"
                 className={chosen ? 'press bot-chip chosen' : 'press bot-chip'}
                 aria-pressed={chosen}
                 title={label}
@@ -74,7 +78,7 @@ export function BotChipBar({ botId, mention, pick, openChat }: {
                     </>
                   ) : null}
                 </span>
-                <Text size="footnote" weight={chosen ? 'semibold' : 'regular'} truncate>{name}</Text>
+                <Text size="body" weight={chosen ? 'semibold' : 'medium'} truncate>{name}</Text>
               </button>
             </div>
           )

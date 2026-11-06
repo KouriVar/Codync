@@ -1390,5 +1390,18 @@ iOS 定制分支：`ui/ios-customization`；当前 Mac 工作分支：`ui/macos-
 - **验证** `npm run typecheck` 通过；随后重打 `dist:mac:local` 并替换正式 App，用户真机亮/暗复核。
 - **关联** C0123。
 
+### C0125 · 2026-11-06 · Bots 标签重做：30px 短 chip + hover 上浮消息卡（照 Figma 51:101 / 54:328）
+
+- **原因** 用户认为输入框上方的 bots 标签"有点丑"，给了 Figma：默认是一排 30 高的小 chip（头像+名字+状态色点，看颜色判断在干嘛），hover 时向上生长浮出「N 条消息往来 · 名字」卡片，卡片 hover 外框高亮、点击打开右侧会话面板。
+- **变化**
+  - `BotChipBar`（`views/thread/BotChipBar.tsx`）：标签由"常驻 62 高、消息数+tag 挤在一张卡"改为 **30 高短 chip + 绝对定位的 `.bot-chip-count-card`**（仅当该 peer 有 exchanges 时渲染），卡片默认 `opacity:0/translateY(8px)`，`.bot-chip-item:hover` 时上浮显示；卡片 `onClick` 打开 docked 会话（`openChat`），chip 仍点击切换 `@` 提及。
+  - `views/thread/bot-chips.css`：按设计重写——chip 高 30、圆角 16、底色 `--bubble-agent`（≈#1F1F1F）、1px 描边 `color-mix(--text 12%)`（≈#353535）、内边距 4/8/4/4、名字 13px Medium；消息卡同底色/描边/圆角，hover 时描边加粗到 42% 高亮；状态点在 chip 底色上描边；`prefers-reduced-motion` 关动画。chip 行改为 `flex-wrap:wrap; overflow:visible`（否则浮动卡会被 `overflow-x:auto` 裁掉）。
+- **文件** `apps/desktop/src/renderer/views/thread/{BotChipBar.tsx,bot-chips.css}`、`CHANGELOG.md`。
+- **token 入口** 仍只有 `styles/tokens.css`；用 `--bubble-agent`/`--text`/`--status-*` 与 `color-mix` 派生描边，无新增硬编码色值。
+- **验证** `npm run typecheck` 通过；随后重打 `dist:mac:local` 替换正式 App，用户在真机 hover 复核动画与点击开面板。
+- **限制/待办** 默认只显示"有过往来"的 peer（沿用 `delegatedPeers`）；Figma 里那些没消息的默认 chip（设计师/产品/数据）若要一起显示，需要再取群成员数据（下轮可加）。
+- **关联** C0095、C0100、C0123。
+
+
 
 
