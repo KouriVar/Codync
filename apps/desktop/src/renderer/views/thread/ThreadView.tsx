@@ -1,4 +1,4 @@
-import { Fragment, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { draftOf, isGroup, isWorking, isWorkingIn, type Bot, type BotDraft, type Entry } from '@shared/models'
 import { BotAvatar, GroupAvatar } from '../../components/Avatar'
 import { Spinner } from '../../components/Controls'
@@ -17,6 +17,7 @@ import { UpdateNeededCard } from '../UpdateNeededCard'
 import { buildChat, rowIn, useArrivals, type ChatItem } from './chat-items'
 import { BotConversationView, BotMessageRow } from './BotConversation'
 import { BotChatPanel } from './BotChatPanel'
+import { useColumnPresence } from './use-column-presence'
 import { MemoryNotice } from './MemoryNotice'
 import { useCiteJump } from './Citation'
 import { useMainBotMenu, useMainMenuActions } from '../MainBotMenu'
@@ -166,12 +167,15 @@ export const ThreadView = memo(function ThreadView({ botId }: { botId: string })
   // C0136: whichever column stands (the bot list or a peer conversation), the window makes room for
   // it — main grows it by 320 when it is narrower than the minimised chat needs, and puts it back.
   const columnOpen = !!menuActions?.botsPanel.open || botChat !== null
+  // C0139: the dock stays up while the window slides back, so the chat's width never changes.
+  const dockColumn = useColumnPresence(botChat !== null)
+  const pin = useRef(0)
+  if (dockColumn.mounted && pin.current === 0) pin.current = window.innerWidth
+  if (!dockColumn.mounted) pin.current = 0
+  // C0139: the column's layout is decided in CSS (`:has`), atomically with the DOM; this only asks
+  // main to grow the window by the column's 320 so the column is not left clipped.
   useEffect(() => {
     window.codync?.app?.panelRoom?.(columnOpen)
-    // C0138: while a column stands the chat keeps its width and the column takes the new room, so
-    // the window growing never reflows a bubble (the split clips until it has grown).
-    document.documentElement.classList.toggle('columns-open', columnOpen)
-    return () => document.documentElement.classList.remove('columns-open')
   }, [columnOpen])
   // C0131: the right side holds either the bot list or one peer conversation — never both.
   const openPeer = (id: string, name: string) => {
@@ -179,8 +183,6 @@ export const ThreadView = memo(function ThreadView({ botId }: { botId: string })
     setBotChat({ id, name })
   }
   // The docked conversation (Mac): a fixed 320 wide (C0100), the chat keeping 560 at least.
-  const chatOpen = isMac && botChat !== null
-  const chatPanelWidth = chatOpen ? 320 : 0
 
   // The bot's name pill. On the Mac it is the shadcn DropdownMenu trigger for the main bot menu; elsewhere it
   // opens the details, as before.
@@ -228,7 +230,7 @@ export const ThreadView = memo(function ThreadView({ botId }: { botId: string })
   )
 
   return (
-    <div className="thread-view" ref={root}>
+    <div className="thread-view" ref={root} style={pin.current ? ({ ['--chat-pin']: `${pin.current}px` } as CSSProperties) : undefined}>
       <div className="conversation">
         <div className="top-chrome">
           <TopFade />
@@ -321,8 +323,8 @@ export const ThreadView = memo(function ThreadView({ botId }: { botId: string })
         {artifactId ? <ArtifactView botId={botId} artifactId={artifactId} close={() => setArtifactId(null)} /> : null}
       </div>
       {/* C0096: the peer's conversation docked beside the chat on the Mac — one window, split by a hairline. */}
-      {chatOpen && botChat ? (
-        <div className="bot-chat-dock" style={{ width: chatPanelWidth }}>
+      {dockColumn.mounted && botChat ? (
+        <div className={`bot-chat-dock${dockColumn.closing ? ' closing' : ''}`} style={{ width: 320 }}>
           <BotChatPanel botId={botId} peerId={botChat.id} peerName={botChat.name} onClose={() => setBotChat(null)} />
         </div>
       ) : null}

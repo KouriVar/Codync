@@ -1558,3 +1558,14 @@ iOS 定制分支：`ui/ios-customization`；当前 Mac 工作分支：`ui/macos-
 - 删除 C0134 的浮层兜底（`@media (max-width: 919px)` 那段）。
 - **文件** `src/renderer/views/{thread/ThreadView.tsx,thread/thread.css,chat-window.css}`、`CHANGELOG.md`。
 - **验证** `npm run typecheck`；真机：600 宽点人形按钮，按钮不位移、气泡不重排，右栏随窗口长大出现。
+
+### C0139 · 2026-11-06 · 右栏开合绝不动左侧：会话宽度钉死 + 窗口按 320 增长（左缘不动）
+
+- **原因** C0138 仍会动：①`columns-open` 是 effect 里加的，右栏先渲染、下一帧才钉宽 → 中间有一帧被压窄；②关闭时右栏一卸载，会话立刻变宽再随窗口缩回；③窗口贴屏幕右缘时我把它左移，整个左栏跟着滑。
+- **现在的规则**
+  - **打开**：会话宽度当场**钉死**为打开前的像素宽（`--chat-pin`，由 React 内联写入，与 DOM 同帧，无过渡帧），窗口**按 320 增长**给右栏用；窗口**左缘固定不动**（空间不够就少长，宁可右栏被裁也不移动窗口）。
+  - **关闭**：右栏**先留在原位淡出**（`useColumnPresence` 保活 300ms），期间窗口缩回、布局仍钉着；窗口到位后才卸载 → 会话宽度前后完全一致。
+  - 布局判定全部走 CSS `:has()`，与 DOM 原子生效，不再依赖 effect 的 class。
+- **文件** `src/renderer/views/{ChatWindow.tsx,thread/ThreadView.tsx,thread/use-column-presence.ts(新),chat-window.css}`、`src/main/index.ts`、`CHANGELOG.md`。
+- **验证** `npm run typecheck`；真机：600 宽开关右栏，会话文字/气泡/按钮零位移，右栏 300ms 进出。
+- **取舍**：面板开启期间手动拖动窗口宽度，会话不跟随（宽度保持钉死值），关闭后恢复自适应。

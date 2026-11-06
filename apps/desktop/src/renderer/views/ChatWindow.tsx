@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode, type CSSProperties } from 'react'
 import type { WindowCommand } from '@shared/ipc'
 import { isSSHConnecting, showsChat as shouldShowChat } from '@shared/ssh-startup'
 import { draftOf, type Bot, type BotDraft } from '@shared/models'
@@ -21,6 +21,7 @@ import { UpdateBadge } from './UpdateButton'
 import { ComputerFilterHeader, computerSelection, useComputerFilterChoices } from './ComputerFilterHeader'
 import { MainMenuActionsContext, type MainMenuActions } from './MainBotMenu'
 import { isMac } from './settings/parts'
+import { useColumnPresence } from './thread/use-column-presence'
 import { ThreadView } from './thread/ThreadView'
 import { queueVoiceKey } from './thread/voice-shortcut-keys'
 import { NewBotView, NewGroupView } from './bots/NewBotView'
@@ -226,6 +227,12 @@ function ChatSplitView({ onComputerAccess }: { onComputerAccess: () => void }) {
   /** C0129: the Mac's bot list lives in a right-hand panel now; closed until the user opens it
    * (top-right person button, the main bot's menu, or Toggle Sidebar), and remembered across runs. */
   const [botsList, setBotsList] = usePref(prefs.botsPanel)
+  // C0139: the column stays mounted through its close so the chat never takes a wider frame.
+  const rosterColumn = useColumnPresence(isMac && botsList)
+  // Its chat keeps the exact width it had when the column opened.
+  const pin = useRef(0)
+  if (isMac && rosterColumn.mounted && pin.current === 0) pin.current = window.innerWidth
+  if (!rosterColumn.mounted) pin.current = 0
   /** C0102: the Mac's memory page, opened from the main bot's menu. */
   const [memoryOpen, setMemoryOpen] = useState(false)
   /** C0105: the proactive-report times, opened from the main bot's menu. */
@@ -464,7 +471,7 @@ function ChatSplitView({ onComputerAccess }: { onComputerAccess: () => void }) {
       onComputers={afterSheet(inSheet, manage)} />
   )
   return (
-    <div className={`split ${showAccount || context ? 'covered' : ''}`}>
+    <div className={`split ${showAccount || context ? 'covered' : ''}`} style={pin.current ? ({ ['--chat-pin']: `${pin.current}px` } as CSSProperties) : undefined}>
       {/* C0096: no left sidebar on the Mac — the main bot's menu opens the list below instead. */}
       {isMac ? null : (
         <>
@@ -499,8 +506,8 @@ function ChatSplitView({ onComputerAccess }: { onComputerAccess: () => void }) {
       </MainMenuActionsContext.Provider>
       {/* C0129: the roster the left sidebar held, as a 320 panel beside the conversation: 12 apart,
           a hairline down the middle. It stays off until the user opens it. */}
-      {isMac && botsList ? (
-        <aside className="sidebar right-panel" style={{ width: 320 }}>
+      {isMac && rosterColumn.mounted ? (
+        <aside className={`sidebar right-panel${rosterColumn.closing ? ' closing' : ''}`} style={{ width: 320 }}>
           <div className="sidebar-header roster-sheet-header">
             <Spacer />
             <HStack gap={6}>

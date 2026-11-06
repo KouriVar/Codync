@@ -79,20 +79,27 @@
   display: flex;
   height: 100%;
 }
-/* C0138: a standing column takes 320 of the window and the chat keeps at least 600 — at the
-   minimised 600 the split is 920 wide and clips until the window has grown to match, so the chat
-   never reflows and the toggle button never travels. */
-html.columns-open .split {
+/* C0139: while a column stands, the chat holds its 600 and the split clips whatever the window has
+   not grown to yet. Decided by the DOM itself (:has) — not by a class set in an effect — so the
+   very first paint that contains the column is already the wide layout: the chat is never given a
+   frame at 600 − 320, and one pixel of it does not move while the column opens or closes. */
+.split:has(> .right-panel) {
   overflow: hidden;
 }
-html.columns-open .detail {
-  min-width: 600px;
+.split:has(> .right-panel) > .detail {
+  /* C0139: frozen at the width it had when the column opened (`--chat-pin`), so the column takes
+     the window's new 320 instead of any of the chat's. */
+  flex: none;
+  width: var(--chat-pin, 100%);
+  min-width: 0;
 }
-html.columns-open .conversation {
-  min-width: 600px;
-}
-html.columns-open .thread-view {
+.thread-view:has(> .bot-chat-dock) {
   overflow: hidden;
+}
+.thread-view:has(> .bot-chat-dock) > .conversation {
+  flex: none;
+  width: var(--chat-pin, 100%);
+  min-width: 0;
 }
 /* An open account panel or action menu takes the clicks. */
 .split.covered {
@@ -337,9 +344,25 @@ html[data-platform="darwin"] .sidebar-header {
     transform: none;
   }
 }
+@keyframes column-out {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+  to {
+    opacity: 0;
+    transform: translateX(14px);
+  }
+}
 .right-panel,
 .bot-chat-dock {
   animation: column-in 300ms cubic-bezier(0, 0, 0.58, 1);
+}
+/* C0139: closing fades the column out while the window slides back; the layout stays exactly as
+   wide as it was until the column is gone. */
+.right-panel.closing,
+.bot-chat-dock.closing {
+  animation: column-out 300ms cubic-bezier(0, 0, 0.58, 1) forwards;
 }
 @media (prefers-reduced-motion: reduce) {
   .right-panel,

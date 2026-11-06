@@ -97,8 +97,9 @@ function openChat() {
   return chat
 }
 
-/** The narrowest window that holds the chat (600) and a 320 column beside it — Figma 105:11442. */
-const PANEL_ROOM = 920
+/** A column beside the chat: 320 wide, so the window grows by exactly that (Figma 105:11442 is the
+ * minimised 600 + 320). */
+const PANEL_WIDTH = 320
 /** The width to put back after a column grew the window; null while no column did. */
 let roomBeforePanel: number | null = null
 
@@ -118,21 +119,22 @@ function smartEase(t: number) {
   return y(u)
 }
 
-/** Grows or shrinks a window's width over 300ms, keeping it on the display it is on. */
+/** Grows or shrinks a window's width over 300ms. The left edge never moves: the chat is the thing
+ * that must not shift, so the window grows to the right and, at the edge of the display, stops a
+ * little short rather than sliding the whole window (and the chat with it) sideways. */
 function animateWindowWidth(win: BrowserWindow, wanted: number) {
   const from = win.getBounds()
   const area = screen.getDisplayMatching(from).workArea
-  const width = Math.max(360, Math.min(wanted, area.width))
+  const room = area.x + area.width - from.x
+  const width = Math.max(360, Math.min(wanted, room))
   if (Math.abs(width - from.width) < 1) return
-  // There is no room to grow to the right at the edge of the display, so the window slides left.
-  const x = Math.max(area.x, Math.min(from.x, area.x + area.width - width))
   const start = Date.now()
   const step = () => {
     if (win.isDestroyed()) return
     const p = Math.min(1, (Date.now() - start) / 300)
     const e = smartEase(p)
     win.setBounds({
-      x: Math.round(from.x + (x - from.x) * e),
+      x: from.x,
       y: from.y,
       width: Math.round(from.width + (width - from.width) * e),
       height: from.height,
@@ -242,10 +244,11 @@ function registerIPC(tray: Tray) {
   ipcMain.on('app:panelRoom', (_e, open: boolean) => {
     if (!chat) return
     if (open) {
-      if (chat.getBounds().width >= PANEL_ROOM) return
+      // C0139: the chat keeps its width and its place, so the window makes the room — always by the
+      // column's 320, whatever the window was; and it never slides sideways doing it.
       if (roomBeforePanel === null) roomBeforePanel = chat.getBounds().width
-      animateWindowWidth(chat, PANEL_ROOM)
-    } else if (roomBeforePanel !== null) {
+      animateWindowWidth(chat, chat.getBounds().width + PANEL_WIDTH)
+    } else if (roomBeforePanel !== null && chat.getBounds().width > roomBeforePanel) {
       const back = roomBeforePanel
       roomBeforePanel = null
       animateWindowWidth(chat, back)
