@@ -137,14 +137,13 @@
      padding now (C0132), so the button adds none — 30 tall at rest. */
   height: 22px;
   max-width: 260px;
-  padding: 0;
+  /* C0135: 1px on the left so the avatar lands at x=5 and the name at x=29, exactly where the
+     frame's chip puts them (104:9026 — the 22-tall box centres its 20 avatar, plus the 4 padding). */
+  padding: 0 0 0 1px;
   border: 0;
   background: transparent;
   color: var(--text);
   transition: background-color var(--hover);
-}
-.bot-chip:hover {
-  background: color-mix(in srgb, var(--text) 6%, transparent);
 }
 .bot-chip.chosen {
   background: color-mix(in srgb, var(--text) 10%, transparent);

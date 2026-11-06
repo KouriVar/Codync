@@ -1523,3 +1523,12 @@ iOS 定制分支：`ui/ios-customization`；当前 Mac 工作分支：`ui/macos-
   - **窄窗口下右栏不占列**：`@media (max-width: 899px)` 时 bot 列表与子 bot 会话栏改为**浮在会话上方**（右侧 320、投影），`.detail` 取消 `min-width`——否则会把会话压到 550 以下。
 - **文件** `src/main/index.ts`、`renderer/views/{chat-window.css,thread/thread.css}`、`CHANGELOG.md`。
 - **验证** `npm run typecheck`；demo 无头量取：600 → 列 **576 @x12**、760 → **736 @x12**、1280 → **888 @x196**；右上按钮右缘恒距窗边 12。
+
+### C0135 · 2026-11-06 · chip 对齐复核（头像 x/y=5、名字 x=29）；hover 不再给底色
+
+- **核对**（直接读用户在 Figma 里选中的 chip `104:9026`）：96×30、padding **上4 右8 下4 左4**、gap 4、r16；子层实际落位 **头像 x=5 y=5**（30−8=22 的框内 20 头像居中多 1px）、**名字 x=29**、名字距右 8。
+- **差异**：我们原来是 头像 x=4（整体贴左 1px），其余（上5 下5 右8）一致。
+- **修正**：`.bot-chip` 左侧补 1px（`padding: 0 0 0 1px`），实测变为 **头像 x=5 y=5、距底 5、名字 x=29、距右 8**，与图层逐项相同。
+- **另**：删掉 `.bot-chip:hover` 的 6% 文字色底——图里 hover 名字不给背景（计数行的描边高亮保留）。
+- **文件** `views/thread/bot-chips.css`、`CHANGELOG.md`。
+- **验证** 最小页 + 2x 实测（数值同上）；`npm run typecheck` 通过。
