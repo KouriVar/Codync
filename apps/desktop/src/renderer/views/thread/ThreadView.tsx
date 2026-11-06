@@ -153,7 +153,13 @@ export const ThreadView = memo(function ThreadView({ botId }: { botId: string })
 
   // C0096: the bot's name button opens the menu the left sidebar used to be — its own conversation's
   // entries, the other bots, and the app's.
-  const mainMenu = useMainBotMenu({ onRoutines: () => presentRoutine(null), onFullConversation: openTrace, onDetails: toggleDetails })
+  const mainMenu = useMainBotMenu({
+    onRoutines: () => presentRoutine(null),
+    onFullConversation: openTrace,
+    onDetails: toggleDetails,
+    // C0128: the menu's 待你处理汇总 asks the host for one digest turn; no message of the user's.
+    onPendingDigest: () => store.pendingDigest(botId),
+  })
   // The docked conversation (Mac): a fixed 320 wide (C0100), the chat keeping 560 at least.
   const chatOpen = isMac && botChat !== null
   const chatPanelWidth = chatOpen ? 320 : 0

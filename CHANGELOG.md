@@ -1413,6 +1413,32 @@ iOS 定制分支：`ui/ios-customization`；当前 Mac 工作分支：`ui/macos-
 - **验证** `npm run typecheck` 通过；重打 `dist:mac:local` 替换正式 App，真机 hover 复核「一张卡长高」。
 - **关联** C0125。
 
+### C0127 · 2026-11-06 · Host：Bot 主动往群发消息（list_groups / post_to_group）+ 升级后刷新工具
+
+- **原因** Bot 此前只能向自己的聊天发消息；群里发言只能以用户身份经 `send` 起一轮房间对话。首版只在 Host 加两个工具，iOS/Mac 沿用现有群消息同步与展示。
+- **变化**
+  - 新增 `host/src/chat/team/groups.rs`：`list_groups(query?)`（只列当前 Bot 是成员、未隐藏未删除的群）与 `post_to_group(groupId, text, requestId)`（写一条 `EntryKind::Agent` + `{text, final:true, author}` 到群 lane，复用 `entry` 事件/`history`；**不调 `group::start`**，不唤醒其他成员；写入时重读群并校验成员，退群/隐藏/删除后旧 id 直接拒绝；`requestId` → 确定性 entry id 做幂等）。
+  - `chat/team.rs`：`mod groups`、`tools()` 追加、`call_async`/`call` 分发、INSTRUCTIONS 补用法。
+  - 新增 `host/src/agent/upgrade.rs` + `hub.rs::start` 里的版本比对：host 版本变化时给所有 bot 发 `Cmd::RefreshTools`，重连 MCP 子进程，否则旧会话看不到新工具。
+  - 文档：`docs/features/groups-and-replies.md` 新增一节。
+- **文件** `host/src/chat/team/{groups.rs,team.rs}`、`host/src/agent/{upgrade.rs,mod.rs}`、`host/src/hub.rs`、`docs/features/groups-and-replies.md`、`CHANGELOG.md`。
+- **验证** `cargo fmt --check` / `clippy --all-targets -D warnings` / `chat::`、`api::`、`store::` 测试通过（`remote::relay|channel` 网络测试在本机会 hang，干净 dev 上同样失败，属环境问题）。真机 API E2E：写入一条 `agent/晚安/author=主bot/final=true`、同 `requestId` 重试只一条、退群后 400 拒绝；另用「产品经理」真实模型调用成功在群里发出「晚上好」。
+- **关联** C0128。
+
+### C0128 · 2026-11-06 · 待你处理汇总（手动触发，只读工具 + 主 bot 提示词规则 + 桌面菜单）
+
+- **原因** 主 bot 读其他 bot 最近的对话，只挑"停在用户这儿"的事推给用户；先做手动触发版，不做定时。
+- **变化**
+  - 新增只读工具 `pending_digest`（挂 `codync-team`，`readOnlyHint: true`，文件 `host/src/chat/team/pending.rs`）：遍历除调用者外的非群、未隐藏、未删除 bot，每个用 `Store::recent_messages` 取最近 N 条（默认 30，上限 50），复用 `recall::sensitive` 丢掉疑似密钥文本，单条正文截 600 字；返回 `now{at,local}` + 每个 bot 的 `botId/botName/lastAt/lastLocal/lastAuthor(user|bot)/messages[{at,local,author,text}]`，时间固定 Asia/Shanghai（`+08:00`），按最后时间倒序。
+  - `chat/team.rs`：`mod pending`、`tools()` 追加、`call_async`/`call` 分发 `pending_digest`。
+  - 提示词：`chat/lead.rs` 新增 **`DIGEST`**（判断规则，独立成段，不塞进 `BRIEF`）与 `DIGEST_PROMPT`（菜单触发的一轮提示）；`chat/context.rs::render` 在 `cfg.lead` 时把 `DIGEST` 作为单独一段注入，代码里不做任何判定。
+  - 触发：a) 用户说「汇总」「有啥等我的」「待办」（由 `DIGEST` 规则识别）；b) 桌面主 bot 菜单新增「待你处理汇总」（`views/MainBotMenu.tsx`）→ `BotStore.pendingDigest()` → host `pendingDigest` → `Cmd::Prompt { text: DIGEST_PROMPT, call: None }`，起一轮**没有用户气泡**的回合，结果由 bot 用 `send_message` 当普通助手消息发出。
+- **文件** `host/src/chat/team/{pending.rs,team.rs}`、`host/src/chat/{lead.rs,context.rs}`、`host/src/api/bots.rs`、`apps/desktop/src/renderer/{store/bot-store.ts,views/MainBotMenu.tsx,views/thread/ThreadView.tsx}`、`CHANGELOG.md`。
+- **限制/待办** 只做桌面端菜单，本单不动 iOS/Android；未做定时（后续可直接用 routines：`instruction` 写"跑 pending_digest 并发汇总"，cron 触发即可复用）。
+- **验证** 只编译：`cd host && cargo check`、`cd apps/desktop && npm run typecheck` 通过；按要求**未自测、未重启正式 Host 19222、未重打/替换正式 App**。现有 bot 要看到新工具/新提示词，需新会话或 host 升级后的自动刷新（C0127）。
+- **关联** C0127。
+
+
 
 
 

@@ -312,6 +312,11 @@ export class BotStore extends BotSync {
     this.perform((c) => c.call('markRead', { botId }), true)
   }
 
+  /** C0128: the main menu's 待你处理汇总 — one digest turn here, with no message of the user's. */
+  pendingDigest(botId: string) {
+    this.perform((c) => c.call('pendingDigest', { botId }), true)
+  }
+
   private patchBot(bot: Bot, change: Partial<BotDraft>) {
     const current = this.bots.get(bot.id)
     if (current) this.bots.set(bot.id, { ...current, ...change } as Bot)

@@ -45,6 +45,8 @@ export function useMainBotMenu(conversation: {
   onRoutines: () => void
   onFullConversation: () => void
   onDetails: () => void
+  /** C0128: asks the main bot for the pending-items digest, in its chat. */
+  onPendingDigest: () => void
 }) {
   const actions = useMainMenuActions()
   const ref = useRef<HTMLButtonElement>(null)
@@ -73,6 +75,7 @@ export function useMainBotMenu(conversation: {
     if (page === 'connection') return [back(), ...actions.connection.items()]
     // The bot's own conversation, then the other bots, then the app itself — a rule between each.
     const own: MenuItem[] = [
+      { title: '待你处理汇总', icon: 'checklist', action: conversation.onPendingDigest },
       { title: 'Routines', icon: 'clock', action: conversation.onRoutines },
       { title: 'Memory', icon: 'brain', action: () => actions.openMemory() },
       { title: 'Conversation details', icon: 'info.circle', action: conversation.onDetails },

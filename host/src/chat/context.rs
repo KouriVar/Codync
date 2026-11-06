@@ -215,6 +215,8 @@ pub fn render(store: &Store, cfg: &BotConfig) -> String {
     );
     if cfg.lead {
         lines.push(crate::chat::lead::BRIEF.to_owned());
+        // C0128: separate from the role, so the digest rules can change without rewriting it.
+        lines.push(crate::chat::lead::DIGEST.to_owned());
     }
     // Claude Code's own system prompt, which this is appended to, says the user is in its CLI.
     let engine = if cfg.backend == "custom" {

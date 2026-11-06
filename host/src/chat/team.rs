@@ -17,6 +17,7 @@ use std::sync::Arc;
 pub mod assistant;
 mod directory;
 mod groups;
+mod pending;
 pub mod remote;
 mod requests;
 pub use requests::{Requests, Turn};
@@ -78,9 +79,11 @@ pub fn tools() -> Value {
             "annotations": {"readOnlyHint": false, "idempotentHint": false},
         }
     ]);
-    // Speaking in a group is part of the same collaboration surface.
+    // Speaking in a group, and reading how the other chats end, are part of the same collaboration
+    // surface.
     if let Some(list) = tools.as_array_mut() {
         list.extend(groups::tools());
+        list.extend(pending::tools());
     }
     tools
 }
@@ -372,6 +375,10 @@ pub async fn call_async(hub: &Arc<Hub>, from: &str, name: &str, args: &Value) ->
             visible_bot(hub, from)?;
             groups::call(hub, from, name, args)
         }
+        "pending_digest" => {
+            visible_bot(hub, from)?;
+            pending::call(hub, from, args)
+        }
         _ => call(hub, from, name, args),
     }
 }
@@ -389,6 +396,7 @@ fn call(hub: &Arc<Hub>, from: &str, name: &str, args: &Value) -> Result<Value> {
             }
         }
         "list_groups" | "post_to_group" => groups::call(hub, from, name, args),
+        "pending_digest" => pending::call(hub, from, args),
         _ => bail!("unknown team tool: {name}"),
     }
 }

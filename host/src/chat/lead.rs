@@ -25,6 +25,14 @@ const CHECK_IN: &str = "Check in on the user. Look at what you know: your memory
 
 const OPENING: &str = "[Codync: the user just started a voice call with you, and you speak first. What you send is read aloud. In one or two short sentences, tell them what deserves their attention now (from your memory, recent conversations and connected services), or greet them and ask what they'd like to do. No lists, code or links.]";
 
+/// The pending-items digest (C0128), only for the lead: the user's other chats, read through
+/// `pending_digest`, told back as one line each for what still waits on them. The judgement is here,
+/// in the prompt, so the tool stays a plain reader.
+pub const DIGEST: &str = "待你处理汇总：用户说「汇总」「有啥等我的」「待办」，或从菜单点了「待你处理汇总」时，调用 pending_digest，然后只把停在用户这边的事一行一件发出来：`bot名 · 时间 · 卡在哪 · 你要做什么`。时间用 Asia/Shanghai，按 now 写「今天 HH:MM」「昨天 HH:MM」或「MM-DD HH:MM」。判定：最后一条是 bot 说的，且是提问、等确认、交了结果、报错，就算等你；最后一条是用户说的、或 bot 只是闲聊收尾，就不列。「你还没回」是推断出来的，拿不准就在行尾加「（疑似待回复）」。多个 bot 说的是同一件事就合并，只留最新那条。全都没事只回一句「都清空了」。用 send_message 当普通消息发，不要卡片、不要列表标题。";
+
+/// The turn the menu's 待你处理汇总 starts: no message of the user's; the digest rules do the rest.
+pub const DIGEST_PROMPT: &str = "[Codync: the user picked 待你处理汇总 from your menu. Call pending_digest and send the digest now, following your pending-digest instructions.]";
+
 /// The lead's id, if the computer has one.
 fn id(store: &Store) -> Result<Option<String>> {
     Ok(store.bots()?.into_iter().find(|b| !b.deleted && b.config.lead).map(|b| b.config.id))
