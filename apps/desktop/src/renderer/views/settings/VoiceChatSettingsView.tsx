@@ -6,6 +6,7 @@ import { Icon } from '../../components/Icon'
 import { ModalHeader, SheetPage } from '../../components/Overlay'
 import { HStack, Spacer, VStack } from '../../components/Stack'
 import { Text } from '../../components/Text'
+import { Input } from '../../components/ui/input'
 import { usePref } from '../../lib/prefs'
 import { useStore } from '../../store/context'
 import { useScreenViewed } from '../../store/analytics'
@@ -253,7 +254,7 @@ function ProviderVoiceSettings({ provider, dictationOnly = false }: { provider: 
         // Paste a key; the computer checks it with the provider before keeping it.
         <VStack gap={10}>
           <HStack gap={8} className="settings-row">
-            <input
+            <Input
               type="password"
               aria-label="API key"
               placeholder={info.keyPrompt}

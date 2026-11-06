@@ -2,11 +2,13 @@ import { hasLibrary } from '@shared/artifacts'
 import { isGroup, isWorking, type Bot } from '@shared/models'
 import { AgentIcon } from '../../components/AgentIcon'
 import { BotAvatar, GroupAvatar } from '../../components/Avatar'
-import { IconButton, RowLabel, Switch, TabChoice } from '../../components/Controls'
+import { IconButton, RowLabel } from '../../components/Controls'
 import { LeadAgentBadge } from '../../components/LeadAgentBadge'
 import { Icon } from '../../components/Icon'
 import { HStack, VStack } from '../../components/Stack'
 import { Text } from '../../components/Text'
+import { Switch } from '../../components/ui/switch'
+import { Tabs, TabsList, TabsTrigger } from '../../components/ui/tabs'
 import { useStore } from '../../store/context'
 import { useScreenViewed } from '../../store/analytics'
 import { BotSettingsPanel } from '../bots/BotEditorView'
@@ -42,6 +44,7 @@ export function DetailsPanel({ botId, routineId, tab, setTab, editGroup, openArt
   const store = useStore()
   const bot = store.bots.get(botId) ?? null
   const group = !!bot && isGroup(bot)
+  const tr = useTr()
   useScreenViewed('bot_details')
   return (
     <div className="details-panel">
@@ -56,7 +59,13 @@ export function DetailsPanel({ botId, routineId, tab, setTab, editGroup, openArt
           <GroupMembersList group={bot} editGroup={editGroup} />
         ) : (
           <>
-            <TabChoice label="Conversation details" selection={tab} options={hasLibrary(store.hostVersion?.version) ? TABS : TABS.filter((t) => t.id !== 'library')} onChange={setTab} />
+            <Tabs value={tab} onValueChange={(v) => setTab(v as DetailsTab)}>
+              <TabsList className="w-full justify-start">
+                {(hasLibrary(store.hostVersion?.version) ? TABS : TABS.filter((t) => t.id !== 'library')).map((t) => (
+                  <TabsTrigger key={t.id} value={t.id}>{tr(t.label)}</TabsTrigger>
+                ))}
+              </TabsList>
+            </Tabs>
             <div key={tab} className="details-tab fade-in">
               {tab === 'details' ? (
                 <>
@@ -115,7 +124,7 @@ function ComputerUse({ bot }: { bot: Bot }) {
       <div className="outlined-card details-switch">
         <RowLabel grow label="Use the computer" detail={ready ? null : 'On that computer, open Codync → Settings → Computer access to set it up first.'} />
         <HStack as="span" align="stretch" className="details-switch-control">
-          <Switch label="Use the computer" on={bot.computer} disabled={store.isOffline} onChange={(on) => store.setComputer(bot, on)} />
+          <Switch aria-label={tr('Use the computer')} checked={bot.computer} disabled={store.isOffline} onCheckedChange={(on) => store.setComputer(bot, on)} />
         </HStack>
       </div>
     </section>

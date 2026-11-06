@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
-import { CardSection, IconButton, Switch, TabChoice } from '../../components/Controls'
+import { CardSection, IconButton } from '../../components/Controls'
 import { Icon } from '../../components/Icon'
 import { Sheet } from '../../components/Overlay'
-import { HStack } from '../../components/Stack'
+import { HStack, Spacer } from '../../components/Stack'
 import { Text } from '../../components/Text'
+import { Switch } from '../../components/ui/switch'
+import { Tabs, TabsList, TabsTrigger } from '../../components/ui/tabs'
 import { useModel } from '../../lib/observable'
 import { useTr } from '../../lib/use-language'
 import { useStore } from '../../store/context'
@@ -45,23 +47,29 @@ export function MemoryCard({ botId }: { botId: string }) {
 
   return <>
     <div className="memory-panel">
-      <TabChoice label="Memory" selection={section} options={sections} onChange={(next) => {
-        setSection(next)
+      <Tabs value={section} onValueChange={(next) => {
+        setSection(next as Section)
         // Claude Code writes its notes outside Codync, so nothing moves `memoryRev`: read them again on the way in.
         if (next === 'harness') void memory.load()
-      }} />
+      }}>
+        <TabsList className="w-full justify-start">
+          {sections.map((s) => <TabsTrigger key={s.id} value={s.id}>{tr(s.label)}</TabsTrigger>)}
+        </TabsList>
+      </Tabs>
       <CardSection>
         {memory.error && <p role="alert" className="memory-error">{tr(memory.error)}</p>}
         {!view && !memory.error && <p className="memory-muted">Loading memory…</p>}
-        {view && bot && section === 'yours' && <Switch on={bot.sharedMemory} onChange={(on) => host.setSharedMemory(bot, on)}>
-          Use what your bots share
-        </Switch>}
+        {view && bot && section === 'yours' && <HStack gap={8}>
+          <Text>{tr('Use what your bots share')}</Text>
+          <Spacer />
+          <Switch aria-label={tr('Use what your bots share')} checked={bot.sharedMemory} onCheckedChange={(on) => host.setSharedMemory(bot, on)} />
+        </HStack>}
         {/* The harness's own memory: a switch where Codync can turn it off, "Shared" where every bot on it shares it. */}
         {view && bot && section === 'bot' && (bot.harnessMemory !== null || bot.harnessMemoryShared) && <HStack gap={4}>
           <span>{own}</span>
           <IconButton title={tr("About {name}'s own memory").replaceAll('{name}', harness)} icon="info.circle" onClick={() => setInfo('harness')} />
           {bot.harnessMemory !== null
-            ? <Switch on={bot.harnessMemory} onChange={(on) => host.setHarnessMemory(bot, on)} label={own} className="memory-harness-switch" />
+            ? <Switch aria-label={own} checked={bot.harnessMemory} onCheckedChange={(on) => host.setHarnessMemory(bot, on)} className="memory-harness-switch" />
             : <Text tone="secondary" className="memory-harness-shared">{tr('Shared')}</Text>}
         </HStack>}
         {layer && [

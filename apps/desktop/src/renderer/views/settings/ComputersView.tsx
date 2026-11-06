@@ -6,6 +6,8 @@ import { Icon } from '../../components/Icon'
 import { Dialog, ModalHeader, Sheet, useDismiss } from '../../components/Overlay'
 import { HStack, Spacer, VStack } from '../../components/Stack'
 import { Text } from '../../components/Text'
+import { Input } from '../../components/ui/input'
+import { Label } from '../../components/ui/label'
 import { useModel } from '../../lib/observable'
 import { useAccount } from '../../store/account'
 import { analytics } from '../../store/analytics'
@@ -405,8 +407,8 @@ function SSHProfileEditor({ profile: initial, isNew }: { profile: SSHProfile; is
 
   const field = (label: string, value: string, set: (v: string) => void, prompt: string) => (
     <HStack gap={12} className="settings-row">
-      <Text tone="text">{label}</Text>
-      <input className="settings-field" aria-label={label} placeholder={prompt} value={value} spellCheck={false} onChange={(e) => set(e.target.value)} />
+      <Label className="shrink-0">{label}</Label>
+      <Input className="settings-field" aria-label={label} placeholder={prompt} value={value} spellCheck={false} onChange={(e) => set(e.target.value)} />
     </HStack>
   )
 

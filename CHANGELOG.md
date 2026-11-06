@@ -1211,4 +1211,19 @@ iOS 定制分支：`ui/ios-customization`；当前 Mac 工作分支：`ui/macos-
 - **限制/待办** 实验分支；设置页其余子页（Computers/Network/Voice）与主会话、右侧栏、主 bot 菜单仍待后续轮次接入。
 - **关联** C0106、C0109。
 
+### C0111 · 2026-11-06 · 右侧详情栏 + 只读记忆页页签/开关、SSH 与语音设置输入接入 shadcn（实验分支续）
+
+- **原因** 承接 C0109/C0110：右侧详情栏（聊天右侧 inspector）和只读记忆卡仍用自绘 `TabChoice`（分段页签）与 `Controls.Switch`；设置里「Add/Edit SSH computer」与「Voice chat」的 API key 仍是原生 `<input>`。这些都是 Desktop 可见 UI 且点名范围内的弹层/侧栏，本轮统一换官方件。
+- **变化**
+  - **右侧详情栏 `views/thread/DetailsPanel.tsx`**：对话详情页签（Details/Library/Memory/Settings）由自绘 `TabChoice` → shadcn `Tabs`（`TabsList`/`TabsTrigger`，保留原 `tab`/`setTab` 与内容切换逻辑）；「Use the computer」由自绘 `Switch` → shadcn `Switch`（`checked`/`onCheckedChange`）。
+  - **只读记忆卡 `views/bots/MemoryView.tsx`**：四个记忆分区页签由 `TabChoice` → shadcn `Tabs`；「Use what your bots share」与 harness 记忆两个开关 → shadcn `Switch`（各带 `aria-label`）。
+  - **设置表单**：`views/settings/ComputersView.tsx` 的 SSH 编辑器 `field()`（Name/Host/User/SSH port/Codync port）由原生 `<input>` → shadcn `Input` + `Label`；`views/settings/VoiceChatSettingsView.tsx` 的 API key 密码框 → shadcn `Input`（`type=password`，保留 `settings-key-input` 类与 Enter 校验）。
+- **文件** `apps/desktop/src/renderer/views/thread/DetailsPanel.tsx`、`apps/desktop/src/renderer/views/bots/MemoryView.tsx`、`apps/desktop/src/renderer/views/settings/{ComputersView.tsx,VoiceChatSettingsView.tsx}`、`CHANGELOG.md`。
+- **token 入口** 仍只有 `apps/desktop/src/renderer/styles/tokens.css`（经 `styles/tailwind.css` 映射）；`Tabs`/`Switch`/`Input` 全部走 token 语义类，无新增硬编码色值；SSH 字段沿用 `.settings-row`/`.settings-field` 的行内布局，边框/背景/圆角来自 `Input` 默认。
+- **验证** `apps/desktop` 下 `npm run typecheck` 与 `npm run build` 通过；构建 CSS 204.99 kB→205.05 kB、JS 4,379.97 kB→4,380.20 kB（Tabs/Switch/Input 已进产物）。按规则只编译，未启动应用；亮/暗色人工走查仍未执行。
+- **未换（保留）** 主 bot 菜单仍是 `AnchoredMenu`/`PanelRows` 自定义菜单（定位、子菜单悬停计时、keepsOpen 翻页、键盘导航；换 Radix DropdownMenu 会改交互）；`DetailsPanel` 的结构与业务逻辑不变，只换页签/开关原语；`Controls.Button` 等共享原语未整体替换；原生桌面 chrome 不动。
+- **限制/待办** 实验分支；主 bot 菜单、主会话消息区、设置 Network/Computers 主列表等仍待后续轮次。
+- **关联** C0106、C0110。
+
+
 
