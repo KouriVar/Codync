@@ -1,11 +1,12 @@
-import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { draftOf, isGroup, isWorking, isWorkingIn, type Bot, type BotDraft, type Entry } from '@shared/models'
 import { BotAvatar, GroupAvatar } from '../../components/Avatar'
 import { Spinner } from '../../components/Controls'
 import { Icon } from '../../components/Icon'
-import { Sheet, usePresence, AnchoredMenu } from '../../components/Overlay'
+import { Sheet, usePresence } from '../../components/Overlay'
 import { HStack, IconSlot, Spacer } from '../../components/Stack'
 import { Text } from '../../components/Text'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '../../components/ui/dropdown-menu'
 import { prefs, usePref } from '../../lib/prefs'
 import { connectedThrough } from '../../lib/relay-copy'
 import { useTr } from '../../lib/use-language'
@@ -157,6 +158,30 @@ export const ThreadView = memo(function ThreadView({ botId }: { botId: string })
   const chatOpen = isMac && botChat !== null
   const chatPanelWidth = chatOpen ? 320 : 0
 
+  // The bot's name pill. On the Mac it is the shadcn DropdownMenu trigger for the main bot menu; elsewhere it
+  // opens the details, as before.
+  const titlePill = (
+    <button
+      className={`title-pill ${calling ? 'hidden-by-call' : ''}`}
+      inert={calling}
+      onClick={isMac ? undefined : toggleDetails}
+      aria-label={isMac
+        ? tr('{name}, open menu').replaceAll('{name}', () => bot?.name ?? tr('Conversation'))
+        : tr('{name}, view details').replaceAll('{name}', () => bot?.name ?? tr('Conversation'))}
+      title={isMac ? tr('Open menu') : 'View conversation details'}
+    >
+      <HStack as="span" gap={8}>
+        {bot ? isGroup(bot) ? <GroupAvatar members={store.members(bot)} size={22} /> : <BotAvatar bot={bot} size={22} /> : null}
+        <Text size="body" weight="medium" tone="text" truncate>{bot?.name ?? ''}</Text>
+        {/* Grok Bot's hint on hover: the pill opens the details. */}
+        <span className="title-pill-chevron">
+          <Icon name={isMac ? 'chevron.down' : 'chevron.right'} size={10} weight="semibold" color="var(--secondary)" />
+        </span>
+      </HStack>
+      {store.shownConnection.kind !== 'online' || store.mismatch ? <ConnectionSubtitle /> : null}
+    </button>
+  )
+
   const details = (
     <DetailsPanel
       key={routineRequest}
@@ -190,29 +215,34 @@ export const ThreadView = memo(function ThreadView({ botId }: { botId: string })
             ) : null}
           </div>
           {/* The call bar takes the pill's place; its frosted glass would show the name blurred. */}
-          <button
-            ref={isMac ? mainMenu.anchor : undefined}
-            className={`title-pill ${calling ? 'hidden-by-call' : ''}`}
-            inert={calling}
-            onClick={isMac ? mainMenu.toggle : toggleDetails}
-            aria-haspopup={isMac ? 'menu' : undefined}
-            aria-expanded={isMac ? mainMenu.open : undefined}
-            aria-label={isMac
-              ? tr('{name}, open menu').replaceAll('{name}', () => bot?.name ?? tr('Conversation'))
-              : tr('{name}, view details').replaceAll('{name}', () => bot?.name ?? tr('Conversation'))}
-            title={isMac ? tr('Open menu') : 'View conversation details'}
-          >
-            <HStack as="span" gap={8}>
-              {bot ? isGroup(bot) ? <GroupAvatar members={store.members(bot)} size={22} /> : <BotAvatar bot={bot} size={22} /> : null}
-              <Text size="body" weight="medium" tone="text" truncate>{bot?.name ?? ''}</Text>
-              {/* Grok Bot's hint on hover: the pill opens the details. */}
-              <span className="title-pill-chevron">
-                <Icon name={isMac ? 'chevron.down' : 'chevron.right'} size={10} weight="semibold" color="var(--secondary)" />
-              </span>
-            </HStack>
-            {store.shownConnection.kind !== 'online' || store.mismatch ? <ConnectionSubtitle /> : null}
-          </button>
-          {isMac ? <AnchoredMenu open={mainMenu.open} onClose={mainMenu.close} anchor={mainMenu.anchor} items={mainMenu.items} /> : null}
+          {isMac ? (
+            <DropdownMenu open={mainMenu.open} onOpenChange={(o) => { if (o && !mainMenu.open) mainMenu.toggle(); else if (!o) mainMenu.close() }}>
+              <DropdownMenuTrigger asChild>{titlePill}</DropdownMenuTrigger>
+              <DropdownMenuContent align="center" className="w-64">
+                {mainMenu.items().map((item, i) => (
+                  <Fragment key={`${item.title}-${i}`}>
+                    {item.divider ? <DropdownMenuSeparator /> : null}
+                    <DropdownMenuItem
+                      onSelect={(e) => {
+                        if (item.keepsOpen) e.preventDefault()
+                        item.action()
+                      }}
+                      className={item.destructive ? 'text-destructive focus:text-destructive' : undefined}
+                    >
+                      {item.leading ?? (item.icon ? <Icon name={item.icon} size={13} color="var(--secondary)" /> : null)}
+                      <span className="flex-1 truncate">{item.verbatim ? item.title : tr(item.title)}</span>
+                      {item.detail ? <span className="text-xs text-muted-foreground">{tr(item.detail)}</span> : null}
+                      {item.selected !== undefined ? (
+                        <Icon name="checkmark" size={11} weight="semibold" className={item.selected ? '' : 'opacity-0'} />
+                      ) : null}
+                    </DropdownMenuItem>
+                  </Fragment>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            titlePill
+          )}
         </div>
         {/* C0102: a light “记住了：……” pill when this bot's memory gains a fact. */}
         {isMac ? <MemoryNotice botId={botId} /> : null}

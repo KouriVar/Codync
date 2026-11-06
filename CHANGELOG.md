@@ -1225,5 +1225,19 @@ iOS 定制分支：`ui/ios-customization`；当前 Mac 工作分支：`ui/macos-
 - **限制/待办** 实验分支；主 bot 菜单、主会话消息区、设置 Network/Computers 主列表等仍待后续轮次。
 - **关联** C0106、C0110。
 
+### C0112 · 2026-11-06 · 主 bot 菜单换成 shadcn DropdownMenu（实验分支续）
+
+- **原因** 承接 C0111：主 bot 菜单（点 Mac 聊天顶部名字 pill 弹出的菜单）此前是自绘 `AnchoredMenu`/`PanelRows`。它是最显眼的「主 bot 菜单」表面，也是目标清单里 `DropdownMenu` 的正经用途；本条把它换成官方 shadcn `DropdownMenu`，让菜单看起来像默认 shadcn 模板，同时保留原菜单的三组条目、分隔线、图标、`keepsOpen` 翻页（更多/连接状态子页）。
+- **变化**
+  - `views/thread/ThreadView.tsx`：名字 pill 在 Mac 上改为 `DropdownMenuTrigger asChild`；`mainMenu.items()` 渲染为 `DropdownMenuItem`（`leading`/`icon` 图标、`detail` 次要文字、`selected` 勾选、`destructive` 红字、`divider` → `DropdownMenuSeparator`）。菜单受控：`open={mainMenu.open}`，`onOpenChange` 打开时 `toggle`、关闭时 `close()`。`keepsOpen` 条目（Back / More / 连接状态）在 `onSelect` 里 `preventDefault()`，保持菜单打开并翻页，行为与原来一致。
+  - 仅替换主 bot 菜单这一处；新建 bot 菜单、账号面板、roster 右键菜单仍用既有 `AnchoredMenu`/`DesktopActionMenu`（它们的子菜单悬停计时与定位未动）。
+- **文件** `apps/desktop/src/renderer/views/thread/ThreadView.tsx`、`CHANGELOG.md`。
+- **token 入口** 仍只有 `apps/desktop/src/renderer/styles/tokens.css`；菜单内容用 shadcn `DropdownMenu` 的 `bg-popover`/`text-popover-foreground`/`border-border`/`shadow-lg`/`rounded-md` 等类，经 `styles/tailwind.css` 映射到同一批 token，无新增硬编码色值。
+- **验证** `apps/desktop` 下 `npm run typecheck` 与 `npm run build` 通过；构建 CSS 205.05 kB→205.27 kB、JS 4,380.20 kB→4,431.09 kB（Radix DropdownMenu 进入产物）。按规则只编译，未启动应用；亮/暗色人工走查（主会话+菜单+一个弹层）仍未执行。
+- **未换（保留）** 其余锚定菜单（新建/账号/roster 右键）保持自绘，避免一次性改动它们的定位与子菜单时序；主会话消息区渲染、设置 Network/Computers 主列表仍未覆盖；原生桌面 chrome 不动（红绿灯仍左 16/顶 16）。
+- **限制/待办** 实验分支；主 bot 菜单的位置由 Radix popper 接管，与原 `anchorPlacement` 的像素位置可能略有差异（属「先可用、后精细化」接受项）。
+- **关联** C0106、C0111。
+
+
 
 
