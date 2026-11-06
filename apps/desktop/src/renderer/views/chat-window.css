@@ -79,21 +79,20 @@
   display: flex;
   height: 100%;
 }
-/* C0134: the minimised window (600–800) has no room to dock a 320 column beside the chat — docking
-   one would push it under its 550 floor. So the roster floats over the chat instead. */
-@media (max-width: 919px) {
-  .detail {
-    min-width: 0;
-  }
-  .right-panel {
-    position: absolute;
-    top: 0;
-    right: 0;
-    bottom: 0;
-    z-index: 8;
-    background: var(--surface);
-    box-shadow: -16px 0 40px rgb(0 0 0 / 0.45);
-  }
+/* C0138: a standing column takes 320 of the window and the chat keeps at least 600 — at the
+   minimised 600 the split is 920 wide and clips until the window has grown to match, so the chat
+   never reflows and the toggle button never travels. */
+html.columns-open .split {
+  overflow: hidden;
+}
+html.columns-open .detail {
+  min-width: 600px;
+}
+html.columns-open .conversation {
+  min-width: 600px;
+}
+html.columns-open .thread-view {
+  overflow: hidden;
 }
 /* An open account panel or action menu takes the clicks. */
 .split.covered {

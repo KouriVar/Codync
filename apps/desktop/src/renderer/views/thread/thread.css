@@ -577,17 +577,7 @@ html[data-platform="darwin"] .bot-chat-dock {
   /* C0131: flush — the frame puts the 1px hairline on the panel's own left edge. */
   margin-left: 0;
 }
-/* C0134: the same width rule as the roster — under 920 the peer column floats over the chat. */
-@media (max-width: 919px) {
-  .bot-chat-dock {
-    position: absolute;
-    top: 0;
-    right: 0;
-    bottom: 0;
-    z-index: 8;
-    box-shadow: -16px 0 40px rgb(0 0 0 / 0.45);
-  }
-}
+
 
 /* ============================================================================
    C0100 — Mac main layout aligned to the Figma frame (1280×800). Only geometry:

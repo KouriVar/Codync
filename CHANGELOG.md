@@ -1550,3 +1550,11 @@ iOS 定制分支：`ui/ios-customization`；当前 Mac 工作分支：`ui/macos-
 - **变化** 删掉 `.bot-chip.chosen` 的 `background`（保留 semibold 字重作为轻提示；hover 仍无底色，计数行描边高亮不变）。
 - **文件** `apps/desktop/src/renderer/views/thread/bot-chips.css`、`CHANGELOG.md`。
 - **验证** `npm run typecheck`。
+
+### C0138 · 2026-11-06 · 开右栏时不再重排：会话宽度当场锁定，窗口长大只是「露出」右栏
+
+- **原因** C0136 里 920 以下右栏是浮层、920 以上才占列，于是点击瞬间窗口从 600 涨到 920 的过程中：会话区一度整宽（列宽 576→895），到 920 又跳回 576 —— 表现为**气泡重排、文字跳行、右上按钮左移、右侧留白忽大忽小**。
+- **变化** 右栏**从第一帧就占列**（320），同时给会话加宽度下限：`html.columns-open` 下 `.detail` / `.conversation` 至少 **600**、`.split` / `.thread-view` `overflow: hidden`。窄窗点开时布局其实已经宽 920，超出窗口的部分先被裁掉，窗口 300ms 长大把它「露出来」——**气泡、按钮、右边距全程不动**。
+- 删除 C0134 的浮层兜底（`@media (max-width: 919px)` 那段）。
+- **文件** `src/renderer/views/{thread/ThreadView.tsx,thread/thread.css,chat-window.css}`、`CHANGELOG.md`。
+- **验证** `npm run typecheck`；真机：600 宽点人形按钮，按钮不位移、气泡不重排，右栏随窗口长大出现。

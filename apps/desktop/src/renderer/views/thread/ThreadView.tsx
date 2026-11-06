@@ -168,6 +168,10 @@ export const ThreadView = memo(function ThreadView({ botId }: { botId: string })
   const columnOpen = !!menuActions?.botsPanel.open || botChat !== null
   useEffect(() => {
     window.codync?.app?.panelRoom?.(columnOpen)
+    // C0138: while a column stands the chat keeps its width and the column takes the new room, so
+    // the window growing never reflows a bubble (the split clips until it has grown).
+    document.documentElement.classList.toggle('columns-open', columnOpen)
+    return () => document.documentElement.classList.remove('columns-open')
   }, [columnOpen])
   // C0131: the right side holds either the bot list or one peer conversation — never both.
   const openPeer = (id: string, name: string) => {
