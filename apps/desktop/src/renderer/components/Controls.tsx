@@ -4,13 +4,15 @@ import { AnchoredMenu, IconButtonBase, usePresence, type MenuItem } from './Over
 import { HStack, Spacer, VStack } from './Stack'
 import { useTr } from '../lib/use-language'
 import { Text } from './Text'
+import { Button as UiButton } from './ui/button'
 import './controls.css'
 
-// Codync's own controls (kit Controls.swift): never the stock ones.
+// Codync's own controls (kit Controls.swift). Since the shadcn experiment (C0113) the filled/quieter
+// button is the shadcn `Button`, so every call site gets the default component; the rest stay bespoke.
 
 export const IconButton = IconButtonBase
 
-/** The filled call-to-action (`.primary`) or the quieter filled one (`.secondary`). */
+/** The filled call-to-action (shadcn `default`) or the quieter filled one (`secondary`). */
 export function Button({ kind = 'primary', children, onClick, disabled, className, title }: {
   kind?: 'primary' | 'secondary'
   children: ReactNode
@@ -21,9 +23,9 @@ export function Button({ kind = 'primary', children, onClick, disabled, classNam
 }) {
   const tr = useTr()
   return (
-    <button className={`styled-button ${kind} ${className ?? ''}`} onClick={onClick} disabled={disabled} title={title ? tr(title) : title}>
+    <UiButton variant={kind === 'primary' ? 'default' : 'secondary'} onClick={onClick} disabled={disabled} className={className} title={title ? tr(title) : title}>
       {typeof children === 'string' ? tr(children) : children}
-    </button>
+    </UiButton>
   )
 }
 

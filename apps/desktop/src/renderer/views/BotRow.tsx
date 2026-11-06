@@ -4,6 +4,7 @@ import { AvatarWithStatus } from '../components/Avatar'
 import { Icon } from '../components/Icon'
 import { HStack, VStack } from '../components/Stack'
 import { Text } from '../components/Text'
+import { Badge } from '../components/ui/badge'
 import { ThinkingOrb } from '../components/ThinkingOrb'
 import { messagePreview } from '../lib/message-preview'
 import { useModel } from '../lib/observable'
@@ -28,7 +29,7 @@ export const BotRow = memo(function BotRow({ bot, store, compact, usingComputer,
           <HStack align="stretch" grow>
             <Preview bot={bot} store={store} />
           </HStack>
-          {bot.unread > 0 ? <span className="unread-badge">{bot.unread}</span> : null}
+          {bot.unread > 0 ? <Badge className="unread-badge">{bot.unread}</Badge> : null}
         </HStack>
       </VStack>
     </HStack>

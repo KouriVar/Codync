@@ -1238,6 +1238,21 @@ iOS 定制分支：`ui/ios-customization`；当前 Mac 工作分支：`ui/macos-
 - **限制/待办** 实验分支；主 bot 菜单的位置由 Radix popper 接管，与原 `anchorPlacement` 的像素位置可能略有差异（属「先可用、后精细化」接受项）。
 - **关联** C0106、C0111。
 
+### C0113 · 2026-11-06 · 共享 `Button` 全局换成 shadcn Button（实验分支续）
+
+- **原因** 目标是「全局落到 shadcn 默认组件」。此前各视图仍大量使用 `Controls.tsx` 的自绘 `.styled-button`（胶囊圆角）。把它一次性接到 shadcn `Button`，所有 80 处 `<Button>` 调用点即刻拿到默认组件，是最省事、最「像 shadcn 模板」的一步。
+- **变化**
+  - `components/Controls.tsx`：`Button` 内部改为渲染 shadcn `ui/button` 的 `Button`（`kind: primary → variant=default`，`secondary → variant=secondary`），保留原有 `onClick/disabled/className/title` 与字符串 `tr()` 行为；API 不变，调用点零改动。
+  - 少数调用点自带类（`.dialog-button`、`.bot-chat-panel-send`、`.permission-option` 等）继续命中其既有 CSS，故这些特定按钮保持原样外观；其余按钮统一变为 shadcn 默认（`rounded-md`、`h-8`、`bg-primary`/`bg-secondary`）。
+  - `views/BotRow.tsx`：侧栏未读数由 `<span className="unread-badge">` → shadcn `Badge`（沿用 `.unread-badge` 类保持 18px 胶囊外观）。
+- **文件** `apps/desktop/src/renderer/components/Controls.tsx`、`apps/desktop/src/renderer/views/BotRow.tsx`、`CHANGELOG.md`。
+- **token 入口** 仍只有 `apps/desktop/src/renderer/styles/tokens.css`；shadcn `Button` 用 `bg-primary`/`text-primary-foreground`/`bg-secondary`/`ring-ring`/`rounded-md`，`Badge` 用 `bg-primary`，均经 `styles/tailwind.css` 映射，无新增硬编码色值。旧的 `.styled-button` 规则保留但已无调用（死样式，非破坏）。
+- **验证** `apps/desktop` 下 `npm run typecheck` 与 `npm run build` 通过（CSS 205.27 kB 不变，JS 4,431.16→4,431.17 kB）。按规则只编译，未启动应用；亮/暗色人工走查（主会话+菜单+一个弹层）仍未执行。
+- **未换（保留）** 共享 `Switch`/`IconButton`/`ChoicePicker` 仍是自绘（`Switch` 的「标签行 + 轨道」布局与 `ChoicePicker` 的锚定菜单若整体换 Radix 会影响大量视图的尺寸与交互，留待逐面核）；主会话消息区渲染、设置 Computers/Network 主列表未覆盖；原生桌面 chrome 不动（红绿灯仍左 16/顶 16）。
+- **限制/待办** 实验分支；按钮由胶囊变为 shadcn 圆角矩形属预期（「先像默认模板、后精细化」）。若某处工具行因尺寸收紧出现挤压，下一轮逐处微调。
+- **关联** C0106、C0109、C0110、C0111、C0112。
+
+
 
 
 
