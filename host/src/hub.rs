@@ -172,6 +172,9 @@ impl Hub {
                 self.spawn_bot(row.config);
             }
         }
+        // A new host version may bring MCP tools the running sessions never saw: ask every bot to
+        // reopen its session before its next turn (see `agent::upgrade`).
+        crate::agent::upgrade::refresh_tools_on_upgrade(self);
         crate::chat::calls::rewatch(self);
         crate::routines::start(self);
         crate::analytics::start(self);
