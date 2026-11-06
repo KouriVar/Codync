@@ -3,12 +3,14 @@ import type { Screen } from '@shared/analytics'
 import { APPEARANCES, type Appearance } from '@shared/appearance'
 import { islandLabel } from '@shared/island'
 import { VOICE_SHORTCUTS, type VoiceShortcut } from '@shared/voice-shortcut'
-import { Button, CardForm, CardSection, ChoicePicker, IconButton, ProgressBar, Switch, ValueRow } from '../../components/Controls'
+import { CardForm, CardSection, IconButton, ProgressBar, ValueRow } from '../../components/Controls'
 import { Icon } from '../../components/Icon'
 import { useDismiss } from '../../components/Overlay'
 import { HStack, IconSlot, VStack } from '../../components/Stack'
 import { Text } from '../../components/Text'
 import { Badge } from '../../components/ui/badge'
+import { Button } from '../../components/ui/button'
+import { Switch } from '../../components/ui/switch'
 import { useModel } from '../../lib/observable'
 import { appLanguages, languageTitle } from '../../lib/l10n'
 import { useTr } from '../../lib/use-language'
@@ -16,12 +18,11 @@ import { DEFAULT_TEXT_SIZE, prefs, TEXT_SIZES, usePref } from '../../lib/prefs'
 import { useAccount } from '../../store/account'
 import { useScreenViewed } from '../../store/analytics'
 import { StoreContext, useApp } from '../../store/context'
-import { SwitchRow } from '../bots/parts'
 import { ComputerBadge } from '../ComputerBadge'
 import { UpdateButton, useUpdates } from '../UpdateButton'
 import { ComputersView } from './ComputersView'
 import { NetworkView } from './NetworkView'
-import { errorText, isMac, thisMac } from './parts'
+import { ChoiceSelect, errorText, isMac, thisMac, ToggleRow } from './parts'
 import { UsageLimits } from './UsageLimits'
 import { VoiceChatSettingsView } from './VoiceChatSettingsView'
 import { ComputerAccessView } from '../computer-access/ComputerAccessView'
@@ -159,18 +160,18 @@ function GeneralSettings() {
             </Text>
           </VStack>
           {account.isSignedIn ? (
-            <Button kind="secondary" onClick={() => void account.signOut()} disabled={account.isBusy}>
-              {account.isBusy ? 'Please wait…' : 'Sign out'}
+            <Button variant="secondary" onClick={() => void account.signOut()} disabled={account.isBusy}>
+              {account.isBusy ? tr('Please wait…') : tr('Sign out')}
             </Button>
           ) : (
             <>
-              <Button kind="secondary" onClick={() => void account.signIn('apple')} disabled={account.isBusy}>
+              <Button variant="secondary" onClick={() => void account.signIn('apple')} disabled={account.isBusy}>
                 Apple
               </Button>
-              <Button kind="secondary" onClick={() => void account.signIn('google')} disabled={account.isBusy}>
+              <Button variant="secondary" onClick={() => void account.signIn('google')} disabled={account.isBusy}>
                 Google
               </Button>
-              <Button kind="secondary" onClick={() => void account.signIn('github')} disabled={account.isBusy}>
+              <Button variant="secondary" onClick={() => void account.signIn('github')} disabled={account.isBusy}>
                 GitHub
               </Button>
             </>
@@ -179,30 +180,28 @@ function GeneralSettings() {
       </CardSection>
       <CardSection title="Appearance">
         <ValueRow label="Theme">
-          <ChoicePicker selection={appearance} options={[...APPEARANCES]} onChange={(value) => void window.codync.app.setAppearance(value).then(setAppearance)} />
+          <ChoiceSelect value={appearance} options={[...APPEARANCES]} onChange={(value) => void window.codync.app.setAppearance(value).then(setAppearance)} />
         </ValueRow>
         <ValueRow label="Text size">
-          <ChoicePicker
-            selection={textSize}
+          <ChoiceSelect
+            value={textSize}
             options={TEXT_SIZES.map((s) => ({ id: s, label: s === DEFAULT_TEXT_SIZE ? tr('{size} pt (Default)').replace('{size}', String(s)) : `${s} pt` }))}
             onChange={setTextSize}
           />
         </ValueRow>
         <ValueRow label="Usage icons">
-          <ChoicePicker selection={usageIconStyle} options={[{ id: 'character', label: 'Character' }, { id: 'original', label: 'Original' }]} onChange={setUsageIconStyle} />
+          <ChoiceSelect value={usageIconStyle} options={[{ id: 'character', label: 'Character' }, { id: 'original', label: 'Original' }]} onChange={setUsageIconStyle} />
         </ValueRow>
-        <Switch on={compact} onChange={setCompact}>
-          Compact sidebar
-        </Switch>
-        <SwitchRow title="Show agent logos" detail="Marks each bot with its agent's logo when your bots use more than one agent." on={agentLogos} onChange={setAgentLogos} />
+        <ToggleRow title="Compact sidebar" on={compact} onChange={setCompact} />
+        <ToggleRow title="Show agent logos" detail="Marks each bot with its agent's logo when your bots use more than one agent." on={agentLogos} onChange={setAgentLogos} />
       </CardSection>
       <CardSection
         title="Language"
         footer="Choose the language for this device. Unsupported system languages use English."
       >
         <ValueRow label="App language">
-          <ChoicePicker
-            selection={language}
+          <ChoiceSelect
+            value={language}
             options={appLanguages.map((id) => ({
               id,
               label: languageTitle(id, language, systemLanguage),
@@ -212,26 +211,20 @@ function GeneralSettings() {
         </ValueRow>
       </CardSection>
       <CardSection title="Chat" footer="Lets you unfold a working bot's thinking and steps from its status in the chat. Only changes this device.">
-        <Switch on={thinkingDetails} onChange={setThinkingDetails}>
-          Show thinking details
-        </Switch>
+        <ToggleRow title="Show thinking details" on={thinkingDetails} onChange={setThinkingDetails} />
       </CardSection>
       <CardSection title="System">
-        {window.codync.platform === 'darwin' ? <Switch on={showInDock} onChange={(on) => void window.codync.app.setShowInDock(on).then(setShowInDock)}>Show in Dock</Switch> : null}
+        {window.codync.platform === 'darwin' ? <ToggleRow title="Show in Dock" on={showInDock} onChange={(on) => void window.codync.app.setShowInDock(on).then(setShowInDock)} /> : null}
         {window.codync.island.supported ? (
-          <Switch on={island} onChange={(on) => void window.codync.island.setEnabled(on).then(setIsland)}>
-            {islandLabel(window.codync.platform)}
-          </Switch>
+          <ToggleRow title={islandLabel(window.codync.platform)} on={island} onChange={(on) => void window.codync.island.setEnabled(on).then(setIsland)} />
         ) : null}
         {/* On-device speech, so macOS only. */}
         {window.codync.speech.available ? (
           <ValueRow label="Voice input shortcut" detail="Talk to a bot from any app, then tap the key once more to send.">
-            <ChoicePicker selection={voiceShortcut} options={VOICE_SHORTCUTS} onChange={(s) => void window.codync.speech.setShortcut(s).then(setVoiceShortcut)} />
+            <ChoiceSelect value={voiceShortcut} options={VOICE_SHORTCUTS} onChange={(s) => void window.codync.speech.setShortcut(s).then(setVoiceShortcut)} />
           </ValueRow>
         ) : null}
-        <Switch on={launchAtLogin} onChange={(on) => void window.codync.app.setLaunchAtLogin(on).then(setLaunchAtLogin)}>
-          Open at login
-        </Switch>
+        <ToggleRow title="Open at login" on={launchAtLogin} onChange={(on) => void window.codync.app.setLaunchAtLogin(on).then(setLaunchAtLogin)} />
       </CardSection>
       <PrivacySettings />
       <HiddenBotsSection />
@@ -253,7 +246,7 @@ function PrivacySettings() {
         <HStack gap={4}>
           <span className={running ? undefined : 'settings-off'}>{tr('Share usage analytics')}</span>
           <IconButton title="About usage analytics" icon="info.circle" onClick={() => setAbout(true)} />
-          <Switch on={local?.analytics === true} onChange={setShared} disabled={!running} label="Share usage analytics" className="settings-privacy-switch" />
+          <Switch checked={local?.analytics === true} onCheckedChange={setShared} disabled={!running} aria-label={tr('Share usage analytics')} className="settings-privacy-switch" />
         </HStack>
       </CardSection>
       <FormSheet open={about} onClose={() => setAbout(false)}>
@@ -311,18 +304,14 @@ function UpdateSettings() {
                 </div>,
               ]
             : []),
-          <Switch key="check" on={updates.autoCheck} onChange={(on) => window.codync.updates.setAutoCheck(on)} disabled={!updates.supported}>
-            Automatically check for updates
-          </Switch>,
-          <Switch key="download" on={updates.autoDownload} onChange={(on) => window.codync.updates.setAutoDownload(on)} disabled={!updates.supported}>
-            Automatically download and install
-          </Switch>,
+          <ToggleRow key="check" title="Automatically check for updates" on={updates.autoCheck} onChange={(on) => window.codync.updates.setAutoCheck(on)} disabled={!updates.supported} />,
+          <ToggleRow key="download" title="Automatically download and install" on={updates.autoDownload} onChange={(on) => window.codync.updates.setAutoDownload(on)} disabled={!updates.supported} />,
           ...(updates.error
             ? [
                 <div key="error" className="settings-row settings-appear">
                   <Text tone="attention" grow>{updates.error}</Text>
-                  <Button kind="secondary" onClick={() => window.codync.updates.check()} disabled={updates.checking}>
-                    Retry
+                  <Button variant="secondary" onClick={() => window.codync.updates.check()} disabled={updates.checking}>
+                    {tr('Retry')}
                   </Button>
                 </div>,
               ]

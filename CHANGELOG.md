@@ -1197,3 +1197,18 @@ iOS 定制分支：`ui/ios-customization`；当前 Mac 工作分支：`ui/macos-
 - **限制/待办** 实验分支；`dialog`/`sheet`/`dropdown-menu`/`popover`/`tooltip`/`scroll-area`/`checkbox`/`select`/`avatar` 已入库但尚未逐面接入（后续轮次推进主会话、右侧栏、主 bot 菜单、设置主页）。`avatar` 暂未替换带状态点的 `AvatarWithStatus`（状态角标逻辑尚需保留）。
 - **关联** C0106、C0107、C0108。
 
+### C0110 · 2026-11-06 · 设置「常规」页换成 shadcn Select / Switch / Button（实验分支续）
+
+- **原因** 承接 C0109：设置页（Desktop 可见 UI，本次点名范围）仍用自绘 `ChoicePicker`（下拉菜单）与 `Controls.Switch`；主题、字号、用量图标、语言、语音快捷键都是单一取值选择，正是 shadcn `Select` 的用途。本条把「常规」页的选择器与开关换成官方件，让设置页更像默认 shadcn 模板。
+- **变化**
+  - `views/settings/parts.tsx` 新增两个设置页专用薄封装：`ChoiceSelect`（用 shadcn `Select`/`SelectTrigger`/`SelectContent`/`SelectItem` 渲染 `{id,label}[]`，含数字型取值）与 `ToggleRow`（用 shadcn `Switch` + `RowLabel` 的一行开关）。
+  - `views/settings/SettingsView.tsx`「常规」页：主题、文字大小、用量图标、应用语言、语音输入快捷键 5 处 `ChoicePicker` → `ChoiceSelect`；紧凑侧栏、显示智能体 logo、显示思考过程、Dock、灵动岛、登录时打开 6 处自绘 `Switch`（含 `SwitchRow`）→ `ToggleRow`；账户区 Sign out / Apple / Google / GitHub 由 `Controls.Button` → shadcn `Button variant="secondary"`。
+  - `PrivacySettings` 的「分享用量分析」开关 → shadcn `Switch`（`checked`/`onCheckedChange`，保留 `aria-label`）；`UpdateSettings` 两个自动更新开关 → `ToggleRow`，Retry 按钮 → shadcn `Button`。
+- **文件** `apps/desktop/src/renderer/views/settings/{parts.tsx,SettingsView.tsx}`、`CHANGELOG.md`。
+- **token 入口** 仍只有 `apps/desktop/src/renderer/styles/tokens.css`；`ChoiceSelect` 的 `SelectTrigger` 用 `bg-background`/`border-input`/`text-sm`/`rounded-md`，`ToggleRow` 的 `Switch` 用 `bg-primary`/`bg-input`，均经 `styles/tailwind.css` 映射，无新增硬编码色值；宽度 `168` 由调用处 inline（运行期尺寸，允许）。
+- **验证** `apps/desktop` 下 `npm run typecheck` 与 `npm run build` 通过；构建 JS 由 4,191.02 kB 增至 4,379.97 kB（Radix Select 等进入产物）。按规则只编译，未启动应用；亮/暗色人工走查见 C0109 说明（仍未执行）。
+- **未换（保留）** `ChoicePicker` 在连接/网络类弹层里仍自绘（选项带图标、锚定定位与既有菜单时序，换 Radix 会改交互）；`Controls.Button`/`Switch` 的全局替换仍留待逐视图核对；`settings-privacy-switch` 的旧 `.switch` 复合样式对新 Radix 开关不再命中（视觉回到默认尺寸），属接受项。
+- **限制/待办** 实验分支；设置页其余子页（Computers/Network/Voice）与主会话、右侧栏、主 bot 菜单仍待后续轮次接入。
+- **关联** C0106、C0109。
+
+
