@@ -152,6 +152,14 @@ mod tests {
         assert_ne!(dedup_id("g", "b", "x:y"), dedup_id("g", "b:x", "y"));
     }
 
+    #[test]
+    fn the_team_server_advertises_the_group_tools() {
+        let tools = crate::chat::team::tools();
+        let names: Vec<&str> = tools.as_array().unwrap().iter().filter_map(|tool| tool["name"].as_str()).collect();
+        assert!(names.contains(&"list_groups"), "{names:?}");
+        assert!(names.contains(&"post_to_group"), "{names:?}");
+    }
+
     /// A group row holding `members`.
     fn group(id: &str, name: &str, members: &[&str]) -> BotConfig {
         serde_json::from_value(json!({"id": id, "kind": "group", "name": name, "members": members})).unwrap()
