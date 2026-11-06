@@ -332,6 +332,11 @@
   max-width: 100%;
   min-width: 0;
 }
+/* C0130: 12 in, 16 round, as the home frame draws them. */
+html[data-platform="darwin"] .conversation .bubble {
+  padding: 12px;
+  border-radius: 16px;
+}
 .bubble.user {
   background: var(--chat-user);
   color: var(--text);
@@ -533,6 +538,15 @@
    C0106: the numbers are named tokens in styles/tokens.css (--chat-max / --chat-min / --bubble-max /
    --panel-min / --frame-inset / --divider-width). */
 html[data-platform="darwin"] .conversation {
+  /* C0130: the Figma home frame's own fills, scoped to the chat column (51:101). */
+  --bubble-agent: #242424;
+  --bubble-user: #242424;
+  --chat-agent: #242424;
+  --chat-user: #242424;
+  --composer-fill: #1f1f1f;
+  --outline: #353535;
+  /* C0130: bubbles stop at 560 in the frame. */
+  --agent-bubble-max: 560px;
   min-width: var(--chat-min);
   /* C0100: the content column keeps its 80px side inset inside the main area (782 at 1280),
      capped at 888 and floored at 560. */
@@ -579,38 +593,53 @@ html[data-platform="darwin"] .bot-chat-dock::before {
    ============================================================================ */
 /* The title pill: 38 tall, 8 from the top, 8 padding, avatar 22 + 8 gap (JSX). */
 html[data-platform="darwin"] .top-chrome {
-  /* C0129: the band is 50 tall; the pill (38) centres in it, the traffic lights keep their 16. */
-  padding: 0 16px;
+  /* C0130: the band is 50; the pill (38) and the button (38) sit 12 from the top, as in the frame. */
+  padding: 12px 12px 0 16px;
   height: 50px;
+  align-items: start;
 }
 /* With the band no longer letting messages through, its blur stays inside the 50. */
 html[data-platform="darwin"] .top-fade {
   height: 50px;
 }
-/* C0129: the person button at the band's right, above the drag area. */
+/* C0130: the person button at the band's right, above the drag area: 38 square, 12 from the right,
+   #1F1F1F on a #2C2C2C hairline (Figma 84:4634). */
 .top-chrome-panel {
   position: absolute;
-  right: 16px;
-  top: 6px;
+  right: 12px;
+  top: 0;
+  width: 38px;
+  height: 38px;
+  border-radius: 63px;
+  background: #1f1f1f;
+  box-shadow: inset 0 0 0 1px #2c2c2c;
   pointer-events: auto;
   -webkit-app-region: no-drag;
+}
+html[data-platform="darwin"] .top-chrome-panel.selected {
+  background: #2c2c2c;
 }
 html[data-platform="darwin"] .title-pill {
   min-height: 38px;
   padding: 0 10px 0 8px;
   justify-content: center;
 }
+html[data-platform="darwin"] .title-pill {
+  background: #1f1f1f;
+  border-radius: 63px;
+  box-shadow: inset 0 0 0 1px #2c2c2c;
+}
 /* C0101: the message list's viewport starts below the title band (54: traffic lights + title pill),
    so scrolling messages are clipped at its top and never show behind the title or the traffic
    lights; the top-fade fades them out just under it. The first message still sits 90 from the
    conversation's top (54 + 36); the bottom reserves the floating composer plus its 8px gap. */
-/* C0129: the 50-tall title band doesn't let messages through — the transcript starts below it, so
-   the first message sits 90 from the window top (50 + 40). */
+/* C0130: the frame's content block starts 130 from the window top (Frame 35), and the band above it
+   lets nothing through. */
 html[data-platform="darwin"] .transcript-frame {
-  top: 50px;
+  top: 130px;
 }
 html[data-platform="darwin"] .transcript-content {
-  padding: 40px 0 calc(var(--composer-height, 70px) + 8px);
+  padding: 0 0 calc(var(--composer-height, 70px) + 8px);
 }
 html[data-platform="darwin"] .transcript-content > div:first-of-type .chat-row {
   padding-top: 0;

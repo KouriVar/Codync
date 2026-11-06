@@ -109,7 +109,9 @@
   flex: 1;
   min-width: 0;
   background: var(--composer-fill);
-  border-radius: var(--radius-xl);
+  /* C0130: 62 radius in the frame. */
+  border-radius: 62px;
+  min-height: 44px;
   /* Inset, so the outline sits on the fill like the sheets' and menus' border, not on the page. */
   box-shadow: inset 0 0 0 1px var(--outline), var(--shadow-s);
   display: flex;
@@ -121,10 +123,10 @@
   display: flex;
   align-items: flex-end;
   gap: 8px;
-  /* C0129: the input is 44 tall (Figma), 9 in from its box. */
+  /* C0130: the input is 44 tall, 8 in from its box (Figma 54:121). */
   box-sizing: border-box;
   min-height: 44px;
-  padding: 9px;
+  padding: 8px;
 }
 .composer-field {
   flex: 1;
@@ -141,6 +143,10 @@
   color: var(--text);
   user-select: text;
   cursor: text;
+}
+.composer-box textarea::placeholder {
+  /* C0130: white at 50% in the frame. */
+  color: color-mix(in srgb, var(--text) 50%, transparent);
 }
 .composer-box textarea {
   display: block;
@@ -283,14 +289,15 @@
 /* C0100 — the Mac composer matches the Figma frame: the box is 44 tall (9 padding + a 26 control
    each side), its bottom 8 above the main area's edge, and it is 4 below the tag bar. */
 html[data-platform="darwin"] .composer {
-  padding: 4px 0 8px;
+  /* C0130: the dock sits 8 above the bottom; 4 more makes the input's edge 12 (Figma 54:121). */
+  padding: 4px 0 4px;
 }
 html[data-platform="darwin"] .composer-surface {
   min-height: 44px;
-  border-radius: var(--radius-pill);
+  border-radius: 62px;
 }
 html[data-platform="darwin"] .composer-box {
-  padding: 9px;
+  padding: 8px;
   align-items: center;
 }
 html[data-platform="darwin"] .composer-add,

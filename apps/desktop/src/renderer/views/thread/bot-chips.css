@@ -25,6 +25,7 @@
   align-items: center;
   gap: var(--space-3);
   min-height: 28px;
+  padding-left: 4px;
   overflow-x: auto;
   scrollbar-width: none;
 }
@@ -34,11 +35,12 @@
 .bot-chip-running-item {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   flex: none;
   height: 28px;
   max-width: 220px;
-  padding: 0 var(--space-2);
+  padding: 4px 8px 4px 4px;
+  border-radius: 16px;
 }
 /* C0129: one 30-tall row; it scrolls sideways when it doesn't fit (the count card grows in place,
    so nothing has to overflow the row). */
@@ -47,6 +49,7 @@
   flex-wrap: nowrap;
   align-items: flex-end;
   gap: 4px;
+  padding-left: 4px;
   overflow-x: auto;
   scrollbar-width: none;
 }
@@ -136,8 +139,8 @@
   position: absolute;
   right: -1px;
   bottom: -1px;
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
   box-sizing: border-box;
   /* A ring of the card's fill, so the dot reads on the avatar's edge. */

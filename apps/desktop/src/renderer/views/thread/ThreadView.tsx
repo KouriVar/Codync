@@ -180,7 +180,8 @@ export const ThreadView = memo(function ThreadView({ botId }: { botId: string })
     >
       <HStack as="span" gap={8}>
         {bot ? isGroup(bot) ? <GroupAvatar members={store.members(bot)} size={22} /> : <BotAvatar bot={bot} size={22} /> : null}
-        <Text size="body" weight="medium" tone="text" truncate>{bot?.name ?? ''}</Text>
+        {/* C0130: 14 medium in the frame, which the 13/15 scale doesn't hold. */}
+        <Text size="body" weight="medium" tone="text" truncate style={{ fontSize: 'calc(14px * var(--scale))' }}>{bot?.name ?? ''}</Text>
         {/* Grok Bot's hint on hover: the pill opens the details. */}
         <span className="title-pill-chevron">
           <Icon name={isMac ? 'chevron.down' : 'chevron.right'} size={10} weight="semibold" color="var(--secondary)" />
@@ -257,6 +258,7 @@ export const ThreadView = memo(function ThreadView({ botId }: { botId: string })
               title="Bots"
               icon="person.2"
               size={38}
+              iconSize={20}
               className="top-chrome-panel"
               selected={menuActions.botsPanel.open}
               onClick={menuActions.botsPanel.toggle}

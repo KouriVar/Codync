@@ -385,12 +385,14 @@ export function ModalHeader({ title, subtitle, icon, trailing, onClose, closeTit
 }
 
 /** Icon-only button (shadcn `Button` ghost / icon since C0118), labelled for VoiceOver. */
-export function IconButtonBase({ title, icon, onClick, selected = false, size = 28, disabled, className, buttonRef, menuOpen }: {
+export function IconButtonBase({ title, icon, onClick, selected = false, size = 28, iconSize, disabled, className, buttonRef, menuOpen }: {
   title: string
   icon: string
   onClick?: (e: React.MouseEvent) => void
   selected?: boolean
   size?: number
+  /** The glyph's own size; half the button by default. */
+  iconSize?: number
   disabled?: boolean
   className?: string
   buttonRef?: RefObject<HTMLButtonElement | null>
@@ -413,7 +415,7 @@ export function IconButtonBase({ title, icon, onClick, selected = false, size = 
       disabled={disabled}
       onClick={onClick}
     >
-      <Icon name={icon} size={size / 2} weight="medium" />
+      <Icon name={icon} size={iconSize ?? size / 2} weight="medium" />
     </Button>
   )
 }
