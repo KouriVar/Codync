@@ -1,8 +1,8 @@
 import { createContext, useContext, useEffect, useId, useLayoutEffect, useRef, useState, type ReactElement, type ReactNode, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
+import * as DialogPrimitive from '@radix-ui/react-dialog'
 import { reduceMotion } from '../lib/theme'
 import { afterExit } from '../lib/exit-delay'
-import { stackModals } from '../lib/modal-stack'
 import { useTr } from '../lib/use-language'
 import { Icon } from './Icon'
 import { Button } from './ui/button'
@@ -64,70 +64,10 @@ export function useEscape(active: boolean, onEscape: () => void, layer: RefObjec
   }, [active, layer])
 }
 
-const FOCUSABLE = 'button:not(:disabled), [href], input:not(:disabled), textarea:not(:disabled), select:not(:disabled), [tabindex]:not([tabindex="-1"])'
-
 /** The open modal's title id, so its `ModalHeader` names the dialog. */
 const ModalTitleContext = createContext<string | undefined>(undefined)
 
-/** The open modals with where focus returns when each closes, and the page layers they made inert. */
-const openModals = new Map<HTMLElement, HTMLElement | null>()
-const mutedByModals = new WeakSet<HTMLElement>()
-
-/** Applies `stackModals` to the page and moves focus into the modal on top. */
-function syncModals() {
-  const layers = [...document.body.children].filter((el): el is HTMLElement => el instanceof HTMLElement)
-  const { top, mute, unmute } = stackModals(layers.map((el) => ({ el, z: Number(getComputedStyle(el).zIndex) || 0, modal: openModals.has(el), inert: el.inert, muted: mutedByModals.has(el) })))
-  for (const el of mute) {
-    el.inert = true
-    mutedByModals.add(el)
-  }
-  for (const el of unmute) {
-    el.inert = false
-    mutedByModals.delete(el)
-  }
-  if (top && !top.contains(document.activeElement)) (top.querySelector<HTMLElement>('[data-autofocus]') ?? top.querySelector<HTMLElement>('[data-modal-card]'))?.focus({ preventScroll: true })
-}
-
-/**
- * An open modal holds focus: everything behind it goes inert, focus moves in (to a
- * `data-autofocus` control, else the card itself), and returns to where it was on close.
- */
-function useModalFocus(open: boolean, mounted: boolean, layer: RefObject<HTMLElement | null>) {
-  useEffect(() => {
-    const node = layer.current
-    if (!open || !node) return
-    openModals.set(node, document.activeElement instanceof HTMLElement ? document.activeElement : null)
-    syncModals()
-    // Tab cycles inside the top modal instead of leaving the page.
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Tab' || node.inert) return
-      const items = [...node.querySelectorAll<HTMLElement>(FOCUSABLE)].filter((el) => el.getClientRects().length > 0 && !el.closest('[inert]'))
-      const first = items[0]
-      const last = items[items.length - 1]
-      if (!first || !last) return
-      const active = document.activeElement
-      const wrap = e.shiftKey ? active === first || !node.contains(active) : active === last
-      if (!wrap) return
-      e.preventDefault()
-      ;(e.shiftKey ? last : first).focus()
-    }
-    window.addEventListener('keydown', onKey, true)
-    return () => {
-      window.removeEventListener('keydown', onKey, true)
-      const previous = openModals.get(node)
-      openModals.delete(node)
-      syncModals()
-      if (previous?.isConnected && !previous.closest('[inert]')) {
-        previous.focus({ preventScroll: true })
-        return
-      }
-      // Its opener is under a modal still open: the modal opened from this one returns there instead.
-      for (const [other, theirs] of openModals) if (theirs && node.contains(theirs)) openModals.set(other, previous ?? null)
-    }
-  }, [open, mounted, layer])
-}
-
-/** The Mac modal (`.codyncSheet`): a centered card over a dim; the content sizes it. */
+/** The Mac modal, a shadcn/Radix Dialog (C0119): a centered card over a dim; the content sizes it. */
 export function Sheet({ open, onClose, width, height, maxHeight, dismissOnDim = false, children }: {
   open: boolean
   onClose: () => void
@@ -139,26 +79,25 @@ export function Sheet({ open, onClose, width, height, maxHeight, dismissOnDim = 
   maxHeight?: number | string
   children: ReactNode
 }) {
-  const { mounted, shown } = usePresence(open)
-  const last = useRef(children)
-  const layer = useRef<HTMLDivElement>(null)
   const titleId = useId()
-  if (open) last.current = children
-  useEscape(open, onClose, layer)
-  useModalFocus(open, mounted, layer)
-  if (!mounted) return null
-  return createPortal(
-    <DismissContext.Provider value={onClose}>
-      <ModalTitleContext.Provider value={titleId}>
-        <div ref={layer} className={`modal-card ${shown ? 'shown' : ''}`} role="dialog" aria-modal aria-labelledby={titleId}>
-          <div className="modal-dim" onClick={dismissOnDim ? onClose : undefined} />
-          <div className="modal-content" data-modal-card tabIndex={-1} style={{ width, height, maxHeight }}>
-            {open ? children : last.current}
-          </div>
-        </div>
-      </ModalTitleContext.Provider>
-    </DismissContext.Provider>,
-    document.body,
+  return (
+    <DialogPrimitive.Root open={open} onOpenChange={(next) => { if (!next) onClose() }}>
+      <DialogPrimitive.Portal>
+        <DialogPrimitive.Overlay className="fixed inset-0 z-[100] bg-black/50" />
+        <DialogPrimitive.Content
+          className="fixed left-1/2 top-1/2 z-[100] flex max-h-[calc(100vh-48px)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-lg border border-border bg-background text-foreground shadow-xl"
+          style={{ width, height, maxHeight }}
+          aria-labelledby={titleId}
+          onInteractOutside={(e) => { if (!dismissOnDim) e.preventDefault() }}
+        >
+          <DialogPrimitive.Title className="sr-only">Dialog</DialogPrimitive.Title>
+          <DialogPrimitive.Description className="sr-only">Dialog</DialogPrimitive.Description>
+          <DismissContext.Provider value={onClose}>
+            <ModalTitleContext.Provider value={titleId}>{children}</ModalTitleContext.Provider>
+          </DismissContext.Provider>
+        </DialogPrimitive.Content>
+      </DialogPrimitive.Portal>
+    </DialogPrimitive.Root>
   )
 }
 
@@ -168,7 +107,7 @@ export interface DialogAction {
   action: () => void
 }
 
-/** A centered card over a dimmed screen with the actions and Cancel (`.codyncDialog`). */
+/** A centered shadcn/Radix Dialog (C0119) with the actions and Cancel. */
 export function Dialog({ open, title, message, actions, cancel = 'Cancel', onCancel, onClose, children }: {
   open: boolean
   title: string
@@ -178,57 +117,50 @@ export function Dialog({ open, title, message, actions, cancel = 'Cancel', onCan
   /** Closed without an action; `onClose` follows, as it does after an action. */
   onCancel?: () => void
   onClose: () => void
-  /** A field between the text and the buttons (a name to type); `data-autofocus` on it takes the focus. */
+  /** A field between the text and the buttons (a name to type). */
   children?: ReactNode
 }) {
-  const { mounted, shown } = usePresence(open, 120)
   const tr = useTr()
-  const last = useRef({ title, message, actions, children })
-  const layer = useRef<HTMLDivElement>(null)
-  const id = useId()
-  if (open) last.current = { title, message, actions, children }
-  const dismiss = () => {
-    onCancel?.()
-    onClose()
-  }
-  useEscape(open && cancel !== null, dismiss, layer)
-  useModalFocus(open, mounted, layer)
-  if (!mounted) return null
-  const shownContent = last.current
-  return createPortal(
-    <div ref={layer} className={`dialog ${shown ? 'shown' : ''}`} role="alertdialog" aria-modal aria-labelledby={`${id}-title`} aria-describedby={shownContent.message ? `${id}-message` : undefined}>
-      <div className="dialog-dim" onClick={() => cancel !== null && dismiss()} />
-      <div className="dialog-card" data-modal-card tabIndex={-1}>
-        <div className="dialog-text">
-          {/* Callers translate the sentence, then insert names. A second pass would also translate a device named "Done". */}
-          <Text as="h2" id={`${id}-title`} size="title3" weight="semibold">{shownContent.title}</Text>
-          {shownContent.message ? <Text as="div" id={`${id}-message`} size="body" tone="secondary">{shownContent.message}</Text> : null}
-        </div>
-        {shownContent.children}
-        <div className="dialog-buttons">
-          {cancel !== null ? (
-            <Button variant="secondary" size="sm" className="dialog-button" data-autofocus onClick={dismiss}>
-              {tr(cancel)}
-            </Button>
-          ) : null}
-          {shownContent.actions.map((a) => (
-            <Button
-              key={a.title}
-              variant={a.destructive ? 'destructive' : 'default'}
-              size="sm"
-              className={`dialog-button ${a.destructive ? 'destructive' : 'prominent'}`}
-              onClick={() => {
-                onClose()
-                a.action()
-              }}
-            >
-              {tr(a.title)}
-            </Button>
-          ))}
-        </div>
-      </div>
-    </div>,
-    document.body,
+  return (
+    <DialogPrimitive.Root
+      open={open}
+      onOpenChange={(next) => {
+        if (next) return
+        onCancel?.()
+        onClose()
+      }}
+    >
+      <DialogPrimitive.Portal>
+        <DialogPrimitive.Overlay className="fixed inset-0 z-[200] bg-black/50" />
+        <DialogPrimitive.Content
+          className="fixed left-1/2 top-1/2 z-[200] flex w-[min(360px,calc(100vw-48px))] -translate-x-1/2 -translate-y-1/2 flex-col gap-4 rounded-lg border border-border bg-background p-5 text-foreground shadow-xl"
+          onInteractOutside={(e) => { if (cancel === null) e.preventDefault() }}
+          onEscapeKeyDown={(e) => { if (cancel === null) e.preventDefault() }}
+        >
+          <div className="flex flex-col gap-1">
+            <DialogPrimitive.Title className="text-base font-semibold">{title}</DialogPrimitive.Title>
+            {message ? (
+              <DialogPrimitive.Description className="text-sm text-muted-foreground">{message}</DialogPrimitive.Description>
+            ) : (
+              <DialogPrimitive.Description className="sr-only"> </DialogPrimitive.Description>
+            )}
+          </div>
+          {children}
+          <div className="flex flex-row flex-wrap justify-end gap-2">
+            {cancel !== null ? (
+              <Button variant="secondary" size="sm" data-autofocus onClick={() => { onCancel?.(); onClose() }}>
+                {tr(cancel)}
+              </Button>
+            ) : null}
+            {actions.map((a) => (
+              <Button key={a.title} variant={a.destructive ? 'destructive' : 'default'} size="sm" onClick={() => { onClose(); a.action() }}>
+                {tr(a.title)}
+              </Button>
+            ))}
+          </div>
+        </DialogPrimitive.Content>
+      </DialogPrimitive.Portal>
+    </DialogPrimitive.Root>
   )
 }
 

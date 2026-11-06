@@ -1314,6 +1314,20 @@ iOS 定制分支：`ui/ios-customization`；当前 Mac 工作分支：`ui/macos-
 - **未换/待办** Dialog/Sheet 将在 C0119 处理；`ScrollArea`/`Popover`/`Checkbox` 仍入库未接；原生桌面 chrome 不动。
 - **关联** C0106、C0117。
 
+### C0119 · 2026-11-06 · 全量替换（二）：Dialog/Sheet 改为原生 Radix shadcn Dialog（实验分支续）
+
+- **原因** 用户要求「字面意义全换」。此前 `components/Overlay.tsx` 的 `Sheet`/`Dialog` 是自绘模态（自有焦点陷阱/inert 叠层/Escape 栈/`.modal-card`/`.dialog-card` CSS）。本条改为原生 `@radix-ui/react-dialog`（shadcn Dialog 的底座），用 shadcn 语义类（`bg-background`/`border-border`/`rounded-lg`/`shadow-xl`/`bg-black/50` 遮罩），行为（焦点陷阱、Escape、点击遮罩、aria）交给 Radix。
+- **变化**
+  - `Sheet`：`DialogPrimitive.Root/Portal/Overlay/Content`；保留 `open/onClose/width/height/maxHeight/dismissOnDim/children` 与 `DismissContext`/`ModalTitleContext`（`ModalHeader` 的标题 id 仍通过 `aria-labelledby` 关联）。`dismissOnDim=false` 时 `onInteractOutside` preventDefault（表单不误关）。
+  - `Dialog`：`DialogPrimitive` + `Title`/`Description` + shadcn `Button`（secondary/destructive/default）。`cancel=null` 时禁止 Escape/点遮罩关闭（仅动作结束）。
+  - 删除仅供旧实现使用的 `useModalFocus`/`syncModals`/`openModals`/`mutedByModals`/`FOCUSABLE` 与 `stackModals` 导入；`useEscape`/`usePresence` 等仍被 `AnchoredMenu` 使用故保留。
+- **文件** `apps/desktop/src/renderer/components/Overlay.tsx`、`CHANGELOG.md`。
+- **token 入口** 仍只有 `styles/tokens.css`；模态卡片/遮罩/按钮全部走 token 语义类，无新增硬编码色值。旧 `.modal-card/.modal-content/.dialog*` 规则保留为死样式。
+- **验证** `npm run typecheck` 与 `npm run build` 通过（CSS 205.44→206.03 kB，JS 4,459.78→4,468.74 kB）；demo 刷新后主会话正常，点开「Bot 列表」新的 Radix Sheet 卡片渲染正常（截图确认）。
+- **限制/待办（需真机复核）** 焦点返回/嵌套模态的 inert 叠层改由 Radix 处理，可能与旧的多层模态行为有差异；`ScrollArea`/`Popover`/`Checkbox` 仍入库未接；原生桌面 chrome 不动（红绿灯仍左 16/顶 16）。
+- **关联** C0106、C0118。
+
+
 
 
 
