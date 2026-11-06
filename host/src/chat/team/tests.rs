@@ -96,7 +96,7 @@ impl Fixture {
     }
 
     /// What `bot`'s agent was prompted with, in order.
-    fn prompts_of(&self, bot: &str) -> Vec<String> {
+    pub(super) fn prompts_of(&self, bot: &str) -> Vec<String> {
         std::fs::read_to_string(self.dir.join(bot).join("prompts.jsonl"))
             .unwrap_or_default()
             .lines()
