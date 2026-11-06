@@ -165,3 +165,11 @@
 .no-drag {
   -webkit-app-region: no-drag;
 }
+
+/* Radix popper portals (Select / DropdownMenu / Popover / Tooltip) render at <body>; keep them
+   above the app's modals (Radix Sheet/Dialog, z 100/200) and clickable under Radix's modal
+   scroll-lock (which sets pointer-events:none on <body>). */
+[data-radix-popper-content-wrapper] {
+  z-index: 1000 !important;
+  pointer-events: auto !important;
+}
