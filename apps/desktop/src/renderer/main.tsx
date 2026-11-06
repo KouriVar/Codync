@@ -6,6 +6,7 @@ import './styles/theme.css'
 import { ChatWindow } from './views/ChatWindow'
 import { PairingWindow } from './views/PairingWindow'
 import { RenderBoundary } from './views/RenderBoundary'
+import { TooltipProvider } from './components/ui/tooltip'
 import { IslandWindow } from './views/island/IslandWindow'
 import { IslandModel } from './views/island/island-model'
 import { AppModel } from './store/app-model'
@@ -45,7 +46,9 @@ if (page === 'island') {
   if (page !== 'pairing') void account.start()
   root.render(
     <RenderBoundary>
-      <AppContext.Provider value={app}>{page === 'pairing' ? <PairingWindow /> : <ChatWindow />}</AppContext.Provider>
+      <TooltipProvider delayDuration={300}>
+        <AppContext.Provider value={app}>{page === 'pairing' ? <PairingWindow /> : <ChatWindow />}</AppContext.Provider>
+      </TooltipProvider>
     </RenderBoundary>,
   )
 }

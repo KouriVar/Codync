@@ -1265,6 +1265,21 @@ iOS 定制分支：`ui/ios-customization`；当前 Mac 工作分支：`ui/macos-
 - **限制/待办** 实验分支；开关由 34px 变 shadcn 36px 轨道，属预期。整行点击切走 label 上的显式 `onClick`（见上），已不依赖浏览器转发；若个别布局下点空白处误触，下一轮微调。
 - **关联** C0106、C0113。
 
+### C0115 · 2026-11-06 · 接入 Tooltip，并把网络规则弹层的选择器换成 Select（实验分支续）
+
+- **原因** 承接 C0114：`Tooltip` 原语已入库但未接；同时「连接相关弹层」里 `RuleSheet`（添加网络规则）的 From computer/From bot/To bot 仍是自绘 `ChoicePicker`。本条落地这两个原语。
+- **变化**
+  - `main.tsx`：根渲染外包一层 shadcn `TooltipProvider`（`delayDuration=300`），供全树的 Tooltip 使用。
+  - `views/thread/MacChatButton.tsx`（聊天顶部/详情面板/产物页的圆形按钮）：原生 `title` 提示换成 shadcn `Tooltip`（`TooltipTrigger asChild` 包原按钮 + `TooltipContent`），保留 `aria-label` 与方向箭头动画。
+  - `views/settings/RuleSheet.tsx`：三处 `ChoicePicker` → `ChoiceSelect`（shadcn `Select`，来自 `settings/parts`），选项仍是纯 `{id,label}` 字符串，行为不变。
+- **文件** `apps/desktop/src/renderer/main.tsx`、`apps/desktop/src/renderer/views/thread/MacChatButton.tsx`、`apps/desktop/src/renderer/views/settings/RuleSheet.tsx`、`CHANGELOG.md`。
+- **token 入口** 仍只有 `apps/desktop/src/renderer/styles/tokens.css`；`TooltipContent` 用 `bg-primary`/`text-primary-foreground`，`Select` 用 `bg-popover`/`border-border`/`bg-background`/`border-input`，均经 `styles/tailwind.css` 映射，无新增硬编码色值。
+- **验证** `apps/desktop` 下 `npm run typecheck` 与 `npm run build` 通过（CSS 205.31 kB 不变，JS 4,431.91→4,453.42 kB：Tooltip/Select 内容进产物）。按规则只编译，未启动应用；亮/暗色人工走查仍未执行。
+- **未换（保留）** 其余 `ChoicePicker`（语音设置、机器人/例程等）仍自绘：部分选项带 `leading` 图标（agent logo），整体换 Select 会丢图标且影响 16 处布局，留待逐面处理；`IconButton` 仍自绘；`ScrollArea`/`Popover`/`Checkbox` 已入库未接入；主会话消息区图标按钮、设置 Computers/Network 主列表未覆盖；原生桌面 chrome 不动（红绿灯仍左 16/顶 16）。
+- **限制/待办** 实验分支；Tooltip 依赖 Radix Portal，模态内提示的层级由 Radix 处理，未做像素走查。
+- **关联** C0106、C0114。
+
+
 
 
 

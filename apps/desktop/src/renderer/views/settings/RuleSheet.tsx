@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { Network, NetworkRule } from '@shared/network'
-import { CardSection, ChoiceList, ChoicePicker, IconButton, Reveal, Spinner, ValueRow } from '../../components/Controls'
+import { CardSection, ChoiceList, IconButton, Reveal, Spinner, ValueRow } from '../../components/Controls'
 import { ModalHeader, useDismiss } from '../../components/Overlay'
 import { HStack, Spacer, VStack } from '../../components/Stack'
 import { Text } from '../../components/Text'
@@ -10,7 +10,7 @@ import { ANY } from '../../lib/network-copy'
 import { useTr } from '../../lib/use-language'
 import type { BotStore } from '../../store/bot-store'
 import { network } from '../../store/network'
-import { errorText } from './parts'
+import { ChoiceSelect, errorText } from './parts'
 
 const ACCESS: { id: NetworkRule['access']; label: string }[] = [
   { id: 'allow', label: 'Allow' },
@@ -67,13 +67,13 @@ export function RuleSheet({ store, net }: { store: BotStore; net: Network }) {
         </CardSection>
         <CardSection footer="The first rule that matches decides.">
           <ValueRow label="From computer">
-            <ChoicePicker selection={fromComputer} options={[{ id: ANY, label: 'Any computer' }, ...others.map((c) => ({ id: c.name, label: c.name }))]} onChange={pickComputer} />
+            <ChoiceSelect value={fromComputer} options={[{ id: ANY, label: 'Any computer' }, ...others.map((c) => ({ id: c.name, label: c.name }))]} onChange={pickComputer} />
           </ValueRow>
           <ValueRow label="From bot">
-            <ChoicePicker selection={fromAgent} options={[{ id: ANY, label: 'Any bot' }, ...(from?.agents ?? []).map((a) => ({ id: a.id, label: a.name }))]} onChange={setFromAgent} />
+            <ChoiceSelect value={fromAgent} options={[{ id: ANY, label: 'Any bot' }, ...(from?.agents ?? []).map((a) => ({ id: a.id, label: a.name }))]} onChange={setFromAgent} />
           </ValueRow>
           <ValueRow label="To bot">
-            <ChoicePicker selection={toAgent} options={[{ id: ANY, label: 'Any bot here' }, ...(me?.agents ?? []).map((a) => ({ id: a.id, label: a.name }))]} onChange={setToAgent} />
+            <ChoiceSelect value={toAgent} options={[{ id: ANY, label: 'Any bot here' }, ...(me?.agents ?? []).map((a) => ({ id: a.id, label: a.name }))]} onChange={setToAgent} />
           </ValueRow>
           <HStack gap={12} className="settings-row">
             <Label>{tr('Put it first')}</Label>
