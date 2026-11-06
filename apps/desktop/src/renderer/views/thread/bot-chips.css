@@ -69,7 +69,10 @@
   flex-direction: column;
   justify-content: flex-end;
   align-items: stretch;
-  gap: 4px;
+  /* C0132: no gap while the count line is folded away, so the card at rest is 30 — the chip's own
+     height plus the card's 4/4 (the frame's default state is 77×30). */
+  gap: 0;
+  transition: gap var(--smart);
   max-width: 260px;
   padding: 4px 8px 4px 4px;
   border-radius: 16px;
@@ -85,8 +88,12 @@
   display: flex;
   align-items: center;
   flex: none;
+  box-sizing: border-box;
   height: 28px;
+  /* C0132: width collapses too — the hidden line's text used to set the card's width, so a card at
+     rest was as wide as "N messages · name" instead of hugging its chip (30/77 in the frame). */
   max-height: 0;
+  max-width: 0;
   overflow: hidden;
   padding: 0 6px;
   border: 0;
@@ -103,11 +110,16 @@
   text-overflow: ellipsis;
   opacity: 0;
   transform: translateY(6px);
-  transition: max-height var(--smart), opacity var(--smart), transform var(--smart), box-shadow var(--smart);
+  transition: max-height var(--smart), max-width var(--smart), opacity var(--smart), transform var(--smart), box-shadow var(--smart);
+}
+.bot-chip-item:hover .bot-chip-card.has-count,
+.bot-chip-item:focus-within .bot-chip-card.has-count {
+  gap: 4px;
 }
 .bot-chip-item:hover .bot-chip-card.has-count .bot-chip-count,
 .bot-chip-item:focus-within .bot-chip-card.has-count .bot-chip-count {
   max-height: 28px;
+  max-width: 240px;
   opacity: 1;
   transform: none;
 }
@@ -119,12 +131,13 @@
 .bot-chip {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   flex: none;
-  /* C0131: 22 inside the card, so 4+28+4+22+4 = 62 when the count line shows. */
+  /* C0131: 22 inside the card, so 4+28+4+22+4 = 62 when the count line shows; the card carries the
+     padding now (C0132), so the button adds none — 30 tall at rest. */
   height: 22px;
   max-width: 260px;
-  padding: 4px 8px 4px 4px;
+  padding: 0;
   border: 0;
   background: transparent;
   color: var(--text);

@@ -1488,6 +1488,15 @@ iOS 定制分支：`ui/ios-customization`；当前 Mac 工作分支：`ui/macos-
 - **验证** 只编译 `npm run typecheck`；demo 1280×800 实测：内容列 888、`transcript-frame` top 0、右上按钮 38×38/r63/`#1F1F1F` 且已是 SVG 图标。**右栏本身在 demo 里没有 peer 数据，未做视觉验证**（真机可点「N 条消息往来」看）。
 - **关联** C0129、C0130。
 
+### C0132 · 2026-11-06 · 修正 chip 默认宽度：隐藏的计数行把卡片撑长了
+
+- **原因** 「N 条消息往来 X」那行只是 `max-height: 0` 藏起来，**宽度仍参与布局**，卡片于是一出生就和那行一样长（用户看到「默认这么长、不 hugging」）。
+- **变化** 折叠时**宽度一并收到 0**（`max-width: 0`），hover 再展开到 `240` 上限；卡片 `gap` 也随折叠从 4 收到 0。顺带把 chip 按钮自己的 padding 去掉（改由卡片承担 4/8/4/4），避免双层内边距。
+- **实测**（同一套 CSS 的最小页面，deviceScaleFactor 2）：折叠卡片 **89×30**（内部 chip 77×22）、hover **155×62**、计数行 hover 描边 **`#353535`**（inset 1px）。
+- **文件** `apps/desktop/src/renderer/views/thread/bot-chips.css`、`CHANGELOG.md`。
+- **验证** `npm run typecheck`；纯 CSS 行为用最小页量取（未跑真机自测）。
+- **关联** C0131。
+
 
 
 
