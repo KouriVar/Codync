@@ -1402,6 +1402,18 @@ iOS 定制分支：`ui/ios-customization`；当前 Mac 工作分支：`ui/macos-
 - **限制/待办** 默认只显示"有过往来"的 peer（沿用 `delegatedPeers`）；Figma 里那些没消息的默认 chip（设计师/产品/数据）若要一起显示，需要再取群成员数据（下轮可加）。
 - **关联** C0095、C0100、C0123。
 
+### C0126 · 2026-11-06 · 修正 bots 标签：同一张卡「长高」成两变体（非两张卡叠加）
+
+- **原因** C0125 把消息数与 chip 做成了"chip + 另外浮一张卡"两个元素，和 Figma 不符：设计里是**同一个圆角容器**从 30 高（chip：头像+名字+状态点）在 hover 时**原地长高成 62**，上方露出「N 条消息往来 · 名字」，下方仍是头像+名字——是一张连续卡片（两个 variant），不是两块。
+- **变化**
+  - `BotChipBar`：每个 peer 渲染 **一个 `.bot-chip-card`**（`has-count` 当有 exchanges）；内部上方 `.bot-chip-count`（消息行 button，点击 openChat）、下方 `.bot-chip`（头像+名字 button，点击切 @）。不再有独立浮动卡。
+  - `bot-chips.css`：`.bot-chip-card` 圆角 16 / `--bubble-agent` / 1px `color-mix(--text 12%)` / `overflow:hidden`；`.bot-chip-count` 默认 `max-height:0; opacity:0`，`.bot-chip-item:hover .has-count .bot-chip-count` → `max-height:32px; opacity:1`（配合行 `align-items:flex-end` = 原地向上生长到 62）；卡片 hover 描边 24% 高亮；消息行自身 hover 有 8% 淡底。
+- **文件** `apps/desktop/src/renderer/views/thread/{BotChipBar.tsx,bot-chips.css}`、`CHANGELOG.md`。
+- **token 入口** 仍只有 `styles/tokens.css`。
+- **验证** `npm run typecheck` 通过；重打 `dist:mac:local` 替换正式 App，真机 hover 复核「一张卡长高」。
+- **关联** C0125。
+
+
 
 
 

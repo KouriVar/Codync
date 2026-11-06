@@ -1,10 +1,12 @@
-/* The bots a chat has worked with, above its message box (C0095 / C0125), matching the Figma
-   design (51:101 / 54:328):
-   - a status row 28 tall (whoever is running right now);
-   - a row of 30-tall chips (avatar + name + a status dot whose colour says what it's doing);
-   - hovering a chip floats the "N messages · name" card up above it (the up-grow animation);
-   - that card highlights its outline on hover and opens the docked conversation on click.
-   Chip: h30, radius 16, fill ≈ #1F1F1F, 1px stroke ≈ #353535, 13px name (all via tokens). */
+/* The bots a chat has worked with, above its message box (C0095 / C0125), matching Figma
+   Frame 23 (51:101 / 54:328): ONE card with two variants.
+   - Default: a 30-tall chip (avatar 20 + name 13px Medium + a status dot whose colour says what
+     the bot is doing).
+   - Hover: the SAME card grows upward to 62 tall and reveals the "N messages · name" line on
+     top, avatar+name still at the bottom — one continuous rounded rectangle, not two boxes.
+   - The revealed message line highlights (background) on its own hover and opens the docked
+     conversation on click; the chip toggles @mention on click.
+   Specs from Figma: radius 16, fill ≈ #1F1F1F, 1px stroke ≈ #353535 (all via tokens). */
 .bot-chip-bar-wrap {
   /* The four delegation status dots (red broke · orange running · blue awaiting you · green done)
      live in tokens.css as --status-problem / -working / -asking / -idle; only referenced below. */
@@ -16,7 +18,7 @@
   gap: var(--space-4);
   min-width: 0;
 }
-/* The row of running bots, above the chips: one strip each. */
+/* The row of running bots, above the chips. */
 .bot-chip-running {
   display: flex;
   flex-wrap: nowrap;
@@ -40,7 +42,7 @@
   border-radius: var(--radius-pill);
   background: var(--surface);
 }
-/* The chip row. Wrap rather than clip, so a chip's hover card can float above the row. */
+/* The chip row: bottom-aligned so a card grows upward on hover; wraps rather than clips. */
 .bot-chip-bar {
   display: flex;
   flex-wrap: wrap;
@@ -49,35 +51,79 @@
   overflow: visible;
 }
 .bot-chip-item {
-  position: relative;
   flex: none;
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
+  align-items: flex-end;
 }
-/* One chip: avatar 20 + name, 30 tall, radius 16, 1px outline. */
+/* ONE card, 30-tall by default, 62-tall on hover. */
+.bot-chip-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: stretch;
+  max-width: 260px;
+  border-radius: 16px;
+  overflow: hidden;
+  background: var(--bubble-agent);
+  border: 1px solid color-mix(in srgb, var(--text) 12%, transparent);
+  transition: border-color var(--hover), background-color var(--hover);
+}
+.bot-chip-card:hover {
+  border-color: color-mix(in srgb, var(--text) 24%, transparent);
+}
+/* The "N messages · name" line, hidden (0 tall) until the card is hovered, then it slides up in. */
+.bot-chip-count {
+  display: flex;
+  align-items: center;
+  flex: none;
+  height: 32px;
+  max-height: 0;
+  overflow: hidden;
+  padding: 0 12px;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  font-size: var(--text-body);
+  font-weight: 500;
+  line-height: 1.2;
+  color: var(--text);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  opacity: 0;
+  transform: translateY(6px);
+  transition: max-height var(--morph), opacity var(--morph), transform var(--morph), background-color var(--hover);
+}
+.bot-chip-item:hover .bot-chip-card.has-count .bot-chip-count,
+.bot-chip-item:focus-within .bot-chip-card.has-count .bot-chip-count {
+  max-height: 32px;
+  opacity: 1;
+  transform: none;
+}
+.bot-chip-count:hover {
+  background: color-mix(in srgb, var(--text) 8%, transparent);
+}
+/* The bottom line: avatar + name, 30 tall, transparent over the card. */
 .bot-chip {
   display: flex;
   align-items: center;
   gap: 6px;
   flex: none;
   height: 30px;
-  max-width: 220px;
+  max-width: 260px;
   padding: 4px 8px 4px 4px;
-  border-radius: 16px;
-  background: var(--bubble-agent);
-  border: 1px solid color-mix(in srgb, var(--text) 12%, transparent);
+  border: 0;
+  background: transparent;
   color: var(--text);
-  transition: background-color var(--hover), border-color var(--hover);
+  transition: background-color var(--hover);
 }
 .bot-chip:hover {
-  background: color-mix(in srgb, var(--bubble-agent) 86%, var(--text) 14%);
+  background: color-mix(in srgb, var(--text) 6%, transparent);
 }
 .bot-chip.chosen {
   background: color-mix(in srgb, var(--text) 10%, transparent);
-  border-color: color-mix(in srgb, var(--text) 26%, transparent);
 }
-/* The avatar with its status dot on the bottom-right corner. */
+/* The avatar with its status dot on its bottom-right corner. */
 .bot-chip-avatar {
   position: relative;
   display: inline-flex;
@@ -91,7 +137,7 @@
   height: 8px;
   border-radius: 50%;
   box-sizing: border-box;
-  /* A ring of the chip's fill, so the dot reads on the avatar's edge. */
+  /* A ring of the card's fill, so the dot reads on the avatar's edge. */
   box-shadow: 0 0 0 1.5px var(--bubble-agent);
 }
 .bot-chip-status.problem {
@@ -106,48 +152,10 @@
 .bot-chip-status.idle {
   background: var(--status-idle);
 }
-/* The "N messages · name" card: hidden below the chip, floats up on hover (up-grow), then
-   highlights its outline on hover and opens the docked conversation on click. */
-.bot-chip-count-card {
-  position: absolute;
-  left: 0;
-  bottom: calc(100% - 1px);
-  z-index: 2;
-  max-width: 260px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  padding: 8px 12px;
-  border-radius: 16px;
-  background: var(--bubble-agent);
-  border: 1px solid color-mix(in srgb, var(--text) 12%, transparent);
-  color: var(--text);
-  font-size: var(--text-body);
-  font-weight: 500;
-  line-height: 1.2;
-  box-shadow: var(--shadow-m);
-  opacity: 0;
-  transform: translateY(8px);
-  pointer-events: none;
-  cursor: default;
-  transition: opacity var(--morph), transform var(--morph), border-color var(--hover), background-color var(--hover);
-}
-.bot-chip-item:hover .bot-chip-count-card,
-.bot-chip-item:focus-within .bot-chip-count-card {
-  opacity: 1;
-  transform: translateY(0);
-  pointer-events: auto;
-  cursor: pointer;
-}
-.bot-chip-count-card:hover,
-.bot-chip-count-card:focus-visible {
-  border-color: color-mix(in srgb, var(--text) 42%, transparent);
-  background: color-mix(in srgb, var(--bubble-agent) 88%, var(--text) 12%);
-  outline: none;
-}
 @media (prefers-reduced-motion: reduce) {
   .bot-chip,
-  .bot-chip-count-card {
+  .bot-chip-count,
+  .bot-chip-card {
     transition: none;
   }
 }

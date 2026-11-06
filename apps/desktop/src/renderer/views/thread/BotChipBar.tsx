@@ -48,38 +48,41 @@ export function BotChipBar({ botId, mention, pick, openChat }: {
           const chosen = mention?.id === peerId
           const dot = DELEGATE_STATUS_DOTS[state]
           const label = `@${name} · ${tr(DELEGATE_STATUS_LABELS[state])}`
-          // C0125: default is a 30-tall chip; hovering it floats the "N messages · name" card up.
+          // C0125: ONE card that grows from a 30-tall chip into a 62-tall card (two variants); the
+          // "N messages · name" line reveals on top, avatar+name stays at the bottom.
           const summary = `${tr('{count} messages').replaceAll('{count}', () => String(exchanges.length))} ${name}`
           return (
             <div key={peerId} className="bot-chip-item">
-              {exchanges.length > 0 ? (
+              <div className={`bot-chip-card${exchanges.length > 0 ? ' has-count' : ''}`}>
+                {exchanges.length > 0 ? (
+                  <button
+                    type="button"
+                    className="bot-chip-count"
+                    title={summary}
+                    onClick={() => openChat(peerId, name)}
+                  >
+                    {summary}
+                  </button>
+                ) : null}
                 <button
                   type="button"
-                  className="bot-chip-count-card"
-                  title={summary}
-                  onClick={() => openChat(peerId, name)}
+                  className={chosen ? 'bot-chip chosen' : 'bot-chip'}
+                  aria-pressed={chosen}
+                  title={label}
+                  aria-label={label}
+                  onClick={() => pick(chosen ? null : { id: peerId, name })}
                 >
-                  {summary}
+                  <span className="bot-chip-avatar">
+                    {bot ? (
+                      <>
+                        <BotAvatar bot={bot} size={20} animated={false} />
+                        <span className={`bot-chip-status ${dot}`} aria-hidden="true" />
+                      </>
+                    ) : null}
+                  </span>
+                  <Text size="body" weight={chosen ? 'semibold' : 'medium'} truncate>{name}</Text>
                 </button>
-              ) : null}
-              <button
-                type="button"
-                className={chosen ? 'press bot-chip chosen' : 'press bot-chip'}
-                aria-pressed={chosen}
-                title={label}
-                aria-label={label}
-                onClick={() => pick(chosen ? null : { id: peerId, name })}
-              >
-                <span className="bot-chip-avatar">
-                  {bot ? (
-                    <>
-                      <BotAvatar bot={bot} size={20} animated={false} />
-                      <span className={`bot-chip-status ${dot}`} aria-hidden="true" />
-                    </>
-                  ) : null}
-                </span>
-                <Text size="body" weight={chosen ? 'semibold' : 'medium'} truncate>{name}</Text>
-              </button>
+              </div>
             </div>
           )
         })}
