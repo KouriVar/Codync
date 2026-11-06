@@ -47,27 +47,50 @@
   pointer-events: auto;
   -webkit-app-region: no-drag;
 }
+/* Progressive (iOS 26-style) top blur: no opaque band and no hard clip — the transcript scrolls
+   under 64px of stacked backdrop-filters, each masked to fade out further down, so the blur is
+   strongest at the very top and clears toward the content. */
 .top-fade {
-  /* Placed in grid area 1/1 its box would start inside the chrome's padding and leave hard
-     edges; auto placement makes it cover the whole chrome. It fades out 24px below the
-     chrome. */
   grid-area: auto !important;
   position: absolute;
-  inset: 0 0 -24px;
+  inset: 0 0 auto;
+  height: 64px;
   pointer-events: none;
-  background: linear-gradient(to bottom, var(--background) 0%, color-mix(in srgb, var(--background) 60%, transparent) 35%, transparent 100%);
+  overflow: hidden;
 }
-.top-fade::before {
-  content: '';
+.top-fade > i {
   position: absolute;
   inset: 0;
-  backdrop-filter: blur(20px);
-  -webkit-mask-image: linear-gradient(to bottom, #000, transparent 50%);
-  mask-image: linear-gradient(to bottom, #000, transparent 50%);
+  pointer-events: none;
+}
+.top-fade > i:nth-child(1) {
+  backdrop-filter: blur(2px) saturate(1.15);
+  -webkit-backdrop-filter: blur(2px) saturate(1.15);
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 0%, transparent 100%);
+}
+.top-fade > i:nth-child(2) {
+  backdrop-filter: blur(6px) saturate(1.15);
+  -webkit-backdrop-filter: blur(6px) saturate(1.15);
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, transparent 72%);
+  mask-image: linear-gradient(to bottom, #000 0%, transparent 72%);
+}
+.top-fade > i:nth-child(3) {
+  backdrop-filter: blur(12px) saturate(1.15);
+  -webkit-backdrop-filter: blur(12px) saturate(1.15);
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, transparent 48%);
+  mask-image: linear-gradient(to bottom, #000 0%, transparent 48%);
+}
+.top-fade > i:nth-child(4) {
+  backdrop-filter: blur(24px) saturate(1.15);
+  -webkit-backdrop-filter: blur(24px) saturate(1.15);
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, transparent 26%);
+  mask-image: linear-gradient(to bottom, #000 0%, transparent 26%);
 }
 @media (prefers-reduced-transparency: reduce) {
-  .top-fade::before {
+  .top-fade > i {
     backdrop-filter: none;
+    -webkit-backdrop-filter: none;
   }
 }
 .title-pill {
@@ -474,7 +497,8 @@ html[data-platform="darwin"] {
    hairline drawn down the middle of that gap. */
 html[data-platform="darwin"] .thread-view {
   box-sizing: border-box;
-  padding: var(--frame-inset);
+  /* Full-bleed: content runs to the window edge (no 6px inner frame). */
+  padding: 0;
 }
 html[data-platform="darwin"] .bot-chat-dock {
   position: relative;
@@ -483,9 +507,9 @@ html[data-platform="darwin"] .bot-chat-dock {
 html[data-platform="darwin"] .bot-chat-dock::before {
   content: '';
   position: absolute;
-  left: calc(-1 * (var(--frame-inset) + var(--divider-width)));
-  top: calc(-1 * var(--frame-inset));
-  bottom: calc(-1 * var(--frame-inset));
+  left: calc(-1 * (var(--space-5) / 2));
+  top: 0;
+  bottom: 0;
   width: var(--divider-width);
   background: var(--border);
   pointer-events: none;
@@ -510,11 +534,13 @@ html[data-platform="darwin"] .title-pill {
    so scrolling messages are clipped at its top and never show behind the title or the traffic
    lights; the top-fade fades them out just under it. The first message still sits 90 from the
    conversation's top (54 + 36); the bottom reserves the floating composer plus its 8px gap. */
+/* Full-bleed since C0123: the transcript fills the window and scrolls under the 64px progressive
+   blur (no top clip); the first message sits 90 from the top so it clears the band + title pill. */
 html[data-platform="darwin"] .transcript-frame {
-  top: 54px;
+  top: 0;
 }
 html[data-platform="darwin"] .transcript-content {
-  padding: 36px 0 calc(var(--composer-height, 70px) + 8px);
+  padding: 90px 0 calc(var(--composer-height, 70px) + 8px);
 }
 html[data-platform="darwin"] .transcript-content > div:first-of-type .chat-row {
   padding-top: 0;

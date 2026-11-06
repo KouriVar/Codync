@@ -323,9 +323,13 @@ export const ThreadView = memo(function ThreadView({ botId }: { botId: string })
   )
 })
 
-/** The top edge of the chat: messages fade out gradually as they scroll under the title pill. */
+/** The top edge of the chat: a progressive (iOS 26-style) blur the messages scroll under. */
 function TopFade() {
-  return <div className="top-fade" />
+  return (
+    <div className="top-fade" aria-hidden>
+      <i /><i /><i /><i />
+    </div>
+  )
 }
 
 function ConnectionSubtitle() {

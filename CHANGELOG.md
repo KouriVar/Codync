@@ -1354,3 +1354,29 @@ iOS 定制分支：`ui/ios-customization`；当前 Mac 工作分支：`ui/macos-
 - **文件** `apps/desktop/src/renderer/components/ui/{select,dropdown-menu,popover,tooltip}.tsx`、`CHANGELOG.md`。
 - **验证** `npm run typecheck` 通过；demo 中打开 设置→通用，鼠标单击「主题」可正常展开 `系统/浅色/深色`（截图确认，弹层在面板之上）。随后重打 `dist:mac:local` 并替换 `/Applications/Codync.app`。
 - **关联** C0109、C0110、C0116、C0119。
+
+### C0122 · 2026-11-06 · 用普通 CSS 规则保证 Radix 弹层恒在模态之上
+
+- **原因** C0121 给 `SelectContent` 加的 Tailwind 任意值 `z-[1000]` 在**生产构建里没有被生成**（dev 有、build 无），导致装到机上的正式包下拉仍被 Sheet 盖住。改用不依赖 Tailwind 的普通 CSS 规则兜底。
+- **变化**：`styles/theme.css` 末尾新增无层规则 `[data-radix-popper-content-wrapper]{ z-index:1000 !important; pointer-events:auto !important; }`，覆盖 Select / DropdownMenu / Popover / Tooltip 所有 Radix popper portal，保证在 Sheet/Dialog（z 100/200）之上且可点。
+- **文件** `apps/desktop/src/renderer/styles/theme.css`、`CHANGELOG.md`。
+- **验证** 构建产物 `out/renderer/assets/*.css` 里确认含 `z-index: 1000` 与 `radix-popper-content-wrapper`；重打并替换正式 App。
+- **关联** C0121。
+
+### C0123 · 2026-11-06 · 顶部条：全出血 + iOS26 式渐进模糊（去硬裁）
+
+- **原因** 用户要求顶部不用"白条硬切"，要 iOS26 那种越靠顶越糊、往下渐清晰的渐进模糊；并且窗口四周不要内间距、内容顶格，红绿灯保留 16/16，头像/输入框等继续做悬浮卡片。
+- **变化**
+  - `views/thread/thread.css`：
+    - 删掉 macOS 的硬裁：`html[data-platform="darwin"] .transcript-frame { top: 54px }` → `top: 0`；消息列表从窗口顶开始、滚到顶部条下面。
+    - 去内间距：`html[data-platform="darwin"] .thread-view { padding: var(--frame-inset) }` → `padding: 0`（全出血到窗口四边）；docked 竖线 `.bot-chat-dock::before` 的 `top/bottom/left` 随之改为 0 基准。
+    - 首条消息 padding-top 36 → 90，保持不被顶部条/名字 pill 压住。
+    - `.top-fade` 由"不透明渐变底 + 单层 blur(20px)"改为**64px、四层 backdrop-filter（2/6/12/24px，逐层用 mask 收窄到越往上越糊）**、无底色、无硬边；`prefers-reduced-transparency` 下关闭模糊。
+  - `views/thread/ThreadView.tsx`：`TopFade` 渲染 4 个 `<i>` 层承载渐进模糊。
+- **文件** `apps/desktop/src/renderer/views/thread/thread.css`、`apps/desktop/src/renderer/views/thread/ThreadView.tsx`、`CHANGELOG.md`。
+- **token 入口** 仍只有 `styles/tokens.css`；模糊层无底色，仅 `backdrop-filter`/`saturate`，不新增硬编码色值。
+- **验证** `npm run typecheck` 通过。随后重打 `dist:mac:local` 并替换 `/Applications/Codync.app`，由用户亮/暗实测观感（demo 固定暗色）。
+- **限制/待办** 多层 backdrop-filter 有 GPU 开销（64px 高、4 层，实测再调）；若某些 GPU 掉帧可减到 3 层或降 blur。
+- **关联** C0100、C0101、C0106。
+
+
