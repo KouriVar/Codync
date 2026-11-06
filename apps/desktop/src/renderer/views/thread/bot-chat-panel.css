@@ -71,12 +71,23 @@
 .bot-chat-panel-status {
   padding: var(--space-3) var(--space-2);
 }
-/* One message: avatar at the bubble's bottom-left corner, name in the bot's colour above the
-   bubble. 24 apart from the next message. */
+/* C0133: one message is a header row (avatar 20 + name, 28 tall, 12/4 padding) over a full-width
+   bubble — 24 apart from the next message. */
 .panel-msg {
   display: flex;
-  align-items: flex-end;
-  gap: var(--space-2);
+  flex-direction: column;
+  gap: 4px;
+}
+.panel-msg-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 28px;
+  padding: 4px 12px;
+  min-width: 0;
+}
+.panel-msg-head > :last-child {
+  min-width: 0;
 }
 .panel-msg + .panel-msg,
 .panel-msg + .time-separator,
@@ -85,33 +96,14 @@
 .panel-msg + .bot-chat-panel-status {
   margin-top: var(--space-7);
 }
-.panel-msg-avatar {
-  flex: none;
-  width: 24px;
-  height: 24px;
-  display: flex;
-  align-items: flex-end;
-}
-.panel-msg-content {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  flex: 1;
-}
-.panel-msg-name {
-  height: 28px;
-  padding: var(--space-2) var(--space-5);
-  display: flex;
-  align-items: center;
-  min-width: 0;
-}
-.panel-msg-name > * {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
+/* C0133: the bubble fills the column (295), 12 in, 16 round, #242424 — as the frame draws it. */
 .panel-msg .bubble {
-  max-width: 100%;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: none;
+  padding: 12px;
+  border-radius: 16px;
+  background: #242424;
 }
 .bot-chat-panel-mine {
   margin-top: var(--space-7);

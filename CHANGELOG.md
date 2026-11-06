@@ -1497,6 +1497,15 @@ iOS 定制分支：`ui/ios-customization`；当前 Mac 工作分支：`ui/macos-
 - **验证** `npm run typecheck`；纯 CSS 行为用最小页量取（未跑真机自测）。
 - **关联** C0131。
 
+### C0133 · 2026-11-06 · 右上图标居中；右栏消息改「头像+昵称一行 + 整宽气泡」
+
+- **原因** ①右上角按钮里的 `<svg>` 是 inline 元素，按文字基线排版，看着偏上偏左；②右栏消息我做成了「头像单独一列 + 气泡不满宽」，与图不符——`58:465` 组件里是**头像和昵称同一个 28 高行**（padding 12/4、头像 20、名字 14 用 bot 自己的颜色），下面**气泡铺满 295**。
+- **变化**
+  - `.top-chrome-panel` 改 `display:grid; place-items:center`（并给里面的 svg `display:block`），图标正中外框；顺带补 `border:0; padding:0; color:var(--text); cursor:pointer`。
+  - 右栏消息结构：`.panel-msg` 改为纵向「`.panel-msg-head`（头像 20 + 名字 14，min-height 28，padding 4/12）+ `.bubble`（宽 100%、padding 12、r16、`#242424`）」，删掉单独的头像列与旧 name 行；消息之间仍 24。
+- **文件** `views/thread/{thread.css,bot-chat-panel.css,BotChatPanel.tsx}`、`CHANGELOG.md`。
+- **验证** `npm run typecheck`；重打包安装后真机核对（图标居中 + 右栏点「N 条消息往来」打开后看结构）。
+
 
 
 

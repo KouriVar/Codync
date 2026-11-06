@@ -61,15 +61,15 @@ export function BotChatPanel({ botId, peerId, peerName, onClose }: {
           const bot = store.bots.get(row.author)
           return (
             <div key={row.id} className="panel-msg">
-              <span className="panel-msg-avatar">{bot ? <BotAvatar bot={bot} size={24} animated={false} /> : null}</span>
-              <div className="panel-msg-content">
-                <div className="panel-msg-name">
-                  <Text size="subheadline" weight="medium" style={{ color: nameColor(row.author) }}>{name(row.author)}</Text>
-                </div>
-                <Bubble className="bubble agent selectable" items={() => [{ title: 'Copy', icon: 'square.on.square', action: () => window.codync.app.copy(row.text) }]}>
-                  <MarkdownText text={row.text} />
-                </Bubble>
+              {/* C0133: the frame puts the avatar and the name on ONE 28-tall row (12/4 padding), and
+                  the bubble full width under it. */}
+              <div className="panel-msg-head">
+                {bot ? <BotAvatar bot={bot} size={20} animated={false} /> : null}
+                <Text weight="medium" truncate style={{ color: nameColor(row.author), fontSize: 'calc(14px * var(--scale))' }}>{name(row.author)}</Text>
               </div>
+              <Bubble className="bubble agent selectable" items={() => [{ title: 'Copy', icon: 'square.on.square', action: () => window.codync.app.copy(row.text) }]}>
+                  <MarkdownText text={row.text} />
+              </Bubble>
             </div>
           )
         })}
