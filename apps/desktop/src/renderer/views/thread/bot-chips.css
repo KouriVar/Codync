@@ -145,9 +145,8 @@
   color: var(--text);
   transition: background-color var(--hover);
 }
-.bot-chip.chosen {
-  background: color-mix(in srgb, var(--text) 10%, transparent);
-}
+/* C0137: no fill when the tag is picked — the @tag in the composer already says which bot the
+   message goes to (the frame gives the row no selected background either). */
 /* The avatar with its status dot on its bottom-right corner. */
 .bot-chip-avatar {
   position: relative;

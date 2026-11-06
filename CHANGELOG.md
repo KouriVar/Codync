@@ -1543,3 +1543,10 @@ iOS 定制分支：`ui/ios-customization`；当前 Mac 工作分支：`ui/macos-
   - 断点从 899 改到 **919**：920 起右栏**贴边占列**，再窄才退化为浮层（屏幕放不下 920 时的兜底）。
 - **文件** `src/{shared/ipc.ts,preload/index.ts,main/index.ts}`、`src/renderer/views/{thread/ThreadView.tsx,thread/thread.css,chat-window.css}`、`src/renderer/demo/bridge.ts`、`CHANGELOG.md`。
 - **验证** `npm run typecheck`；真机：600 宽开栏→窗口涨到 920 且右栏占列，关闭→回 600。
+
+### C0137 · 2026-11-06 · 取消 chip 选中态的底色
+
+- **原因** 点 chip 插入 @ 之后，标签上还有一层 10% 文字色高光；用户不需要——输入框里的 `@数据分析` 已经说明了收件人。
+- **变化** 删掉 `.bot-chip.chosen` 的 `background`（保留 semibold 字重作为轻提示；hover 仍无底色，计数行描边高亮不变）。
+- **文件** `apps/desktop/src/renderer/views/thread/bot-chips.css`、`CHANGELOG.md`。
+- **验证** `npm run typecheck`。
