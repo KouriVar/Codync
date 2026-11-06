@@ -1,10 +1,6 @@
-import { useState } from 'react'
 import { BotAvatar } from '../../components/Avatar'
-import { Button } from '../../components/ui/button'
-import { IconButton } from '../../components/Controls'
-import { Icon } from '../../components/Icon'
+import { FigmaIcon } from '../../components/FigmaIcon'
 import { Text } from '../../components/Text'
-import { Textarea } from '../../components/ui/textarea'
 import { useTr } from '../../lib/use-language'
 import { avatarColor } from '../../lib/theme'
 import { useStore } from '../../store/context'
@@ -31,15 +27,6 @@ export function BotChatPanel({ botId, peerId, peerName, onClose }: {
   const tr = useTr()
   const store = useStore()
   const { rows, error, fetched } = useBotConversation(botId, peerId)
-  const mine = store.bots.get(peerId)
-  const sent = mine ? store.allEntries(peerId).filter((e) => e.kind === 'user' && e.data.text) : []
-  const [draft, setDraft] = useState('')
-  const send = () => {
-    const text = draft.trim()
-    if (!text || !mine) return
-    store.send(text, peerId)
-    setDraft('')
-  }
   const name = (id: string) => store.authorName(id, id === peerId ? peerName : undefined)
   /**
    * Every sender's name takes its own bot's theme colour (C0101) — the main bot and the peer alike,
@@ -57,11 +44,10 @@ export function BotChatPanel({ botId, peerId, peerName, onClose }: {
         <div className="bot-chat-panel-title">
           <BotPair botId={botId} peer={{ id: peerId, name: peerName }} />
         </div>
-        {/* A placeholder for now: no menu behind it yet. */}
-        <div className="bot-chat-panel-head-actions">
-          <IconButton title="More" icon="ellipsis" size={26} onClick={() => undefined} />
-          <IconButton title="Close" icon="xmark" size={26} onClick={onClose} />
-        </div>
+        {/* C0131: the frame's close button (101:7877), 38 round, at the row's right end. */}
+        <button type="button" className="bot-chat-panel-close press" title={tr('Close')} aria-label={tr('Close')} onClick={onClose}>
+          <FigmaIcon name="close-line" size={20} />
+        </button>
       </div>
       <div className="bot-chat-panel-scroll">
         {error ? <Text as="div" size="footnote" tone="danger" className="bot-chat-panel-note">{error}</Text> : null}
@@ -87,50 +73,7 @@ export function BotChatPanel({ botId, peerId, peerName, onClose }: {
             </div>
           )
         })}
-        {mine && sent.length ? (
-          <div className="bot-chat-panel-mine">
-            <Text as="div" size="footnote" tone="tertiary" className="bot-chat-panel-mine-title">
-              {tr('You to {name}').replaceAll('{name}', () => peerName)}
-            </Text>
-            {sent.map((e) => (
-              <div key={e.id} className="panel-msg">
-                <span className="panel-msg-avatar" />
-                <div className="panel-msg-content">
-                  <div className="bubble agent selectable"><MarkdownText text={e.data.text ?? ''} /></div>
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : null}
       </div>
-      {mine ? (
-        <div className="bot-chat-panel-composer">
-          <div className="bot-chat-panel-box">
-            <Textarea
-              rows={1}
-              value={draft}
-              placeholder={tr('Message {name}').replaceAll('{name}', () => peerName)}
-              aria-label={tr('Message {name}').replaceAll('{name}', () => peerName)}
-              onChange={(e) => setDraft(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
-                  e.preventDefault()
-                  send()
-                }
-              }}
-            />
-            <Button size="icon" className="press bot-chat-panel-send" aria-label={tr('Send')} title={tr('Send')} disabled={!draft.trim()} onClick={send}>
-              <Icon name="arrow.up" size={13} weight="bold" />
-            </Button>
-          </div>
-        </div>
-      ) : (
-        <div className="bot-chat-panel-composer">
-          <Text as="div" size="footnote" tone="tertiary" className="bot-chat-panel-hint">
-            {tr('Not on this computer: ask {name}’s own chat to reply.').replaceAll('{name}', () => peerName)}
-          </Text>
-        </div>
-      )}
     </aside>
   )
 }

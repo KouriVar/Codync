@@ -156,6 +156,9 @@
   --fade: 0.12s var(--ease);
   --press: 0.05s var(--ease);
   --morph: 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+  /* C0131: the chip card's smart-animate curve, straight from the frame's timelines
+     (54:193 / 54:192 / 54:217 — 300ms, cubic-bezier(0, 0, 0.58, 1)). */
+  --smart: 300ms cubic-bezier(0, 0, 0.58, 1);
   /* Critically damped 0.3 s spring. */
   --spring: linear(0, 0.0712, 0.2244, 0.3992, 0.5638, 0.7018, 0.8077, 0.8834, 0.9342, 0.9663, 0.9853, 0.9958, 1.0009, 1.0028, 1.0029, 1);
   --layout: 0.3s var(--spring);
@@ -228,6 +231,7 @@
     --fade: 0s;
     --press: 0s;
     --morph: 0s;
+    --smart: 0s;
     --layout: 0s;
   }
 }

@@ -6,45 +6,63 @@
   display: flex;
   flex-direction: column;
   height: 100%;
-  width: var(--panel-min);
-  min-width: var(--panel-min);
+  /* C0131: 320 with 12 of padding, the frame's hairline on its own left edge, no gap beside the chat. */
+  box-sizing: border-box;
+  width: 320px;
+  min-width: 320px;
   min-height: 0;
+  padding: 12px;
+  border-left: 1px solid rgb(255 255 255 / 0.1);
   background: var(--background);
 }
 /* The title band: 54 tall (8 + 38 + 8), the pill centred with the two actions absolute at the top
    right, so they never push the title off centre. */
+/* The head is one 38-tall row: the pair pill at the left, the close button at the right. */
 .bot-chat-panel-head {
-  position: relative;
   flex: none;
-  height: 54px;
-  padding: var(--space-4);
-  display: grid;
-  place-items: center;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 46px;
 }
 .bot-chat-panel-title {
+  box-sizing: border-box;
   height: 38px;
-  max-width: calc(100% - 72px);
   display: flex;
   align-items: center;
-  padding: 0 10px 0 var(--space-4);
-  border-radius: var(--radius-pill);
-  background: var(--panel);
+  gap: 8px;
+  padding: 0 10px 0 8px;
+  border-radius: 63px;
+  background: #1f1f1f;
+  box-shadow: inset 0 0 0 1px #2c2c2c;
   overflow: hidden;
 }
-.bot-chat-panel-head-actions {
-  position: absolute;
-  top: var(--space-4);
-  right: var(--space-4);
-  display: flex;
-  align-items: center;
-  gap: var(--space-1);
+/* The close button beside it: 38 square, 63 round, the same fills (Figma 101:7877). */
+.bot-chat-panel-close {
+  flex: none;
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  padding: 0;
+  border-radius: 63px;
+  background: #1f1f1f;
+  box-shadow: inset 0 0 0 1px #2c2c2c;
+  color: var(--text);
+  cursor: pointer;
 }
+.bot-chat-panel-close:hover {
+  background: #2c2c2c;
+}
+
 .bot-chat-panel-scroll {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  /* The title band is 54; 58 more puts the first message 112 from the panel's top. */
-  padding: 58px var(--space-4) var(--space-4);
+  /* C0131: the head row is in flow now, so the list starts right under it. */
+  padding: 12px 0 0;
 }
 .bot-chat-panel-note {
   padding: var(--space-4) var(--space-2);

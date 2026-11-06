@@ -1472,6 +1472,22 @@ iOS 定制分支：`ui/ios-customization`；当前 Mac 工作分支：`ui/macos-
 - **验证** 只编译 `npm run typecheck` 通过；并用 Playwright 在 1280×800 量实际 DOM：pill 38 高 / y12 / `#1f1f1f` / r63、按钮 38 / r63 / y12 / 右 12 / icon 20、composer 888×44 / 底 12 / r62、气泡 `#242424` / 12 / 16 / 宽 ≤560。按要求**未自测真机、未重启 19222、未装正式 App**。
 - **关联** C0129。
 
+### C0131 · 2026-11-06 · 首页-扩展（`96:5224`）：子 bot 会话栏、真图标、chip 三态动画；撤回 C0130 的两处误读
+
+- **原因** 上一版把「内容区没填满的 frame」当成了设计意图：把消息区裁到距顶 130、把主栏按 560 压。设计其实要求**全出血 + 上下渐进模糊**，且右栏展开时主栏**不缩内容**。本单按 `96:5224` + `智能动画 101:7886` 重做，并把三个图标从 Figma 原样导出。
+- **撤回** `transcript-frame` 回到 `top: 0`（全出血，顶部渐进模糊重新盖住上滚内容）；`--column` 改为 `min(888, 100% - 72px)`——右栏占 320 时主栏 960、内容仍 888、两侧边距 196→36。
+- **右栏（子 bot 会话，纯展示）**
+  - 320 宽、内边距 12、**左缘 1px 白 10% 发丝线**（原先的 12 间距撤回），与主栏紧贴；右栏不再压缩主栏。
+  - 顶行 295×38、`SPACE_BETWEEN`：左是 **198×38 双头像 pill**（头像22+名字14 / ↔20 / 头像22+名字14，`#1F1F1F`/`#2C2C2C`/r63/pad 8-10-8-8/gap 8），右是 **38×38 关闭按钮**（`#1F1F1F`/`#2C2C2C`/r63/pad 9，`close-line` 20）。
+  - **输入框、状态行、chips 全部删除**（图里没有）：右栏只读。
+  - 主/子两侧消息都显示，换人间距 24，气泡 `#242424`/r16/pad 12。
+- **图标改成图里的真矢量**：新增 `components/FigmaIcon.tsx`，内联 `group-line`(84:4819)、`close-line`(101:7883)、`arrow-left-right-line`(58:445) 的 24×24 path（导出而非照抄 SF Symbol）。顶栏右上按钮因此从 `person.2` 换成 `group-line` 20。
+- **chips 三态动画**（按 `101:7886` 的 5 段 timeline）：`tokens.css` 新增 `--smart: 300ms cubic-bezier(0, 0, 0.58, 1)`；卡 `#1F1F1F` + `#353535` 发丝线、padding 4/8/4/4、gap 4；「N 条消息往来」行 28 高、r10、`#242424`，hover 时**描边 `#242424`→`#353535`**、行与标签一起 300ms 淡入；折叠 30 / 展开 62（4+28+4+22+4）。
+- **互斥**：右侧同一位置只站一个——点人形按钮（列表）会关掉子 bot 会话，点「N 条消息往来」（会话）会关掉列表（`botsPanel.close()`）。
+- **文件** `renderer/components/FigmaIcon.tsx`(新)、`components/ui/`—无、`views/thread/{ThreadView,BotChatPanel,BotPair}.tsx`、`views/thread/{thread,bot-chips,bot-chat-panel}.css`、`styles/tokens.css`、`views/{ChatWindow,MainBotMenu}.tsx`、`CHANGELOG.md`。
+- **验证** 只编译 `npm run typecheck`；demo 1280×800 实测：内容列 888、`transcript-frame` top 0、右上按钮 38×38/r63/`#1F1F1F` 且已是 SVG 图标。**右栏本身在 demo 里没有 peer 数据，未做视觉验证**（真机可点「N 条消息往来」看）。
+- **关联** C0129、C0130。
+
 
 
 

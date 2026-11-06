@@ -329,7 +329,7 @@ function ChatSplitView({ onComputerAccess }: { onComputerAccess: () => void }) {
   // C0096: every entry the sidebar held, as the main bot's menu reaches it. Same handlers, new door.
   const menuActions: MainMenuActions = {
     openBots: () => setBotsList(true),
-    botsPanel: { open: botsList, toggle: () => setBotsList(!botsList) },
+    botsPanel: { open: botsList, toggle: () => setBotsList(!botsList), close: () => setBotsList(false) },
     openMemory: () => { setBotsList(false); setMemoryOpen(true) },
     openProactive: () => { setBotsList(false); setProactiveOpen(true) },
     openSearch: () => setSearching(true),

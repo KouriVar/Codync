@@ -550,7 +550,8 @@ html[data-platform="darwin"] .conversation {
   min-width: var(--chat-min);
   /* C0100: the content column keeps its 80px side inset inside the main area (782 at 1280),
      capped at 888 and floored at 560. */
-  --column: clamp(var(--chat-min), calc(100% - 160px), var(--chat-max));
+  /* C0131: 888 fixed; when the peer column takes 320 the side margins give way to 36 each. */
+  --column: min(var(--chat-max), calc(100% - 72px));
 }
 html[data-platform="darwin"] {
   --agent-bubble-max: min(var(--bubble-max), max(80px, (100cqw + 32px) * 0.8 - 32px), 100cqw - 88px);
@@ -572,17 +573,8 @@ html[data-platform="darwin"] .thread-view {
 }
 html[data-platform="darwin"] .bot-chat-dock {
   position: relative;
-  margin-left: var(--space-5);
-}
-html[data-platform="darwin"] .bot-chat-dock::before {
-  content: '';
-  position: absolute;
-  left: calc(-1 * (var(--space-5) / 2));
-  top: 0;
-  bottom: 0;
-  width: var(--divider-width);
-  background: var(--border);
-  pointer-events: none;
+  /* C0131: flush — the frame puts the 1px hairline on the panel's own left edge. */
+  margin-left: 0;
 }
 
 /* ============================================================================
@@ -598,10 +590,7 @@ html[data-platform="darwin"] .top-chrome {
   height: 50px;
   align-items: start;
 }
-/* With the band no longer letting messages through, its blur stays inside the 50. */
-html[data-platform="darwin"] .top-fade {
-  height: 50px;
-}
+
 /* C0130: the person button at the band's right, above the drag area: 38 square, 12 from the right,
    #1F1F1F on a #2C2C2C hairline (Figma 84:4634). */
 .top-chrome-panel {
@@ -633,13 +622,13 @@ html[data-platform="darwin"] .title-pill {
    so scrolling messages are clipped at its top and never show behind the title or the traffic
    lights; the top-fade fades them out just under it. The first message still sits 90 from the
    conversation's top (54 + 36); the bottom reserves the floating composer plus its 8px gap. */
-/* C0130: the frame's content block starts 130 from the window top (Frame 35), and the band above it
-   lets nothing through. */
+/* C0131: full-bleed again — the transcript fills the window and scrolls under the top band, whose
+   progressive blur fades it out; the first message starts 90 down so it clears the band + pill. */
 html[data-platform="darwin"] .transcript-frame {
-  top: 130px;
+  top: 0;
 }
 html[data-platform="darwin"] .transcript-content {
-  padding: 0 0 calc(var(--composer-height, 70px) + 8px);
+  padding: 90px 0 calc(var(--composer-height, 70px) + 8px);
 }
 html[data-platform="darwin"] .transcript-content > div:first-of-type .chat-row {
   padding-top: 0;

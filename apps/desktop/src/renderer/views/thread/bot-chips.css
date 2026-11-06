@@ -62,32 +62,37 @@
   align-items: flex-end;
 }
 /* ONE card, 30-tall by default, 62-tall on hover. */
+/* C0131: the frame's card — #1F1F1F on a #353535 hairline, 4/8/4/4 padding, 4 between the lines,
+   so the collapsed card is 30 and the count line's 28 makes it 62 (54:187). */
 .bot-chip-card {
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
   align-items: stretch;
+  gap: 4px;
   max-width: 260px;
+  padding: 4px 8px 4px 4px;
   border-radius: 16px;
   overflow: hidden;
-  background: var(--bubble-agent);
-  border: 1px solid color-mix(in srgb, var(--text) 12%, transparent);
-  transition: border-color var(--hover), background-color var(--hover);
-}
-.bot-chip-card:hover {
-  border-color: color-mix(in srgb, var(--text) 24%, transparent);
+  background: #1f1f1f;
+  box-shadow: inset 0 0 0 1px #353535;
 }
 /* The "N messages · name" line, hidden (0 tall) until the card is hovered, then it slides up in. */
+/* C0131: the count line — 28 tall, 10 round, #242424, its hairline going #242424 → #353535 when the
+   pointer is on it (54:193 → 54:217). Both fades and that colour run 300ms on (0,0,.58,1), the curve
+   the frame's timelines use. */
 .bot-chip-count {
   display: flex;
   align-items: center;
   flex: none;
-  height: 32px;
+  height: 28px;
   max-height: 0;
   overflow: hidden;
-  padding: 0 12px;
+  padding: 0 6px;
   border: 0;
-  background: transparent;
+  border-radius: 10px;
+  background: #242424;
+  box-shadow: inset 0 0 0 1px #242424;
   cursor: pointer;
   text-align: left;
   font-size: var(--text-body);
@@ -98,16 +103,17 @@
   text-overflow: ellipsis;
   opacity: 0;
   transform: translateY(6px);
-  transition: max-height var(--morph), opacity var(--morph), transform var(--morph), background-color var(--hover);
+  transition: max-height var(--smart), opacity var(--smart), transform var(--smart), box-shadow var(--smart);
 }
 .bot-chip-item:hover .bot-chip-card.has-count .bot-chip-count,
 .bot-chip-item:focus-within .bot-chip-card.has-count .bot-chip-count {
-  max-height: 32px;
+  max-height: 28px;
   opacity: 1;
   transform: none;
 }
-.bot-chip-count:hover {
-  background: color-mix(in srgb, var(--text) 8%, transparent);
+.bot-chip-count:hover,
+.bot-chip-count:focus-visible {
+  box-shadow: inset 0 0 0 1px #353535;
 }
 /* The bottom line: avatar + name, 30 tall, transparent over the card. */
 .bot-chip {
@@ -115,7 +121,8 @@
   align-items: center;
   gap: 6px;
   flex: none;
-  height: 30px;
+  /* C0131: 22 inside the card, so 4+28+4+22+4 = 62 when the count line shows. */
+  height: 22px;
   max-width: 260px;
   padding: 4px 8px 4px 4px;
   border: 0;

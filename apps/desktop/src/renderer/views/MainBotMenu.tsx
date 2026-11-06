@@ -11,7 +11,7 @@ export interface MainMenuActions {
   /** The roster the sidebar held — its sections, right-clicks and footer — in a sheet. */
   openBots: () => void
   /** C0129: the Mac's right-hand bot list panel: whether it stands, and the top-right button's toggle. */
-  botsPanel: { open: boolean; toggle: () => void }
+  botsPanel: { open: boolean; toggle: () => void; close: () => void }
   /** The Mac's memory page (C0102): the bot's own and the shared facts, editable. */
   openMemory: () => void
   /** The proactive-report times (C0105). */

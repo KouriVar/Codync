@@ -1,7 +1,8 @@
 import { Fragment, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { draftOf, isGroup, isWorking, isWorkingIn, type Bot, type BotDraft, type Entry } from '@shared/models'
 import { BotAvatar, GroupAvatar } from '../../components/Avatar'
-import { Spinner, IconButton } from '../../components/Controls'
+import { Spinner } from '../../components/Controls'
+import { FigmaIcon } from '../../components/FigmaIcon'
 import { Icon } from '../../components/Icon'
 import { Sheet, usePresence } from '../../components/Overlay'
 import { HStack, IconSlot, Spacer } from '../../components/Stack'
@@ -162,6 +163,11 @@ export const ThreadView = memo(function ThreadView({ botId }: { botId: string })
   })
   // C0129: the top-right person button shows and hides the Mac's right-hand bot list.
   const menuActions = useMainMenuActions()
+  // C0131: the right side holds either the bot list or one peer conversation — never both.
+  const openPeer = (id: string, name: string) => {
+    menuActions?.botsPanel.close()
+    setBotChat({ id, name })
+  }
   // The docked conversation (Mac): a fixed 320 wide (C0100), the chat keeping 560 at least.
   const chatOpen = isMac && botChat !== null
   const chatPanelWidth = chatOpen ? 320 : 0
@@ -252,23 +258,25 @@ export const ThreadView = memo(function ThreadView({ botId }: { botId: string })
           ) : (
             titlePill
           )}
-          {/* C0129: shows and hides the right-hand bot list; the icon fills while it stands. */}
+          {/* C0131: the frame's group-line button — 38 round, #1F1F1F on #2C2C2C — opens the bot list;
+              the list and a peer conversation share the right side, so one closes the other. */}
           {isMac && menuActions ? (
-            <IconButton
-              title="Bots"
-              icon="person.2"
-              size={38}
-              iconSize={20}
-              className="top-chrome-panel"
-              selected={menuActions.botsPanel.open}
-              onClick={menuActions.botsPanel.toggle}
-            />
+            <button
+              type="button"
+              className={`top-chrome-panel press${menuActions.botsPanel.open ? ' selected' : ''}`}
+              title={tr('Bots')}
+              aria-label={tr('Bots')}
+              aria-pressed={menuActions.botsPanel.open}
+              onClick={() => { setBotChat(null); menuActions.botsPanel.toggle() }}
+            >
+              <FigmaIcon name="group-line" size={20} />
+            </button>
           ) : null}
         </div>
         {/* C0102: a light “记住了：……” pill when this bot's memory gains a fact. */}
         {isMac ? <MemoryNotice botId={botId} /> : null}
         {/* An update card takes the composer's place, so there's nothing to reply with. */}
-        <Transcript botId={botId} openTrace={openTrace} onReply={store.mismatch ? undefined : setReplyTo} openRoutine={presentRoutine} openAgent={presentAgent} openBotChat={(peerId) => setBotChat({ id: peerId, name: store.authorName(peerId) })} openArtifact={openArtifact} openCall={setCallLine} />
+        <Transcript botId={botId} openTrace={openTrace} onReply={store.mismatch ? undefined : setReplyTo} openRoutine={presentRoutine} openAgent={presentAgent} openBotChat={(peerId) => openPeer(peerId, store.authorName(peerId))} openArtifact={openArtifact} openCall={setCallLine} />
         {/* Lower progressive blur: sits above the message flow but below the floating composer. */}
         <div className="bottom-fade" aria-hidden><i /><i /><i /><i /></div>
         <div className="composer-dock" ref={dock}>
@@ -282,7 +290,7 @@ export const ThreadView = memo(function ThreadView({ botId }: { botId: string })
             <>
               <QueuedMessages botId={botId} />
               {/* A main chat's chips over its box; a group addresses its members with @ in the text. */}
-              {bot && !isGroup(bot) ? <BotChipBar botId={botId} mention={mention} pick={setMention} openChat={(id, name) => setBotChat({ id, name })} /> : null}
+              {bot && !isGroup(bot) ? <BotChipBar botId={botId} mention={mention} pick={setMention} openChat={openPeer} /> : null}
               <Composer
                 botId={botId}
                 reply={replyTo}
