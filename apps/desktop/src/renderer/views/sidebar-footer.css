@@ -120,6 +120,6 @@
 }
 .sidebar-account-notice > :first-child, .sidebar-account-notice > :last-child { margin-top: 2px; flex-shrink: 0; }
 .sidebar-account-notice:hover,
-.rail-account-notice.icon-button:hover { background: color-mix(in srgb, var(--attention) 32%, transparent); }
+.rail-account-notice:hover { background: color-mix(in srgb, var(--attention) 32%, transparent); }
 /* The narrow rail has no room for the text: the same notice as a tinted icon, its text in the tooltip. */
-.rail-account-notice.icon-button { color: var(--attention); background: color-mix(in srgb, var(--attention) 24%, transparent); }
+.rail-account-notice { color: var(--attention); background: color-mix(in srgb, var(--attention) 24%, transparent); }

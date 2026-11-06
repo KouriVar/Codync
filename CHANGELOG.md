@@ -1304,6 +1304,17 @@ iOS 定制分支：`ui/ios-customization`；当前 Mac 工作分支：`ui/macos-
 - **结果** 页面级 `ChoicePicker` 已全部替换为 shadcn `Select`（Controls 里的 `ChoicePicker` 定义保留但已无调用）。`IconButton`（自绘 ghost 图标按钮，视觉已接近 shadcn ghost）、`Overlay.tsx` 的 Dialog/Sheet（自带焦点陷阱/inert/动画、已用 token 卡片样式）仍保留；`ScrollArea`/`Popover`/`Checkbox` 入库未接（无自然落点或需改滚动结构）。
 - **关联** C0106、C0116。
 
+### C0118 · 2026-11-06 · 全量替换（一）：`IconButton` 原生 shadcn Button（实验分支续）
+
+- **原因** 用户要求「字面意义全换」，先把约 100 处共用的图标按钮基元换成 shadcn。`IconButtonBase` 之前是自绘 `<button class="icon-button">`（hover 底色/选中态/尺寸 inline）。
+- **变化**：`components/Overlay.tsx` 的 `IconButtonBase` 改为渲染 shadcn `Button`：`variant = selected ? 'secondary' : 'ghost'`、`size="icon"`，保留 `title/aria-label/aria-haspopup/aria-expanded/disabled/onClick/ref`，尺寸仍由 `style={{width,height}}` 传（24–36）。移除 `icon-button` 基类；`rail-account-notice` / `.custom-icon-url button` 两处复合选择器由 `.rail-account-notice.icon-button` / `.custom-icon-url .icon-button` 调整为不依赖 `.icon-button`。
+- **文件** `apps/desktop/src/renderer/components/Overlay.tsx`、`apps/desktop/src/renderer/views/sidebar-footer.css`、`apps/desktop/src/renderer/views/bots/custom-icon-editor.css`、`CHANGELOG.md`。
+- **token 入口** 仍只有 `styles/tokens.css`；ghost/secondary 用 `bg-accent`/`bg-secondary`/`text-accent-foreground` 等 token 类，无新增硬编码色值。旧 `.icon-button` 规则保留为死样式。
+- **验证** `npm run typecheck` 与 `npm run build` 通过（CSS 205.47→205.44 kB，JS 4,459.81→4,459.78 kB）。demo 热更新正常。
+- **未换/待办** Dialog/Sheet 将在 C0119 处理；`ScrollArea`/`Popover`/`Checkbox` 仍入库未接；原生桌面 chrome 不动。
+- **关联** C0106、C0117。
+
+
 
 
 

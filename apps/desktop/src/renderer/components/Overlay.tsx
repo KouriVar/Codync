@@ -452,7 +452,7 @@ export function ModalHeader({ title, subtitle, icon, trailing, onClose, closeTit
   )
 }
 
-/** Plain icon button that lights up on hover and press. Icon-only, labelled for VoiceOver. */
+/** Icon-only button (shadcn `Button` ghost / icon since C0118), labelled for VoiceOver. */
 export function IconButtonBase({ title, icon, onClick, selected = false, size = 28, disabled, className, buttonRef, menuOpen }: {
   title: string
   icon: string
@@ -468,10 +468,12 @@ export function IconButtonBase({ title, icon, onClick, selected = false, size = 
   const tr = useTr()
   const label = tr(title)
   return (
-    <button
+    <Button
       ref={buttonRef}
-      className={`icon-button ${selected ? 'selected' : ''} ${className ?? ''}`}
-      style={{ width: size, height: size, borderRadius: size * 0.28 }}
+      variant={selected ? 'secondary' : 'ghost'}
+      size="icon"
+      className={className}
+      style={{ width: size, height: size }}
       title={label}
       aria-label={label}
       aria-haspopup={menuOpen === undefined ? undefined : 'menu'}
@@ -480,6 +482,6 @@ export function IconButtonBase({ title, icon, onClick, selected = false, size = 
       onClick={onClick}
     >
       <Icon name={icon} size={size / 2} weight="medium" />
-    </button>
+    </Button>
   )
 }
