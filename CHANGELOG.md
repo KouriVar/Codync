@@ -1337,3 +1337,12 @@ iOS 定制分支：`ui/ios-customization`；当前 Mac 工作分支：`ui/macos-
 
 
 
+
+### C0241 · 2026-11-06 · 确认卡片中文文案与展示空壳
+
+- 原因：为第三期的大事确认准备统一中文文案。
+- 变化：新增「大事要确认」「要做什么」「为什么」「同意」「拒绝」常量。展示组件留出动作与理由槽位，两枚按钮保持禁用。
+- 文件：`apps/desktop/src/renderer/views/thread/{confirmation-card-copy.ts,ConfirmationCard.tsx}`。
+- 验证：桌面 typecheck、build 通过。用浏览器独立渲染组件，确认五项文案、两个槽位与按钮的禁用状态。
+- 限制与待办：空壳暂时无生产入口。第三期再接确认请求、回调及处理状态。
+- 关联：无。
