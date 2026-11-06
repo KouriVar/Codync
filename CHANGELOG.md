@@ -1290,6 +1290,21 @@ iOS 定制分支：`ui/ios-customization`；当前 Mac 工作分支：`ui/macos-
 - **限制/待办** 实验分支；Select 弹层位置由 Radix 接管，与原锚定菜单略有差异（可接受）。
 - **关联** C0106、C0115。
 
+### C0117 · 2026-11-06 · 收尾：ChoicePicker 全面退场 + 新建 Bot 名称框/头像接入 shadcn（实验分支续）
+
+- **原因** 承接 C0116：最后 3 处 `ChoicePicker`（ApprovalRow 权限模式、NewBotView 选电脑、RoutineScheduleFields 分钟）以及「新建 Bot」的名称输入、账号头像仍是自绘。本条彻底移除 `ChoicePicker` 的页面使用，并把这些换成 shadcn `Select` / `Input` / `Avatar`。
+- **变化**
+  - `views/bots/ApprovalRow.tsx`：权限模式 `ChoicePicker` → shadcn `Select`（`SelectTrigger`/`SelectContent`/`SelectItem`，值 `selected.id`）。
+  - `views/bots/NewBotView.tsx`：「在哪个电脑」选择 → shadcn `Select`；创建名输入原生 `<input>` → shadcn `Input`（保留 `field-box create-name` 类做居中大号名）。
+  - `views/routines/RoutineScheduleFields.tsx`：分钟 `ChoicePicker` → shadcn `Select`（数字 id 走 `String()`，`trigger` 背景保留 `var(--field)`）。
+  - `views/PanelMenus.tsx`：`ProfileAvatar` 由 `<span><img>/<Icon>` → shadcn `Avatar` + `AvatarImage`/`AvatarFallback`（加载中/无头像走 Fallback，`aria-hidden` 不变）。
+- **文件** `apps/desktop/src/renderer/views/bots/{ApprovalRow.tsx,NewBotView.tsx}`、`apps/desktop/src/renderer/views/routines/RoutineScheduleFields.tsx`、`apps/desktop/src/renderer/views/PanelMenus.tsx`、`CHANGELOG.md`。
+- **token 入口** 仍只有 `apps/desktop/src/renderer/styles/tokens.css`；`Select`/`Input`/`Avatar` 全部走 token 语义类，无新增硬编码色值。
+- **验证** `apps/desktop` 下 `npm run typecheck` 与 `npm run build` 通过（CSS 205.31→205.47 kB，JS 4,453.33→4,459.81 kB）；并在 demo（`localhost:5199`，真实 renderer + 假 host）热更新后截图确认主会话渲染正常。按用户规则未做真机亮/暗人工走查。
+- **结果** 页面级 `ChoicePicker` 已全部替换为 shadcn `Select`（Controls 里的 `ChoicePicker` 定义保留但已无调用）。`IconButton`（自绘 ghost 图标按钮，视觉已接近 shadcn ghost）、`Overlay.tsx` 的 Dialog/Sheet（自带焦点陷阱/inert/动画、已用 token 卡片样式）仍保留；`ScrollArea`/`Popover`/`Checkbox` 入库未接（无自然落点或需改滚动结构）。
+- **关联** C0106、C0116。
+
+
 
 
 

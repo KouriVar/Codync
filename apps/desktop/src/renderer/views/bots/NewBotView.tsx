@@ -1,10 +1,12 @@
 import { useState, type ReactNode } from 'react'
 import { isGroup, type Bot } from '@shared/models'
 import { BotAvatar, CharacterAvatar, GroupAvatar } from '../../components/Avatar'
-import { Button, ChoicePicker, Spinner } from '../../components/Controls'
+import { Button, Spinner } from '../../components/Controls'
 import { ModalHeader, useDismiss } from '../../components/Overlay'
 import { HStack, Spacer, VStack } from '../../components/Stack'
 import { Text } from '../../components/Text'
+import { Input } from '../../components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select'
 import { useStore } from '../../store/context'
 import { useTr } from '../../lib/use-language'
 import { errorText, fillDefaults, newDraft } from './drafts'
@@ -135,7 +137,7 @@ function CreateLayout({ title, preview, name, placeholder, onName, canCreate, co
       <ModalHeader title={title} />
       <VStack align="center" gap={20} className="create-body">
         {preview}
-        <input
+        <Input
           className="field-box create-name"
           autoFocus
           value={name}
@@ -153,7 +155,12 @@ function CreateLayout({ title, preview, name, placeholder, onName, canCreate, co
         {computer ? (
           <HStack gap={8}>
             <Text tone="secondary">{tr(`On`)}</Text>
-            <ChoicePicker selection={computer.selection} options={computer.options} onChange={computer.onChange} />
+            <Select value={computer.selection} onValueChange={computer.onChange}>
+              <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {computer.options.map((o) => <SelectItem key={o.id} value={o.id}>{tr(o.label)}</SelectItem>)}
+              </SelectContent>
+            </Select>
           </HStack>
         ) : null}
         <Spacer />

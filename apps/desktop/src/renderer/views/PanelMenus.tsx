@@ -3,6 +3,7 @@ import { Spinner } from '../components/Controls'
 import { Icon } from '../components/Icon'
 import { IconSlot, VStack } from '../components/Stack'
 import { Text } from '../components/Text'
+import { Avatar, AvatarFallback, AvatarImage } from '../components/ui/avatar'
 import type { Link } from '@shared/analytics'
 import { account, useAccount } from '../store/account'
 import { openLink, useScreenViewed } from '../store/analytics'
@@ -16,13 +17,18 @@ import { useTr } from '../lib/use-language'
 export function ProfileAvatar() {
   const { user, isBusy, isReady } = useAccount()
   return (
-    <span className="profile-avatar" aria-hidden>
-      {isBusy || !isReady ? <Spinner size={14} /> : user?.avatarURL ? (
-        <img src={user.avatarURL} alt="" className="profile-avatar-image" />
+    <Avatar className="profile-avatar" aria-hidden>
+      {isBusy || !isReady ? (
+        <AvatarFallback><Spinner size={14} /></AvatarFallback>
+      ) : user?.avatarURL ? (
+        <>
+          <AvatarImage src={user.avatarURL} alt="" className="profile-avatar-image" />
+          <AvatarFallback><Icon name="person.fill" size={15} weight="medium" color="var(--secondary)" /></AvatarFallback>
+        </>
       ) : (
-        <Icon name="person.fill" size={15} weight="medium" color="var(--secondary)" />
+        <AvatarFallback><Icon name="person.fill" size={15} weight="medium" color="var(--secondary)" /></AvatarFallback>
       )}
-    </span>
+    </Avatar>
   )
 }
 

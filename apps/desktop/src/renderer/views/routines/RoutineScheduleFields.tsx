@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react'
-import { CardSection, ChipChoice, ChoicePicker } from '../../components/Controls'
+import { CardSection, ChipChoice } from '../../components/Controls'
 import { HStack, VStack } from '../../components/Stack'
 import { Text } from '../../components/Text'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select'
 import { TimeZonePicker } from './TimeZonePicker'
 import { compiledCron, repeatChoice, repeatChoices, type RepeatChoice, type RoutineScheduleDraft, type RoutineSchedulePreview } from './routine'
 import './routines.css'
@@ -51,7 +52,12 @@ export function RoutineScheduleFields({ schedule, update, preview, error }: {
       ) : null}
       {repeat === 'hourly' ? (
         <LabeledRow key="At minute" label="At minute">
-          <ChoicePicker selection={schedule.minute} options={minutes} onChange={(minute) => update({ minute })} fill="var(--field)" />
+          <Select value={String(schedule.minute)} onValueChange={(v) => update({ minute: Number(v) })}>
+            <SelectTrigger className="w-24" style={{ background: 'var(--field)' }}><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {minutes.map((m) => <SelectItem key={m.id} value={String(m.id)}>{m.label}</SelectItem>)}
+            </SelectContent>
+          </Select>
         </LabeledRow>
       ) : repeat === 'custom' ? (
         <LabeledRow key="Cron" label={tr('Cron')} top>
