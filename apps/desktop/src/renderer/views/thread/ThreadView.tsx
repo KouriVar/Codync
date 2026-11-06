@@ -1,7 +1,7 @@
 import { Fragment, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { draftOf, isGroup, isWorking, isWorkingIn, type Bot, type BotDraft, type Entry } from '@shared/models'
 import { BotAvatar, GroupAvatar } from '../../components/Avatar'
-import { Spinner } from '../../components/Controls'
+import { Spinner, IconButton } from '../../components/Controls'
 import { Icon } from '../../components/Icon'
 import { Sheet, usePresence } from '../../components/Overlay'
 import { HStack, IconSlot, Spacer } from '../../components/Stack'
@@ -18,7 +18,7 @@ import { BotConversationView, BotMessageRow } from './BotConversation'
 import { BotChatPanel } from './BotChatPanel'
 import { MemoryNotice } from './MemoryNotice'
 import { useCiteJump } from './Citation'
-import { useMainBotMenu } from '../MainBotMenu'
+import { useMainBotMenu, useMainMenuActions } from '../MainBotMenu'
 import { isMac } from '../settings/parts'
 import { CallConversationView, CallLineRow } from '../call/CallRows'
 import { hidingCalls } from '@shared/calls'
@@ -160,6 +160,8 @@ export const ThreadView = memo(function ThreadView({ botId }: { botId: string })
     // C0128: the menu's 待你处理汇总 asks the host for one digest turn; no message of the user's.
     onPendingDigest: () => store.pendingDigest(botId),
   })
+  // C0129: the top-right person button shows and hides the Mac's right-hand bot list.
+  const menuActions = useMainMenuActions()
   // The docked conversation (Mac): a fixed 320 wide (C0100), the chat keeping 560 at least.
   const chatOpen = isMac && botChat !== null
   const chatPanelWidth = chatOpen ? 320 : 0
@@ -249,6 +251,17 @@ export const ThreadView = memo(function ThreadView({ botId }: { botId: string })
           ) : (
             titlePill
           )}
+          {/* C0129: shows and hides the right-hand bot list; the icon fills while it stands. */}
+          {isMac && menuActions ? (
+            <IconButton
+              title="Bots"
+              icon="person.2"
+              size={38}
+              className="top-chrome-panel"
+              selected={menuActions.botsPanel.open}
+              onClick={menuActions.botsPanel.toggle}
+            />
+          ) : null}
         </div>
         {/* C0102: a light “记住了：……” pill when this bot's memory gains a fact. */}
         {isMac ? <MemoryNotice botId={botId} /> : null}

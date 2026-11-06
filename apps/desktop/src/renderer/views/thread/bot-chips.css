@@ -34,21 +34,24 @@
 .bot-chip-running-item {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
   flex: none;
   height: 28px;
   max-width: 220px;
-  padding: 0 var(--space-4);
-  border-radius: var(--radius-pill);
-  background: var(--surface);
+  padding: 0 var(--space-2);
 }
-/* The chip row: bottom-aligned so a card grows upward on hover; wraps rather than clips. */
+/* C0129: one 30-tall row; it scrolls sideways when it doesn't fit (the count card grows in place,
+   so nothing has to overflow the row). */
 .bot-chip-bar {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: flex-end;
   gap: 4px;
-  overflow: visible;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.bot-chip-bar::-webkit-scrollbar {
+  display: none;
 }
 .bot-chip-item {
   flex: none;

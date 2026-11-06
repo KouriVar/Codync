@@ -579,7 +579,21 @@ html[data-platform="darwin"] .bot-chat-dock::before {
    ============================================================================ */
 /* The title pill: 38 tall, 8 from the top, 8 padding, avatar 22 + 8 gap (JSX). */
 html[data-platform="darwin"] .top-chrome {
-  padding-top: 8px;
+  /* C0129: the band is 50 tall; the pill (38) centres in it, the traffic lights keep their 16. */
+  padding: 0 16px;
+  height: 50px;
+}
+/* With the band no longer letting messages through, its blur stays inside the 50. */
+html[data-platform="darwin"] .top-fade {
+  height: 50px;
+}
+/* C0129: the person button at the band's right, above the drag area. */
+.top-chrome-panel {
+  position: absolute;
+  right: 16px;
+  top: 6px;
+  pointer-events: auto;
+  -webkit-app-region: no-drag;
 }
 html[data-platform="darwin"] .title-pill {
   min-height: 38px;
@@ -590,13 +604,13 @@ html[data-platform="darwin"] .title-pill {
    so scrolling messages are clipped at its top and never show behind the title or the traffic
    lights; the top-fade fades them out just under it. The first message still sits 90 from the
    conversation's top (54 + 36); the bottom reserves the floating composer plus its 8px gap. */
-/* Full-bleed since C0123: the transcript fills the window and scrolls under the 64px progressive
-   blur (no top clip); the first message sits 90 from the top so it clears the band + title pill. */
+/* C0129: the 50-tall title band doesn't let messages through — the transcript starts below it, so
+   the first message sits 90 from the window top (50 + 40). */
 html[data-platform="darwin"] .transcript-frame {
-  top: 0;
+  top: 50px;
 }
 html[data-platform="darwin"] .transcript-content {
-  padding: 90px 0 calc(var(--composer-height, 70px) + 8px);
+  padding: 40px 0 calc(var(--composer-height, 70px) + 8px);
 }
 html[data-platform="darwin"] .transcript-content > div:first-of-type .chat-row {
   padding-top: 0;

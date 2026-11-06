@@ -301,6 +301,25 @@ html[data-platform="darwin"] .sidebar-header {
   position: relative;
   overflow: hidden;
 }
+/* C0129: the Mac's roster, 320 beside the conversation: 12 apart, a hairline down the middle of the
+   gap. The chat keeps its 560 floor (`--chat-min`), so the window narrows the chat last. */
+.right-panel {
+  flex: none;
+  width: 320px;
+  min-width: 320px;
+  margin-left: 12px;
+  position: relative;
+}
+.right-panel::before {
+  content: '';
+  position: absolute;
+  left: -6px;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--border);
+  pointer-events: none;
+}
 /* The title bar strip of detail views that draw no top chrome of their own, so the window
    still moves from there. */
 .detail-drag {

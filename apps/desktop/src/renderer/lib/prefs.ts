@@ -63,6 +63,8 @@ export function stepTextSize(size: number, up: boolean) {
 
 export const prefs = {
   textSize: pref('conversationFontSize', DEFAULT_TEXT_SIZE),
+  /** C0129: the Mac's right-hand bot list, shown over nothing else; closed by default. */
+  botsPanel: pref('botsPanelOpen', false),
   sidebarCompact: pref('sidebarCompact', false),
   sidebarWidth: pref('desktopSidebarWidth', 266),
   detailsPanelWidth: pref('detailsPanelWidth', 400),

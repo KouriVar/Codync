@@ -93,7 +93,7 @@ function DestinationComposer({ botId, reply, about, cancelReply, onCall, onInter
       ? tr('Ask everyone · @ to ask one bot')
       : working
         ? tr('Queue a message for {name}').replace('{name}', name)
-        : tr('Ask {name}').replace('{name}', name)
+        : tr('Message {name}').replace('{name}', name)
 
   // Picking a message to reply to brings the caret here.
   useEffect(() => {

@@ -223,8 +223,9 @@ function ChatSplitView({ onComputerAccess }: { onComputerAccess: () => void }) {
   const [settings, setSettings] = useState<SettingsPage | null>(null)
   const openVoiceSettings = useCallback(() => setSettings('voice'), [])
   const [showAccount, setShowAccount] = useState(false)
-  /** C0096: with the sidebar gone on the Mac, its list opens from the main bot's menu instead. */
-  const [botsList, setBotsList] = useState(false)
+  /** C0129: the Mac's bot list lives in a right-hand panel now; closed until the user opens it
+   * (top-right person button, the main bot's menu, or Toggle Sidebar), and remembered across runs. */
+  const [botsList, setBotsList] = usePref(prefs.botsPanel)
   /** C0102: the Mac's memory page, opened from the main bot's menu. */
   const [memoryOpen, setMemoryOpen] = useState(false)
   /** C0105: the proactive-report times, opened from the main bot's menu. */
@@ -281,7 +282,7 @@ function ChatSplitView({ onComputerAccess }: { onComputerAccess: () => void }) {
         if (c.kind === 'search') setSearching(true)
         if (c.kind === 'networkSettings') setSettings('network')
         // With no sidebar on the Mac, the menu bar's Toggle Sidebar opens the bot list instead (C0096).
-        if (c.kind === 'toggleSidebar') isMac ? setBotsList((o) => !o) : setCompact(!prefs.sidebarCompact.get())
+        if (c.kind === 'toggleSidebar') isMac ? setBotsList(!botsList) : setCompact(!prefs.sidebarCompact.get())
         if (c.kind === 'voiceKey') {
           if (c.key === 'double' && !app.selection) app.select(voiceTarget(roster)?.ref ?? null)
           queueVoiceKey(c.key)
@@ -328,6 +329,7 @@ function ChatSplitView({ onComputerAccess }: { onComputerAccess: () => void }) {
   // C0096: every entry the sidebar held, as the main bot's menu reaches it. Same handlers, new door.
   const menuActions: MainMenuActions = {
     openBots: () => setBotsList(true),
+    botsPanel: { open: botsList, toggle: () => setBotsList(!botsList) },
     openMemory: () => { setBotsList(false); setMemoryOpen(true) },
     openProactive: () => { setBotsList(false); setProactiveOpen(true) },
     openSearch: () => setSearching(true),
@@ -495,6 +497,20 @@ function ChatSplitView({ onComputerAccess }: { onComputerAccess: () => void }) {
           <OpenVoiceSettings.Provider value={openVoiceSettings}>{detail}</OpenVoiceSettings.Provider>
         </main>
       </MainMenuActionsContext.Provider>
+      {/* C0129: the roster the left sidebar held, as a 320 panel beside the conversation: 12 apart,
+          a hairline down the middle. It stays off until the user opens it. */}
+      {isMac && botsList ? (
+        <aside className="sidebar right-panel" style={{ width: 320 }}>
+          <div className="sidebar-header roster-sheet-header">
+            <Spacer />
+            <HStack gap={6}>
+              <ComputerFilterHeader hidden={hidden} setHidden={setHidden} manage={manage} />
+            </HStack>
+          </div>
+          {rosterBlock(false, false)}
+          {footerBlock(false, false)}
+        </aside>
+      ) : null}
 
       {showAccount ? (
         <AccountPanelLayer
@@ -579,21 +595,7 @@ function ChatSplitView({ onComputerAccess }: { onComputerAccess: () => void }) {
           )}
         </Sheet>
       ) : null}
-      {/* C0096: the sidebar's list on the Mac, opened from the main bot's menu (or Toggle Sidebar). */}
-      {isMac ? (
-        <Sheet open={botsList} onClose={() => setBotsList(false)} width={Math.min(360, windowSize.width - 48)} height={sheetHeight} dismissOnDim>
-          <aside className="sidebar roster-sheet" style={{ width: '100%' }}>
-            <div className="sidebar-header roster-sheet-header">
-              <Spacer />
-              <HStack gap={6}>
-                <ComputerFilterHeader hidden={hidden} setHidden={setHidden} manage={afterSheet(true, manage)} />
-              </HStack>
-            </div>
-            {rosterBlock(false, true)}
-            {footerBlock(false, true)}
-          </aside>
-        </Sheet>
-      ) : null}
+      {/* C0129: the Mac's roster stands in the right-hand panel above, not in a sheet. */}
       <Dialog open={errorMessage !== null} title={tr('Something went wrong')} message={errorMessage} actions={[]} cancel="OK" onClose={() => app.clearErrors()} />
       <SignInCodeDialog />
     </div>

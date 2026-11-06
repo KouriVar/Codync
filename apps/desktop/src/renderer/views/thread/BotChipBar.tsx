@@ -36,7 +36,7 @@ export function BotChipBar({ botId, mention, pick, openChat }: {
         <div className="bot-chip-running" role="list" aria-label={tr('Bots working now')}>
           {running.map(({ peerId, bot, name }) => (
             <div key={peerId} className="bot-chip-running-item" role="listitem">
-              {bot ? <BotAvatar bot={bot} size={16} animated={false} /> : null}
+              {bot ? <BotAvatar bot={bot} size={20} animated={false} /> : null}
               <Text size="footnote" weight="medium" truncate>{name}</Text>
               <Text size="footnote" tone="secondary" truncate>{tr(bot?.activity || 'Working…')}</Text>
             </div>

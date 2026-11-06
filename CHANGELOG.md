@@ -1438,6 +1438,21 @@ iOS 定制分支：`ui/ios-customization`；当前 Mac 工作分支：`ui/macos-
 - **验证** 只编译：`cd host && cargo check`、`cd apps/desktop && npm run typecheck` 通过；按要求**未自测、未重启正式 Host 19222、未重打/替换正式 App**。现有 bot 要看到新工具/新提示词，需新会话或 host 升级后的自动刷新（C0127）。
 - **关联** C0127。
 
+### C0129 · 2026-11-06 · Mac 主会话首页对齐 Figma（单栏 + 320 右栏 + 50 顶栏 + 底部规格）
+
+- **原因** 按 Figma `51:101` 对齐 Mac 首页：默认只显示主会话一栏，bot 列表从原来的左侧/弹层改为右侧 320 面板，顶栏、消息区、底部按设计稿尺寸收紧。
+- **变化**
+  - **布局**：Mac 不再用 Sheet 装 roster（`ChatWindow` 里原来的 `botsList` 弹层删掉），改为 `<aside class="sidebar right-panel">`（320 宽、`margin-left:12`、`::before` 在缝隙中间画 1px `--border` 发丝线），内容 = 原来的 `.sidebar-header`（电脑筛选）+ `rosterBlock` + `footerBlock`，即"以前左边删掉的那些"；主会话列 `--column` 上限 888 居中不变。窗口变窄时主会话按 `--chat-min`(560) 收敛，右栏保持 320。
+  - **右栏开合**：默认 **收起**；状态存在 `lib/prefs.ts` 新增的 `botPanel` 偏好里（`pref('botsPanelOpen', false)` → **localStorage**，按设备持久化，跨重启记住）。入口三处：顶栏右侧人形按钮、主 bot 菜单「Bots」（`openBots`）、菜单栏 Toggle Sidebar。
+  - **顶栏**：`html[data-platform="darwin"] .top-chrome` 高 **50**（`padding: 0 16px`），名字 pill 仍是 38 高/内边距 8/头像 22/头像名间距 8，点开仍是主 bot 菜单；**右上新增 38 圆人形按钮**（`person.2`，`IconButton`，右栏打开时 `selected` 填充）挂在 `.top-chrome-panel`（`right:16; top:6`，no-drag）。红绿灯继续由系统绘制（`trafficLightPosition` 16/16 未改，14×14、间距 9 是系统值）。
+  - **消息区**：标题带不再透消息——`.transcript-frame` 在 darwin 回到 `top: 50px`（C0123 的全出血裁剪收回），首条消息 `padding-top: 40`（合计离窗口顶 **90**）；顶部渐进模糊层高度收到 50，不再盖到消息。用户右/bot 左、气泡最大 560、内边距 12、段间距 12、泡间距 12、换人 24 沿用现有 token。
+  - **底部**：状态行 28（头像 **20**、去掉原来的胶囊底色，无状态时整行隐藏）；chip 行 30/间距 4/**放不下横向滚动**（`flex-wrap:nowrap; overflow-x:auto`，隐藏滚动条）；chip 的「N 条消息往来」**仍是同一张卡原地长到 62**（C0125/C0126 的 `max-height 0→32` + `opacity` + `translateY` 过渡保留，未改）；输入框 **44**（`.composer-box` `padding:9` + `min-height:44`），底边距会话底 8（`.composer-dock` 既有），占位改用 `Message {name}`（中文即「给 {name} 发消息」）；左右按钮沿用现有 shadcn 控件。
+- **文件** `apps/desktop/src/renderer/{lib/prefs.ts,views/ChatWindow.tsx,views/MainBotMenu.tsx,views/thread/ThreadView.tsx,views/thread/Composer.tsx,views/thread/thread.css,views/thread/bot-chips.css,views/thread/composer.css,views/chat-window.css}`、`CHANGELOG.md`。
+- **限制/待办** 只做桌面端（不动 iOS/Android）；右栏只把现有 roster 迁进去，**未接 DSHC**；窗口窄于 560+12+320 时按现有 `min-width` 收敛，不做额外折行。
+- **验证** 只编译：`cd apps/desktop && npm run typecheck` 通过；按要求**未自测、未重启正式 Host 19222、未重打/替换正式 App**。
+- **关联** C0126、C0123。
+
+
 
 
 
