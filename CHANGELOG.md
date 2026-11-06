@@ -1346,3 +1346,11 @@ iOS 定制分支：`ui/ios-customization`；当前 Mac 工作分支：`ui/macos-
 - 验证：桌面 typecheck、build 通过。用浏览器独立渲染组件，确认五项文案、两个槽位与按钮的禁用状态。
 - 限制与待办：空壳暂时无生产入口。第三期再接确认请求、回调及处理状态。
 - 关联：无。
+
+### C0121 · 2026-11-06 · 修复设置等弹层里 shadcn Select 下拉点不开/看不见
+
+- **原因** 用户反馈设置「通用」页的主题/文字大小/用量图标下拉点不开。根因：设置面板是 Radix `Sheet`（`Overlay.tsx`，`z-[100]`），而 shadcn 的 `SelectContent` 是 `z-50` 的 body portal，展开后被白色卡片盖住 → 看上去“点了没反应”；且 Radix 模态 dialog 会把 body 设为 `pointer-events:none`，portal 需显式恢复。
+- **变化**：`components/ui/select.tsx` 的 `SelectContent` → `pointer-events-auto z-[1000]`；同时把 `dropdown-menu.tsx`（Content/SubContent）、`popover.tsx`、`tooltip.tsx` 的弹层统一提到 `pointer-events-auto z-[1000]`，避免任何“外壳 z 高、弹层 z 低”的遮挡问题。
+- **文件** `apps/desktop/src/renderer/components/ui/{select,dropdown-menu,popover,tooltip}.tsx`、`CHANGELOG.md`。
+- **验证** `npm run typecheck` 通过；demo 中打开 设置→通用，鼠标单击「主题」可正常展开 `系统/浅色/深色`（截图确认，弹层在面板之上）。随后重打 `dist:mac:local` 并替换 `/Applications/Codync.app`。
+- **关联** C0109、C0110、C0116、C0119。
