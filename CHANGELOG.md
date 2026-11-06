@@ -1512,3 +1512,14 @@ iOS 定制分支：`ui/ios-customization`；当前 Mac 工作分支：`ui/macos-
 
 
 
+
+
+### C0134 · 2026-11-06 · 最小化窗口适配（600–800，Figma `104:8991`）
+
+- **原因** 窗口最小只能到 760，且内容列用 `100% - 72px`，600 时会被压到 528；设计的最小化版是 **600×800、内容列 `padding 0 12` → 576**，`minWidth 550 / maxWidth 888`。
+- **变化**
+  - 窗口最小宽 `760` → **600**（`src/main/index.ts` + `chat-window.css`）。
+  - `--column` 改为 `min(888, 100% - 24px)`：1280 → 888（两侧 196）、960（带右栏）→ 888（两侧 36）、760 → 736、600 → **576**（两侧 12），与图上一致。
+  - **窄窗口下右栏不占列**：`@media (max-width: 899px)` 时 bot 列表与子 bot 会话栏改为**浮在会话上方**（右侧 320、投影），`.detail` 取消 `min-width`——否则会把会话压到 550 以下。
+- **文件** `src/main/index.ts`、`renderer/views/{chat-window.css,thread/thread.css}`、`CHANGELOG.md`。
+- **验证** `npm run typecheck`；demo 无头量取：600 → 列 **576 @x12**、760 → **736 @x12**、1280 → **888 @x196**；右上按钮右缘恒距窗边 12。

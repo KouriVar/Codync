@@ -550,8 +550,9 @@ html[data-platform="darwin"] .conversation {
   min-width: var(--chat-min);
   /* C0100: the content column keeps its 80px side inset inside the main area (782 at 1280),
      capped at 888 and floored at 560. */
-  /* C0131: 888 fixed; when the peer column takes 320 the side margins give way to 36 each. */
-  --column: min(var(--chat-max), calc(100% - 72px));
+  /* C0134: 888 fixed, and the margins give way as the window narrows — 36 each beside the peer
+     column (960), 12 each at the minimised 600 (Figma 104:8991). */
+  --column: min(var(--chat-max), calc(100% - 24px));
 }
 html[data-platform="darwin"] {
   --agent-bubble-max: min(var(--bubble-max), max(80px, (100cqw + 32px) * 0.8 - 32px), 100cqw - 88px);
@@ -575,6 +576,17 @@ html[data-platform="darwin"] .bot-chat-dock {
   position: relative;
   /* C0131: flush — the frame puts the 1px hairline on the panel's own left edge. */
   margin-left: 0;
+}
+/* C0134: the same width rule as the roster — under 900 the peer column floats over the chat. */
+@media (max-width: 899px) {
+  .bot-chat-dock {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 8;
+    box-shadow: -16px 0 40px rgb(0 0 0 / 0.45);
+  }
 }
 
 /* ============================================================================

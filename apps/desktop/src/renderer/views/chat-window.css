@@ -1,6 +1,6 @@
 .chat-window {
   height: 100%;
-  min-width: 760px;
+  min-width: 600px;
   min-height: 500px;
   background: var(--background);
   position: relative;
@@ -75,8 +75,25 @@
 
 
 .split {
+  position: relative;
   display: flex;
   height: 100%;
+}
+/* C0134: the minimised window (600–800) has no room to dock a 320 column beside the chat — docking
+   one would push it under its 550 floor. So the roster floats over the chat instead. */
+@media (max-width: 899px) {
+  .detail {
+    min-width: 0;
+  }
+  .right-panel {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 8;
+    background: var(--surface);
+    box-shadow: -16px 0 40px rgb(0 0 0 / 0.45);
+  }
 }
 /* An open account panel or action menu takes the clicks. */
 .split.covered {

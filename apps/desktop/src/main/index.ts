@@ -76,7 +76,7 @@ function openChat() {
   chat = new BrowserWindow({
     width: 1100,
     height: 760,
-    minWidth: 760,
+    minWidth: 600,
     minHeight: 500,
     title: app.getName(),
     show: false,
