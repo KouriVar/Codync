@@ -16,6 +16,7 @@ use std::sync::Arc;
 
 pub mod assistant;
 mod directory;
+mod groups;
 pub mod remote;
 mod requests;
 pub use requests::{Requests, Turn};
@@ -40,10 +41,13 @@ room's members instead, and while answering another bot's request, say in your r
 others. Provide a self-contained request: the recipient has its own \
 conversation, working directory, tools and permissions, not your context. Coordinate file ownership before \
 asking for edits in a shared project. Native subagents are managed by your own harness; these tools are for \
-collaborating with the user's existing bots.";
+collaborating with the user's existing bots. Use list_groups to see the group chats you may speak in, and \
+post_to_group when the user explicitly asks you to say something in one: it posts as you, once per requestId, \
+and starts no group round, so the other members aren't woken. If two groups share a name, ask the user which \
+one before posting.";
 
 pub fn tools() -> Value {
-    json!([
+    let mut tools = json!([
         {
             "name": "list_bots",
             "description": "List the Codync bots you can message, with their IDs, kinds, specialties and status: this computer's first, then those on the user's other computers (where Claude Code sessions and Codex threads can be offered too). Narrow it with query (words in a bot's name or description), computer, kind, or online; it returns at most limit at a time, with next for the rest.",
@@ -73,7 +77,12 @@ pub fn tools() -> Value {
             },
             "annotations": {"readOnlyHint": false, "idempotentHint": false},
         }
-    ])
+    ]);
+    // Speaking in a group is part of the same collaboration surface.
+    if let Some(list) = tools.as_array_mut() {
+        list.extend(groups::tools());
+    }
+    tools
 }
 
 /// Sent through the recipient's normal actor queue, but never merged with user messages or
@@ -359,6 +368,10 @@ pub async fn call_async(hub: &Arc<Hub>, from: &str, name: &str, args: &Value) ->
                 Recipient::Here(_) => call(hub, from, name, args),
             }
         }
+        "list_groups" | "post_to_group" => {
+            visible_bot(hub, from)?;
+            groups::call(hub, from, name, args)
+        }
         _ => call(hub, from, name, args),
     }
 }
@@ -375,6 +388,7 @@ fn call(hub: &Arc<Hub>, from: &str, name: &str, args: &Value) -> Result<Value> {
                 Recipient::There(target) => bail!("{} is on another computer", target.address),
             }
         }
+        "list_groups" | "post_to_group" => groups::call(hub, from, name, args),
         _ => bail!("unknown team tool: {name}"),
     }
 }

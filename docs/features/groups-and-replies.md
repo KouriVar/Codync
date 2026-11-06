@@ -81,6 +81,28 @@ quotes itself.
   pending permission card is announced (a group has no status of its own), and the realtime
   operator is told the room's members.
 
+## A bot posting in a group on its own (`host/src/chat/team/groups.rs`)
+
+The `codync-team` server also offers two tools, for a bot the user explicitly asks to say
+something in a group:
+
+- `list_groups(query?)` lists the groups on this computer that the bot is a member of and may speak
+  in: `groupId`, name, description and members. Hidden and deleted groups, and groups the bot
+  isn't in, are left out. Groups can share a name, so the bot asks the user which `groupId` when
+  the request is ambiguous.
+- `post_to_group(groupId, text, requestId)` writes one final bot line in that group's transcript:
+  `EntryKind::Agent` with `data.author` and `data.final: true`, the same shape as a member's room
+  reply. The existing `entry` event and `history` carry it to every client, which shows it like any
+  other member's message. It deliberately **does not start a room turn**, so no member is woken by
+  it; room turns still start only from a user message (or a member naming another in a running
+  turn).
+
+The host re-checks the group, the membership and the speak permission when it writes, so a
+`groupId` the bot learned earlier stops working once the user removes it from the group, hides
+the group or deletes it. Membership is the permission: there is no separate per-member switch
+yet. `requestId` maps to a deterministic entry id, so retrying with the same id returns
+`duplicate: true` and posts nothing again; a new id is a new message.
+
 ## How a reply reaches the agent (`host/src/chat/prompt.rs` `of_entry`)
 
 In a bot's own chat a reply is an ordinary message in the same session. A note before its text
