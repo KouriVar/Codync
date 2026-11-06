@@ -1252,6 +1252,20 @@ iOS 定制分支：`ui/ios-customization`；当前 Mac 工作分支：`ui/macos-
 - **限制/待办** 实验分支；按钮由胶囊变为 shadcn 圆角矩形属预期（「先像默认模板、后精细化」）。若某处工具行因尺寸收紧出现挤压，下一轮逐处微调。
 - **关联** C0106、C0109、C0110、C0111、C0112。
 
+### C0114 · 2026-11-06 · 共享 `Switch` 全局换成 shadcn Switch（实验分支续）
+
+- **原因** 承接 C0113：`Controls.tsx` 的共享 `Switch` 仍自绘（`.switch-track`/`.switch-knob` capsure），而它是设置/电脑/机器人/例程里最后一个高频自绘控件。把它换成 Radix 的 shadcn `Switch`，所有剩余调用点（Import bots、Computers 的 Reach/Skip-code/Assistants、Routines、SwitchRow）即刻变成默认开关。
+- **变化**
+  - `components/Controls.tsx`：`Switch` 改为 `<label>` 包裹 Radix `SwitchPrimitive.Root`（shadcn 轨道类：`data-[state=checked]:bg-primary`、`data-[state=unchecked]:bg-input`、`h-5 w-9` 等）+ `Thumb`。保留 `.switch` 行的「标签左、开关右」布局（`row` 仍 `display:flex`，`.switch-label` 仍 `flex:1`）。点击标签文字由 label 上的 `onClick` 显式切换（点轨道时 `closest('[role=switch]')` 命中则交给 Radix，不重复切换），不依赖浏览器 label→button 转发；`label` prop 继续作 `aria-label`；`disabled` 同时置根 `disabled` 与 `.is-disabled`。
+  - `components/controls.css`：`.switch` 加 `cursor:pointer`；`.switch:disabled, .switch.is-disabled { opacity: .4 }`（新增 `.is-disabled`，因外层现在是 label 不再有 `:disabled`）。
+- **文件** `apps/desktop/src/renderer/components/Controls.tsx`、`apps/desktop/src/renderer/components/controls.css`、`CHANGELOG.md`。
+- **token 入口** 仍只有 `apps/desktop/src/renderer/styles/tokens.css`；`Switch` 的轨道/滑块用 `bg-primary`/`bg-input`/`bg-background`/`ring-ring`，经 `styles/tailwind.css` 映射，无新增硬编码色值；`.switch-track`/`.switch-knob` 旧规则保留为死样式。
+- **验证** `apps/desktop` 下 `npm run typecheck` 与 `npm run build` 通过（CSS 205.27→205.31 kB，JS 4,431.17→4,431.91 kB）。按规则只编译，未启动应用；亮/暗色人工走查仍未执行。
+- **未换（保留）** `IconButton`、`ChoicePicker` 仍自绘（图标按钮/锚定菜单定位，牵涉大量视图）；`Tooltip`/`ScrollArea`/`Popover`/`Checkbox` 已入库但尚未逐面接入（`Tooltip` 需在根挂 `TooltipProvider` 并逐处替换原生 `title`，留待专门一轮）；主会话消息区渲染、设置 Computers/Network 主列表未覆盖；原生桌面 chrome 不动（红绿灯仍左 16/顶 16）。
+- **限制/待办** 实验分支；开关由 34px 变 shadcn 36px 轨道，属预期。整行点击切走 label 上的显式 `onClick`（见上），已不依赖浏览器转发；若个别布局下点空白处误触，下一轮微调。
+- **关联** C0106、C0113。
+
+
 
 
 

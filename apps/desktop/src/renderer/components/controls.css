@@ -71,8 +71,10 @@
   align-items: center;
   gap: 12px;
   width: 100%;
+  cursor: pointer;
 }
-.switch:disabled {
+.switch:disabled,
+.switch.is-disabled {
   opacity: 0.4;
 }
 .switch-label {

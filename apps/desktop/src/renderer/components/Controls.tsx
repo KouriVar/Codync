@@ -1,4 +1,5 @@
 import { Children, Fragment, useEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent, type ReactNode } from 'react'
+import * as SwitchPrimitive from '@radix-ui/react-switch'
 import { Icon } from './Icon'
 import { AnchoredMenu, IconButtonBase, usePresence, type MenuItem } from './Overlay'
 import { HStack, Spacer, VStack } from './Stack'
@@ -66,17 +67,31 @@ function ring(size: number) {
   return { w, r, c: 2 * Math.PI * r, center: size / 2 }
 }
 
-/** On/off switch: label on the left, a flat capsule track on the right. */
+/** On/off switch: label on the left, the shadcn (Radix) track on the right. */
 /** `label` names a switch whose visible label sits outside it (beside an info button, say). */
 export function Switch({ on, onChange, children, label, disabled, className }: { on: boolean; onChange: (on: boolean) => void; children?: ReactNode; label?: string; disabled?: boolean; className?: string }) {
   const tr = useTr()
   return (
-    <button className={`switch${className ? ` ${className}` : ''}`} role="switch" aria-checked={on} aria-label={label ? tr(label) : label} disabled={disabled} onClick={() => onChange(!on)}>
+    <label
+      className={`switch${className ? ` ${className}` : ''}${disabled ? ' is-disabled' : ''}`}
+      onClick={(e) => {
+        if (disabled) return
+        // The track is the Radix control; a click on the label text elsewhere toggles the same value.
+        if ((e.target as HTMLElement).closest('[role="switch"]')) return
+        onChange(!on)
+      }}
+    >
       {children !== undefined ? <span className="switch-label">{typeof children === 'string' ? tr(children) : children}</span> : null}
-      <span className={`switch-track ${on ? 'on' : ''}`}>
-        <span className="switch-knob" />
-      </span>
-    </button>
+      <SwitchPrimitive.Root
+        checked={on}
+        onCheckedChange={onChange}
+        disabled={disabled}
+        aria-label={label ? tr(label) : undefined}
+        className="peer inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-primary data-[state=unchecked]:bg-input"
+      >
+        <SwitchPrimitive.Thumb className="pointer-events-none block h-4 w-4 rounded-full bg-background shadow-lg ring-0 transition-transform data-[state=checked]:translate-x-4 data-[state=unchecked]:translate-x-0" />
+      </SwitchPrimitive.Root>
+    </label>
   )
 }
 
