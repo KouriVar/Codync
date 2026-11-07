@@ -169,6 +169,12 @@ export const ThreadView = memo(function ThreadView({ botId }: { botId: string })
   const columnOpen = !!menuActions?.botsPanel.open || botChat !== null
   // C0139: the dock stays up while the window slides back, so the chat's width never changes.
   const dockColumn = useColumnPresence(botChat !== null)
+  // C0154: and it keeps its content while it slides out too — the panel must still occupy its 320
+  // until the window has given it back, exactly like the bot list's aside, or the chat re-centres
+  // into the gap for a frame and jumps right before the window catches up.
+  const lastPeer = useRef(botChat)
+  if (botChat) lastPeer.current = botChat
+  const dockedPeer = botChat ?? lastPeer.current
   const pin = useRef(0)
   const wasClosing = useRef(false)
   if (dockColumn.mounted && pin.current === 0) pin.current = window.innerWidth
@@ -337,9 +343,9 @@ export const ThreadView = memo(function ThreadView({ botId }: { botId: string })
         {artifactId ? <ArtifactView botId={botId} artifactId={artifactId} close={() => setArtifactId(null)} /> : null}
       </div>
       {/* C0096: the peer's conversation docked beside the chat on the Mac — one window, split by a hairline. */}
-      {dockColumn.mounted && botChat ? (
+      {dockColumn.mounted && dockedPeer ? (
         <div className={`bot-chat-dock${dockColumn.closing ? ' closing' : ''}`} style={{ width: 320 }}>
-          <BotChatPanel botId={botId} peerId={botChat.id} peerName={botChat.name} onClose={() => setBotChat(null)} />
+          <BotChatPanel botId={botId} peerId={dockedPeer.id} peerName={dockedPeer.name} onClose={() => setBotChat(null)} />
         </div>
       ) : null}
       <ChatSidePanel

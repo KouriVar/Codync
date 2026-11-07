@@ -1609,3 +1609,10 @@ iOS 定制分支：`ui/ios-customization`；当前 Mac 工作分支：`ui/macos-
 - **原因** `ChatRows` 的 `UserBubble` / `AgentBubble` 在 `.message` 元素上带了原生 `title={fullDate.format(createdAt)}`，浏览器 hover 即显示系统 tooltip。
 - **修复** 去掉这两处 `title`（不再有 hover 时间提示）；给 `AnchoredMenu` / `MenuPanel` 增加可选 `footer`，在消息「…」菜单（复制 / 显示它做了什么）最底部以一行次要文字显示该条消息的完整时间（`.menu-footer`，上方一条 0.5px 分隔线）。右侧气泡的右键菜单与反应条不变。
 - **验证** typecheck/build 通过；已装入 `/Applications/Codync.app`。
+
+### C0154 · 2026-11-07 · 桌面版：关闭子会话侧栏时聊天不再右移
+
+- **现象** 点击子会话（右侧栏）右上角关闭按钮时，左侧会话区先往右移动一下，再跟着窗口边框缩回来；bot 列表侧栏关闭却正常。
+- **原因** 两者关闭时序不一致：bot 列表的 `<aside>` 由 `rosterColumn.mounted` 维持到 300ms 动画结束，关闭期间仍占着 320；子会话的渲染条件是 `dockColumn.mounted && botChat ? …`，`botChat` 一置 null，dock **立刻从 DOM 移除**。此时聊天列还 pin 在开栏宽度，右侧 320 空出来，`.conversation`（settled 类尚未切换）被 `flex: 1` 拉到窗口全宽，居中的消息列因此右移约 160px；下一帧 settled 关闭、窗口缩回，又弹回原位。
+- **修复** 给 dock 保留一份 peer 快照（`lastPeer`），渲染条件改为 `dockColumn.mounted && dockedPeer`，让它在关闭动画期间继续挂载、继续占 320、继续淡出，等窗口缩完再卸载——与 bot 列表的 aside 完全一致。
+- **验证** typecheck/build 通过；已装入 `/Applications/Codync.app`。
