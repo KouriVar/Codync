@@ -145,8 +145,8 @@
   cursor: text;
 }
 .composer-box textarea::placeholder {
-  /* C0130: white at 50% in the frame. */
-  color: color-mix(in srgb, var(--text) 50%, transparent);
+  /* C0130/C0148: white at 50% in the dark frame, #a4a4a4 in the light one. */
+  color: var(--mac-placeholder, color-mix(in srgb, var(--text) 50%, transparent));
 }
 .composer-box textarea {
   display: block;

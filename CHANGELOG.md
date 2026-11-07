@@ -1569,3 +1569,12 @@ iOS 定制分支：`ui/ios-customization`；当前 Mac 工作分支：`ui/macos-
 - **文件** `src/renderer/views/{ChatWindow.tsx,thread/ThreadView.tsx,thread/use-column-presence.ts(新),chat-window.css}`、`src/main/index.ts`、`CHANGELOG.md`。
 - **验证** `npm run typecheck`；真机：600 宽开关右栏，会话文字/气泡/按钮零位移，右栏 300ms 进出。
 - **取舍**：面板开启期间手动拖动窗口宽度，会话不跟随（宽度保持钉死值），关闭后恢复自适应。
+### C0148 · 2026-11-07 · 桌面版 Mac 主界面适配亮/暗两套配色
+
+- **背景** 之前的 Mac 主界面只按 Figma 暗色稿对齐：浅色下页面变白，但气泡、标题药丸、人像按钮、chip 卡片与右侧对话面板仍是写死的暗色（`#1f1f1f`/`#242424`/`#2c2c2c`/`#353535`），所以浅色不可用。
+- **依据** 新画的浅色稿 `首页-最小化-扩展窗口-浅色模式`（117:13519）与暗色稿（105:11442）：浅色为页面 `#ffffff`、药丸/卡片 `#ffffff` + `#e7e7e7`/`#e3e3e3` 描边、助手气泡 `#efefef`、用户气泡 `#242424` + 白字、输入框 `#ffffff` + `#e3e3e3`、面板分隔线 `rgba(0,0,0,.10)`。
+- **改动（只动颜色，不动结构/尺寸）** `styles/tokens.css` 新增一组 `--mac-*` 语义 token（亮/暗各一套：`--mac-pill-bg/stroke/hover`、`--mac-bubble-agent/user/-user-ink`、`--mac-composer/-stroke`、`--mac-hairline`、`--mac-card/-stroke`、`--mac-card-count/-stroke`、`--mac-placeholder`，以及 `--chat-user-ink`）；`views/thread/thread.css` 的 darwin 覆盖块改用 token（并让用户气泡文字用 `--chat-user-ink`，浅色下仍是白字）、`top-chrome-panel`/`title-pill` 用 token；`views/thread/bot-chips.css` 的卡片/count 行、`views/thread/bot-chat-panel.css` 的分隔线/药丸/关闭按钮/气泡、`views/thread/composer.css` 的占位文字都改为 token。
+- **保证暗色不变** 暗色 token 的值与旧字面量逐字一致（`#1f1f1f`/`#242424`/`#2c2c2c`/`#353535`/`rgba(255,255,255,.10)`），另有脚本核对通过。
+- **验证** `npm run typecheck`、`npm run build` 通过；本地起了一个不强制暗色的 demo 预览（系统当前为浅色）截图对比：浅色正确（白底、浅灰助手气泡、深色用户气泡白字、白色药丸/按钮、浅描边输入框），暗色与改动前一致。`npm test` 仍有既有失败（`src/main/updates.ts` 的 path 参数、i18n 目录键），与本次纯 CSS 改动无关。
+- **未做** 未运行正式 App、未改系统外观；浅色下右侧扩展面板的最终观感需你在真实窗口里点开确认。
+- **关联** C0096/C0129/C0130/C0133（Mac 布局与暗色对齐）。

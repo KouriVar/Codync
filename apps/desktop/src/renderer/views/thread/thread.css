@@ -339,7 +339,7 @@ html[data-platform="darwin"] .conversation .bubble {
 }
 .bubble.user {
   background: var(--chat-user);
-  color: var(--text);
+  color: var(--chat-user-ink);
   font-size: var(--conversation);
   line-height: 1.5;
   white-space: pre-wrap;
@@ -538,13 +538,15 @@ html[data-platform="darwin"] .conversation .bubble {
    C0106: the numbers are named tokens in styles/tokens.css (--chat-max / --chat-min / --bubble-max /
    --panel-min / --frame-inset / --divider-width). */
 html[data-platform="darwin"] .conversation {
-  /* C0130: the Figma home frame's own fills, scoped to the chat column (51:101). */
-  --bubble-agent: #242424;
-  --bubble-user: #242424;
-  --chat-agent: #242424;
-  --chat-user: #242424;
-  --composer-fill: #1f1f1f;
-  --outline: #353535;
+  /* C0130/C0148: the Figma home frame's own fills, scoped to the chat column; the values now
+     come from the light/dark Mac tokens (117:13519 for light, 105:11442 for dark). */
+  --bubble-agent: var(--mac-bubble-agent);
+  --bubble-user: var(--mac-bubble-user);
+  --chat-agent: var(--mac-bubble-agent);
+  --chat-user: var(--mac-bubble-user);
+  --chat-user-ink: var(--mac-bubble-user-ink);
+  --composer-fill: var(--mac-composer);
+  --outline: var(--mac-composer-stroke);
   /* C0130: bubbles stop at 560 in the frame. */
   --agent-bubble-max: 560px;
   min-width: var(--chat-min);
@@ -607,8 +609,8 @@ html[data-platform="darwin"] .top-chrome {
   border: 0;
   padding: 0;
   border-radius: 63px;
-  background: #1f1f1f;
-  box-shadow: inset 0 0 0 1px #2c2c2c;
+  background: var(--mac-pill-bg);
+  box-shadow: inset 0 0 0 1px var(--mac-pill-stroke);
   color: var(--text);
   cursor: pointer;
   pointer-events: auto;
@@ -619,7 +621,7 @@ html[data-platform="darwin"] .top-chrome {
   display: block;
 }
 html[data-platform="darwin"] .top-chrome-panel.selected {
-  background: #2c2c2c;
+  background: var(--mac-pill-hover);
 }
 html[data-platform="darwin"] .title-pill {
   min-height: 38px;
@@ -627,9 +629,9 @@ html[data-platform="darwin"] .title-pill {
   justify-content: center;
 }
 html[data-platform="darwin"] .title-pill {
-  background: #1f1f1f;
+  background: var(--mac-pill-bg);
   border-radius: 63px;
-  box-shadow: inset 0 0 0 1px #2c2c2c;
+  box-shadow: inset 0 0 0 1px var(--mac-pill-stroke);
 }
 /* C0101: the message list's viewport starts below the title band (54: traffic lights + title pill),
    so scrolling messages are clipped at its top and never show behind the title or the traffic

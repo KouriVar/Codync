@@ -12,7 +12,7 @@
   min-width: 320px;
   min-height: 0;
   padding: 12px;
-  border-left: 1px solid rgb(255 255 255 / 0.1);
+  border-left: 1px solid var(--mac-hairline);
   background: var(--background);
 }
 /* The title band: 54 tall (8 + 38 + 8), the pill centred with the two actions absolute at the top
@@ -34,8 +34,8 @@
   gap: 8px;
   padding: 0 10px 0 8px;
   border-radius: 63px;
-  background: #1f1f1f;
-  box-shadow: inset 0 0 0 1px #2c2c2c;
+  background: var(--mac-pill-bg);
+  box-shadow: inset 0 0 0 1px var(--mac-pill-stroke);
   overflow: hidden;
 }
 /* The close button beside it: 38 square, 63 round, the same fills (Figma 101:7877). */
@@ -48,13 +48,13 @@
   border: 0;
   padding: 0;
   border-radius: 63px;
-  background: #1f1f1f;
-  box-shadow: inset 0 0 0 1px #2c2c2c;
+  background: var(--mac-pill-bg);
+  box-shadow: inset 0 0 0 1px var(--mac-pill-stroke);
   color: var(--text);
   cursor: pointer;
 }
 .bot-chat-panel-close:hover {
-  background: #2c2c2c;
+  background: var(--mac-pill-hover);
 }
 
 .bot-chat-panel-scroll {
@@ -103,7 +103,7 @@
   max-width: none;
   padding: 12px;
   border-radius: 16px;
-  background: #242424;
+  background: var(--mac-bubble-agent);
 }
 .bot-chat-panel-mine {
   margin-top: var(--space-7);

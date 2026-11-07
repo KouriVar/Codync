@@ -79,6 +79,24 @@
   --chip-on: #ffffff;
   --chip-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
 
+  /* ── Mac chat window chrome. Light values from the Figma frame 117:13519
+     (首页-最小化-扩展窗口-浅色模式); dark values from 105:11442. ─────────────── */
+  --mac-pill-bg: #ffffff;
+  --mac-pill-stroke: #e7e7e7;
+  --mac-pill-hover: #f0f0f0;
+  --mac-bubble-agent: #efefef;
+  --mac-bubble-user: #242424;
+  --mac-bubble-user-ink: #ffffff;
+  --mac-composer: #ffffff;
+  --mac-composer-stroke: #e3e3e3;
+  --mac-hairline: rgba(0, 0, 0, 0.10);
+  --mac-card: #ffffff;
+  --mac-card-stroke: #e3e3e3;
+  --mac-card-count: #f2f2f2;
+  --mac-card-count-stroke: #f2f2f2;
+  --mac-placeholder: #a4a4a4;
+  --chat-user-ink: var(--text);
+
   /* ── shadcn/ui semantic aliases: the names shadcn components are written against,
      pointing at the palette above so the two vocabularies never drift. ───────── */
   --color-background: var(--background);
@@ -222,6 +240,21 @@
     --field: rgba(var(--text-rgb), 0.075);
     --chip-on: rgba(var(--text-rgb), 0.15);
     --chip-shadow: none;
+    --mac-pill-bg: #1f1f1f;
+    --mac-pill-stroke: #2c2c2c;
+    --mac-pill-hover: #2c2c2c;
+    --mac-bubble-agent: #242424;
+    --mac-bubble-user: #242424;
+    --mac-bubble-user-ink: #ffffff;
+    --mac-composer: #1f1f1f;
+    --mac-composer-stroke: #353535;
+    --mac-hairline: rgba(255, 255, 255, 0.10);
+    --mac-card: #1f1f1f;
+    --mac-card-stroke: #353535;
+    --mac-card-count: #242424;
+    --mac-card-count-stroke: #242424;
+    --mac-placeholder: #9a9a9a;
+    --chat-user-ink: #ffffff;
   }
 }
 
