@@ -170,9 +170,12 @@ export const ThreadView = memo(function ThreadView({ botId }: { botId: string })
   // C0139: the dock stays up while the window slides back, so the chat's width never changes.
   const dockColumn = useColumnPresence(botChat !== null)
   const pin = useRef(0)
+  const wasClosing = useRef(false)
   if (dockColumn.mounted && pin.current === 0) pin.current = window.innerWidth
-  if (dockColumn.closing) pin.current = Math.max(0, window.innerWidth - 320)
-  if (!dockColumn.mounted) pin.current = 0
+  // C0152: freeze the chat's width once, the moment the column starts closing (see ChatWindow).
+  if (dockColumn.closing && !wasClosing.current) pin.current = Math.max(0, window.innerWidth - 320)
+  wasClosing.current = dockColumn.closing
+  if (!dockColumn.mounted) { pin.current = 0; wasClosing.current = false }
   // C0151: the pin only covers the column's arrival; after it, the chat flows with the window.
   const [dockSettled, setDockSettled] = useState(false)
   useEffect(() => {

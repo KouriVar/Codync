@@ -231,9 +231,13 @@ function ChatSplitView({ onComputerAccess }: { onComputerAccess: () => void }) {
   const rosterColumn = useColumnPresence(isMac && botsList)
   // Its chat keeps the exact width it had when the column opened.
   const pin = useRef(0)
+  const wasClosing = useRef(false)
   if (isMac && rosterColumn.mounted && pin.current === 0) pin.current = window.innerWidth
-  if (rosterColumn.closing) pin.current = Math.max(0, window.innerWidth - 320)
-  if (!rosterColumn.mounted) pin.current = 0
+  // C0152: freeze the chat's width once, the moment the column starts closing. Recomputing it on every
+  // resize event during the window's 320 shrink subtracted the column twice and made the chat jump.
+  if (rosterColumn.closing && !wasClosing.current) pin.current = Math.max(0, window.innerWidth - 320)
+  wasClosing.current = rosterColumn.closing
+  if (!rosterColumn.mounted) { pin.current = 0; wasClosing.current = false }
   // C0151: the pin only covers the column's arrival; after it, the chat flows with the window.
   const [columnSettled, setColumnSettled] = useState(false)
   useEffect(() => {
