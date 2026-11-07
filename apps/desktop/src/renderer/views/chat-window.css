@@ -330,8 +330,12 @@ html[data-platform="darwin"] .sidebar-header {
   flex: none;
   width: 320px;
   min-width: 320px;
-  margin-left: 12px;
+  /* C0149: the Figma frame sets the column flush against the chat (no gap): the hairline is the
+     panel's own left edge and everything inside sits 12 from it. The old 12px margin read as a
+     white seam in light mode. */
+  margin-left: 0;
   position: relative;
+  background: var(--background);
 }
 /* C0136: a column arrives with the window's own 300ms motion, so the two read as one move. */
 @keyframes column-in {
@@ -373,7 +377,7 @@ html[data-platform="darwin"] .sidebar-header {
 .right-panel::before {
   content: '';
   position: absolute;
-  left: -6px;
+  left: 0;
   top: 0;
   bottom: 0;
   width: 1px;
@@ -525,4 +529,14 @@ html[data-platform="darwin"] .account-panel {
   bottom: auto;
   top: 60px;
   transform-origin: top center;
+}
+
+/* C0149: one 12px inset for the right panel's list and its header (the frame uses 13; the roster's
+   own 10 and the header's 18 read as a seam against the chat). */
+.right-panel .roster {
+  padding-left: 12px;
+  padding-right: 12px;
+}
+.right-panel .roster-sheet-header {
+  padding-left: 12px;
 }

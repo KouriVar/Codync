@@ -1578,3 +1578,10 @@ iOS 定制分支：`ui/ios-customization`；当前 Mac 工作分支：`ui/macos-
 - **验证** `npm run typecheck`、`npm run build` 通过；本地起了一个不强制暗色的 demo 预览（系统当前为浅色）截图对比：浅色正确（白底、浅灰助手气泡、深色用户气泡白字、白色药丸/按钮、浅描边输入框），暗色与改动前一致。`npm test` 仍有既有失败（`src/main/updates.ts` 的 path 参数、i18n 目录键），与本次纯 CSS 改动无关。
 - **未做** 未运行正式 App、未改系统外观；浅色下右侧扩展面板的最终观感需你在真实窗口里点开确认。
 - **关联** C0096/C0129/C0130/C0133（Mac 布局与暗色对齐）。
+
+### C0149 · 2026-11-07 · 桌面版：右栏 bot 列表贴回聊天边缘（浅色下的白缝）
+
+- **现象** 点开右上角 bot 列表按钮后，图标到列表内容之间出现一条明显空白带；暗色时不明显，浅色（白底/近白 `--surface`）下很扎眼。
+- **原因** 不是间距被改大，而是三处叠加：`.right-panel` 带了 `margin-left: 12px`（Figma 里两栏是齐平相邻的），发丝线画在这 12px 里（`left: -6px`），而栏内 `.roster` 只有 10px、`.roster-sheet-header` 却有 18px 左内边距；再加上右栏底色用的是 `--surface`，与页面白底有细微差别，暗色下这些几乎不可见。
+- **修复（对齐 Figma 117:13519 / 105:11442 的坐标：两栏齐平、栏内左右各 13）** `.right-panel` 去掉 12px 外边距、背景改回 `var(--background)`；`::before` 发丝线贴到栏的 `left: 0`；新增 `.right-panel .roster` / `.roster-sheet-header` 统一的 12px 左右内边距。聊天列与 320 宽度不变，暗色观感不变。
+- **验证** `npm run build` 通过；重新生成 `app.asar` 覆盖安装到 `/Applications/Codync.app`（原版备份在 `/Applications/Codync.app.bak-20261107-1108`）后实机确认：图标到列表只剩 12px + 12px 的规范间距，白缝消失。
