@@ -100,6 +100,8 @@ function openChat() {
 /** A column beside the chat: 320 wide, so the window grows by exactly that (Figma 105:11442 is the
  * minimised 600 + 320). */
 const PANEL_WIDTH = 320
+/** The chat column's floor while a column stands (C0151): 560 chat + 320 panel. */
+const CHAT_MIN_WIDTH = 560
 /** The width to put back after a column grew the window; null while no column did. */
 let roomBeforePanel: number | null = null
 
@@ -246,12 +248,20 @@ function registerIPC(tray: Tray) {
     if (open) {
       // C0139: the chat keeps its width and its place, so the window makes the room — always by the
       // column's 320, whatever the window was; and it never slides sideways doing it.
-      if (roomBeforePanel === null) roomBeforePanel = chat.getBounds().width
+      if (roomBeforePanel === null) {
+        roomBeforePanel = chat.getBounds().width
+        // C0151: once the column stands, the chat reflows with the window, so the window must never
+        // shrink below the chat's floor plus the column (880); closing puts the old floor back.
+        chat.setMinimumSize(CHAT_MIN_WIDTH + PANEL_WIDTH, chat.getMinimumSize()[1])
+      }
       animateWindowWidth(chat, chat.getBounds().width + PANEL_WIDTH)
-    } else if (roomBeforePanel !== null && chat.getBounds().width > roomBeforePanel) {
-      const back = roomBeforePanel
+    } else if (roomBeforePanel !== null) {
       roomBeforePanel = null
-      animateWindowWidth(chat, back)
+      chat.setMinimumSize(600, chat.getMinimumSize()[1])
+      // C0151: give back exactly the column's 320 from wherever the window is now, so a window the
+      // person resized while the column stood keeps the width they gave it.
+      const back = Math.max(600, chat.getBounds().width - PANEL_WIDTH)
+      if (chat.getBounds().width > back) animateWindowWidth(chat, back)
     }
   })
   ipcMain.handle('app:showInDock', () => showInDock())

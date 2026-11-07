@@ -101,6 +101,20 @@
   width: var(--chat-pin, 100%);
   min-width: 0;
 }
+
+/* C0151: the frozen open width is only for the moment the column slides in. Once it has arrived the
+   chat goes back to flowing with the window, so dragging the window reflows the conversation beside
+   the column instead of leaving the old width drawn over it. */
+.split.column-settled:has(> .right-panel) > .detail {
+  flex: 1 1 auto;
+  width: auto;
+  min-width: var(--chat-min);
+}
+.thread-view.column-settled:has(> .bot-chat-dock) > .conversation {
+  flex: 1 1 auto;
+  width: auto;
+  min-width: var(--chat-min);
+}
 /* An open account panel or action menu takes the clicks. */
 .split.covered {
   pointer-events: none;

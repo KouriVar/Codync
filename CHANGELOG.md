@@ -1585,3 +1585,13 @@ iOS 定制分支：`ui/ios-customization`；当前 Mac 工作分支：`ui/macos-
 - **原因** 不是间距被改大，而是三处叠加：`.right-panel` 带了 `margin-left: 12px`（Figma 里两栏是齐平相邻的），发丝线画在这 12px 里（`left: -6px`），而栏内 `.roster` 只有 10px、`.roster-sheet-header` 却有 18px 左内边距；再加上右栏底色用的是 `--surface`，与页面白底有细微差别，暗色下这些几乎不可见。
 - **修复（对齐 Figma 117:13519 / 105:11442 的坐标：两栏齐平、栏内左右各 13）** `.right-panel` 去掉 12px 外边距、背景改回 `var(--background)`；`::before` 发丝线贴到栏的 `left: 0`；新增 `.right-panel .roster` / `.roster-sheet-header` 统一的 12px 左右内边距。聊天列与 320 宽度不变，暗色观感不变。
 - **验证** `npm run build` 通过；重新生成 `app.asar` 覆盖安装到 `/Applications/Codync.app`（原版备份在 `/Applications/Codync.app.bak-20261107-1108`）后实机确认：图标到列表只剩 12px + 12px 的规范间距，白缝消失。
+
+### C0151 · 2026-11-07 · 桌面版：侧栏打开后，调整窗口时聊天列改为自适应
+
+- **现象** 打开右侧栏（bot 列表或某个 bot 的子会话）后拖动窗口大小，聊天列不跟着收放，而是保持开栏那一刻的宽度，于是压/盖住右侧栏。
+- **原因** C0139 为防止“开栏瞬间聊天位移 1px”，把聊天列用 `--chat-pin`（开栏时的窗口宽度）+ `flex: none` 冻结了；这个冻结没有结束条件，手动 resize 后聊天列仍是旧宽度，而右栏固定 320，两者合计超过窗口宽度，`overflow: hidden` 就把右栏挤到聊天列下面。
+- **修复**
+  - 渲染层：新增 `column-settled` 状态，开栏动画结束（420ms）后给容器加类，CSS 把聊天列恢复为 `flex: 1 1 auto; width: auto; min-width: var(--chat-min)`；关闭栏时移除该类并重新 pin 到“当前窗口宽度 − 320”，保证关栏动画期间聊天不抖动。
+  - 主进程：开栏时把窗口最小宽度设为 560（聊天下限）+ 320（栏）= 880，关栏恢复 600；关栏时按“当前宽度 − 320”回收窗口，而不是回到开栏前的旧宽度（这样你先调过窗口再关栏也不会跳）。
+- **范围** 两处侧栏都覆盖：bot 列表（`ChatWindow` 的 `.split`）和子会话（`ThreadView` 的 `.bot-chat-dock`）。
+- **验证** typecheck/build 通过；实机装到 `/Applications/Codync.app` 后：开栏 → 拖小窗口，聊天列随宽度收缩、右栏完整显示不再被覆盖；关栏后窗口按当前宽度减 320 收起，聊天铺满。

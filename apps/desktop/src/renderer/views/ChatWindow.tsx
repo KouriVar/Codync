@@ -232,7 +232,18 @@ function ChatSplitView({ onComputerAccess }: { onComputerAccess: () => void }) {
   // Its chat keeps the exact width it had when the column opened.
   const pin = useRef(0)
   if (isMac && rosterColumn.mounted && pin.current === 0) pin.current = window.innerWidth
+  if (rosterColumn.closing) pin.current = Math.max(0, window.innerWidth - 320)
   if (!rosterColumn.mounted) pin.current = 0
+  // C0151: the pin only covers the column's arrival; after it, the chat flows with the window.
+  const [columnSettled, setColumnSettled] = useState(false)
+  useEffect(() => {
+    if (!rosterColumn.mounted || rosterColumn.closing) {
+      setColumnSettled(false)
+      return
+    }
+    const settle = setTimeout(() => setColumnSettled(true), 420)
+    return () => clearTimeout(settle)
+  }, [rosterColumn.mounted, rosterColumn.closing])
   /** C0102: the Mac's memory page, opened from the main bot's menu. */
   const [memoryOpen, setMemoryOpen] = useState(false)
   /** C0105: the proactive-report times, opened from the main bot's menu. */
@@ -471,7 +482,7 @@ function ChatSplitView({ onComputerAccess }: { onComputerAccess: () => void }) {
       onComputers={afterSheet(inSheet, manage)} />
   )
   return (
-    <div className={`split ${showAccount || context ? 'covered' : ''}`} style={pin.current ? ({ ['--chat-pin']: `${pin.current}px` } as CSSProperties) : undefined}>
+    <div className={`split ${showAccount || context ? 'covered' : ''}${columnSettled ? ' column-settled' : ''}`} style={pin.current ? ({ ['--chat-pin']: `${pin.current}px` } as CSSProperties) : undefined}>
       {/* C0096: no left sidebar on the Mac — the main bot's menu opens the list below instead. */}
       {isMac ? null : (
         <>

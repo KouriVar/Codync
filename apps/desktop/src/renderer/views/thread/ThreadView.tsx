@@ -171,7 +171,18 @@ export const ThreadView = memo(function ThreadView({ botId }: { botId: string })
   const dockColumn = useColumnPresence(botChat !== null)
   const pin = useRef(0)
   if (dockColumn.mounted && pin.current === 0) pin.current = window.innerWidth
+  if (dockColumn.closing) pin.current = Math.max(0, window.innerWidth - 320)
   if (!dockColumn.mounted) pin.current = 0
+  // C0151: the pin only covers the column's arrival; after it, the chat flows with the window.
+  const [dockSettled, setDockSettled] = useState(false)
+  useEffect(() => {
+    if (!dockColumn.mounted || dockColumn.closing) {
+      setDockSettled(false)
+      return
+    }
+    const settle = setTimeout(() => setDockSettled(true), 420)
+    return () => clearTimeout(settle)
+  }, [dockColumn.mounted, dockColumn.closing])
   // C0139: the column's layout is decided in CSS (`:has`), atomically with the DOM; this only asks
   // main to grow the window by the column's 320 so the column is not left clipped.
   useEffect(() => {
@@ -230,7 +241,7 @@ export const ThreadView = memo(function ThreadView({ botId }: { botId: string })
   )
 
   return (
-    <div className="thread-view" ref={root} style={pin.current ? ({ ['--chat-pin']: `${pin.current}px` } as CSSProperties) : undefined}>
+    <div className={`thread-view${dockSettled ? ' column-settled' : ''}`} ref={root} style={pin.current ? ({ ['--chat-pin']: `${pin.current}px` } as CSSProperties) : undefined}>
       <div className="conversation">
         <div className="top-chrome">
           <TopFade />
