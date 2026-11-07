@@ -264,6 +264,16 @@
 .menu-row.highlight {
   background: rgba(var(--text-rgb), 0.07);
 }
+
+/* C0153: the menu's quiet footer — a message's exact time instead of the native hover tooltip. */
+.menu-footer {
+  margin-top: 4px;
+  padding: 6px 10px 4px;
+  border-top: 0.5px solid rgba(var(--text-rgb), 0.1);
+  font-size: var(--text-callout);
+  color: var(--secondary);
+  white-space: nowrap;
+}
 .menu-icon {
   width: 18px;
   display: flex;

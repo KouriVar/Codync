@@ -126,7 +126,7 @@ export function UserBubble({ entry, reply }: { entry: Entry; reply?: () => void 
   const status = entry.data.status
   const copy = () => entry.data.text && window.codync.app.copy(entry.data.text)
   return (
-    <div className="message user" title={fullDate.format(entry.createdAt)} onMouseEnter={() => setHovering(true)} onMouseLeave={() => setHovering(false)}>
+    <div className="message user" onMouseEnter={() => setHovering(true)} onMouseLeave={() => setHovering(false)}>
       <div className="message-body">
         {entry.data.attachments?.length ? <AttachmentList attachments={entry.data.attachments} botId={entry.botId} /> : null}
         {entry.data.text || entry.data.replyTo ? (
@@ -144,7 +144,7 @@ export function UserBubble({ entry, reply }: { entry: Entry; reply?: () => void 
         ) : null}
         {status && status !== 'sent' ? <UserStatus entry={entry} hovering={hovering} /> : null}
         {/* Beside the bubble, inside its hover region: showing them never changes the height. */}
-        <MessageActions className="leading" visible={hovering} reactions={reactionPick(store, entry)} reply={reply} copy={copy} />
+        <MessageActions className="leading" visible={hovering} reactions={reactionPick(store, entry)} reply={reply} copy={copy} time={fullDate.format(entry.createdAt)} />
       </div>
     </div>
   )
@@ -176,7 +176,7 @@ export function AgentBubble({ entry, openTrace, reply, openArtifact }: { entry: 
   const [hovering, setHovering] = useState(false)
   const copy = () => entry.data.text && window.codync.app.copy(entry.data.text)
   return (
-    <div className="message agent" title={fullDate.format(entry.createdAt)} onMouseEnter={() => setHovering(true)} onMouseLeave={() => setHovering(false)}>
+    <div className="message agent" onMouseEnter={() => setHovering(true)} onMouseLeave={() => setHovering(false)}>
       <div className="message-body">
         <Bubble
           className={entry.data.files?.length || entry.data.artifact ? 'file-message' : 'bubble agent'}
@@ -195,7 +195,7 @@ export function AgentBubble({ entry, openTrace, reply, openArtifact }: { entry: 
             <MarkdownText text={entry.data.text ?? ''} />
           )}
         </Bubble>
-        <MessageActions className="trailing" visible={hovering} reactions={reactionPick(store, entry)} reply={reply} trace={openTrace} copy={copy} />
+        <MessageActions className="trailing" visible={hovering} reactions={reactionPick(store, entry)} reply={reply} trace={openTrace} copy={copy} time={fullDate.format(entry.createdAt)} />
       </div>
     </div>
   )
@@ -264,13 +264,15 @@ export function ReactionsRow({ entry }: { entry: Entry }) {
 }
 
 /** Compact actions beside the bubble: a reaction strip, reply, and more (copy, what it did). */
-function MessageActions({ visible, className, reactions, reply, trace, copy }: {
+function MessageActions({ visible, className, reactions, reply, trace, copy, time }: {
   visible: boolean
   className: string
   reactions: ReactionPick
   reply?: () => void
   trace?: () => void
   copy: () => void
+  /** C0153: the exact time lives at the bottom of this menu instead of a hover tooltip. */
+  time?: string
 }) {
   const [menu, setMenu] = useState<'reactions' | 'more' | null>(null)
   const smile = useRef<HTMLButtonElement>(null)
@@ -291,6 +293,7 @@ function MessageActions({ visible, className, reactions, reply, trace, copy }: {
         onClose={() => setMenu(null)}
         anchor={more}
         items={() => [{ title: 'Copy', icon: 'square.on.square', action: copy }, ...(trace ? [{ title: 'Show what it did', icon: 'list.bullet', action: trace }] : [])]}
+        footer={time}
       />
     </div>
   )

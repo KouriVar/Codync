@@ -1602,3 +1602,10 @@ iOS 定制分支：`ui/ios-customization`；当前 Mac 工作分支：`ui/macos-
 - **原因** C0151 在关闭期间用 `window.innerWidth - 320` 重新冻结聊天宽度，但这段渲染发生在窗口正在减 320 的动画里：窗口每缩小一帧都会触发一次 resize 重渲染，于是每帧都把“已经缩小的宽度”再减一次 320（重复减），聊天区被压窄/位移，面板卸载后又弹回。
 - **修复** 冻结只在“closing 由 false 变 true”的那一刻计算一次（`wasClosing` ref），窗口动画期间不再重算；卸载时 `--chat-pin` 归零，聊天宽度恰好等于“原宽度 − 320”，与冻结值一致，所以看不出来。
 - **验证** typecheck/build 通过；已装入 `/Applications/Codync.app`。
+
+### C0153 · 2026-11-07 · 桌面版：去掉消息 hover 弹出的精确时间，把时间放进“…”菜单底部
+
+- **现象** 鼠标划过消息时，会弹出 `2026年11月7日 12:49` 这样的精确时间提示；用户觉得没必要，而且容易误触发。
+- **原因** `ChatRows` 的 `UserBubble` / `AgentBubble` 在 `.message` 元素上带了原生 `title={fullDate.format(createdAt)}`，浏览器 hover 即显示系统 tooltip。
+- **修复** 去掉这两处 `title`（不再有 hover 时间提示）；给 `AnchoredMenu` / `MenuPanel` 增加可选 `footer`，在消息「…」菜单（复制 / 显示它做了什么）最底部以一行次要文字显示该条消息的完整时间（`.menu-footer`，上方一条 0.5px 分隔线）。右侧气泡的右键菜单与反应条不变。
+- **验证** typecheck/build 通过；已装入 `/Applications/Codync.app`。

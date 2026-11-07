@@ -216,7 +216,7 @@ export function ReactionStrip({ pick, dismiss, size = 26 }: { pick: ReactionPick
 }
 
 /** The floating panel of menu rows. */
-export function MenuPanel({ items, reactions, dismiss, maxHeight }: { items: MenuItem[]; reactions?: ReactionPick; dismiss: () => void; maxHeight?: number }) {
+export function MenuPanel({ items, reactions, dismiss, maxHeight, footer }: { items: MenuItem[]; reactions?: ReactionPick; dismiss: () => void; maxHeight?: number; footer?: React.ReactNode }) {
   const tr = useTr()
   const [highlight, setHighlight] = useState(-1)
   useEffect(() => {
@@ -271,6 +271,7 @@ export function MenuPanel({ items, reactions, dismiss, maxHeight }: { items: Men
           </button>
         </div>
       ))}
+      {footer ? <div className="menu-footer">{footer}</div> : null}
     </div>
   )
 }
@@ -300,13 +301,14 @@ export function anchorPlacement(rect: DOMRect) {
  * Presents `MenuPanel` next to `anchor` (or at `point`, for right-clicks), flipping to stay on
  * screen; a click anywhere else closes it (`.codyncMenu` / `.contextActions`).
  */
-export function AnchoredMenu({ open, onClose, anchor, point, items, reactions }: {
+export function AnchoredMenu({ open, onClose, anchor, point, items, reactions, footer }: {
   open: boolean
   onClose: () => void
   anchor?: RefObject<HTMLElement | null>
   point?: { x: number; y: number } | null
   items: () => MenuItem[]
   reactions?: ReactionPick
+  footer?: React.ReactNode
 }) {
   const { mounted, shown } = usePresence(open, 120)
   const [rect, setRect] = useState<DOMRect | null>(null)
@@ -324,7 +326,7 @@ export function AnchoredMenu({ open, onClose, anchor, point, items, reactions }:
   return createPortal(
     <div ref={layer} className={`anchored ${shown ? 'shown' : ''}`} onMouseDown={(e) => e.target === e.currentTarget && onClose()} onContextMenu={(e) => { e.preventDefault(); onClose() }}>
       <div className="anchored-panel" style={{ ...style, maxWidth: width }}>
-        <MenuPanel items={frozen.current} reactions={reactions} dismiss={onClose} maxHeight={Math.min(420, room)} />
+        <MenuPanel items={frozen.current} reactions={reactions} dismiss={onClose} maxHeight={Math.min(420, room)} footer={footer} />
       </div>
     </div>,
     document.body,
